@@ -235,13 +235,13 @@ DWORD WINAPI monitor_keypress(LPVOID lpParam)
         }
         else if (GetAsyncKeyState(VK_UP) & 0x8001)
         {
-            pst->target_volume = FFMIN(pst->target_volume + pst->volume_increment, 1.0f);
+            pst->target_volume = FFMIN(pst->target_volume + pst->volume_incr, 1.0f);
             pst->keypress = true;
             pst->keypress_cooldown = 0;
         }
         else if (GetAsyncKeyState(VK_DOWN) & 0x8001)
         {
-            pst->target_volume = FFMAX(pst->target_volume - pst->volume_increment, 0.0f);
+            pst->target_volume = FFMAX(pst->target_volume - pst->volume_incr, 0.0f);
             pst->keypress = true;
             pst->keypress_cooldown = 0;
         }

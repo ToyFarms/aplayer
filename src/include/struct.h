@@ -40,7 +40,7 @@ typedef struct PlayerState
 
     float volume;
     float target_volume;
-    float volume_increment;
+    float volume_incr;
     float volume_lerp;
 
     bool hide_cursor;
