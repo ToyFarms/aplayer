@@ -30,7 +30,7 @@ typedef struct PlayerState
     bool paused;
 
     bool req_seek;
-    int64_t req_rel;
+    int64_t seek_incr;
 
     int64_t last_keypress;
     bool keypress;

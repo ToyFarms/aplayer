@@ -12,7 +12,7 @@ PlayerState *state_player_init()
     pst->paused = false;
 
     pst->req_seek = false;
-    pst->req_rel = 0;
+    pst->seek_incr = 0;
 
     pst->keypress = false;
     pst->keypress_cooldown = 0;
