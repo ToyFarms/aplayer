@@ -21,7 +21,7 @@ PlayerState *state_player_init()
 
     pst->volume = 0.1f;
     pst->target_volume = 0.1f;
-    pst->volume_increment = 0.01f;
+    pst->volume_incr = 0.01f;
     pst->volume_lerp = 0.5f;
 
     pst->hide_cursor = true;
