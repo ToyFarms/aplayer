@@ -207,8 +207,7 @@ DWORD WINAPI monitor_keypress(LPVOID lpParam)
     Sleep(500);
     while (true)
     {
-        int64_t current = av_gettime();
-        if (current - pst->last_keypress < pst->keypress_cooldown)
+        if (av_gettime() - pst->last_keypress < pst->keypress_cooldown)
         {
             Sleep(10);
             continue;
