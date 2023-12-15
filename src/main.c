@@ -89,8 +89,6 @@ void play_audio(char *filename)
         av_log(NULL, AV_LOG_FATAL, "Could not allocate swr_frame.\n");
         goto cleanup;
     }
-    swr_frame->format = AV_SAMPLE_FMT_FLT;
-    swr_frame->ch_layout = sst->audiodec->avctx->ch_layout;
 
     while (av_read_frame(sst->ic, sst->audiodec->pkt) >= 0)
     {
@@ -155,6 +153,8 @@ void play_audio(char *filename)
                                                     sst->audiodec->avctx->sample_rate, AV_ROUND_UP);
 
                 swr_frame->nb_samples = dst_nb_samples;
+                swr_frame->format = AV_SAMPLE_FMT_FLT;
+                swr_frame->ch_layout = sst->audiodec->avctx->ch_layout;
 
                 err = av_frame_get_buffer(swr_frame, 0);
                 err = swr_convert(sst->swr_ctx, swr_frame->data, dst_nb_samples, (const uint8_t **)frame->data, frame->nb_samples);
@@ -274,7 +274,7 @@ DWORD WINAPI handle_event()
 
 #include <shellapi.h>
 /* Will be leaked on exit */
-static char** win32_argv_utf8 = NULL;
+static char **win32_argv_utf8 = NULL;
 static int win32_argc = 0;
 
 /**
@@ -290,7 +290,8 @@ static void prepare_app_arguments(int *argc_ptr, char ***argv_ptr)
     wchar_t **argv_w;
     int i, buffsize = 0, offset = 0;
 
-    if (win32_argv_utf8) {
+    if (win32_argv_utf8)
+    {
         *argc_ptr = win32_argc;
         *argv_ptr = win32_argv_utf8;
         return;
@@ -307,13 +308,15 @@ static void prepare_app_arguments(int *argc_ptr, char ***argv_ptr)
                                         NULL, 0, NULL, NULL);
 
     win32_argv_utf8 = av_mallocz(sizeof(char *) * (win32_argc + 1) + buffsize);
-    argstr_flat     = (char *)win32_argv_utf8 + sizeof(char *) * (win32_argc + 1);
-    if (!win32_argv_utf8) {
+    argstr_flat = (char *)win32_argv_utf8 + sizeof(char *) * (win32_argc + 1);
+    if (!win32_argv_utf8)
+    {
         LocalFree(argv_w);
         return;
     }
 
-    for (i = 0; i < win32_argc; i++) {
+    for (i = 0; i < win32_argc; i++)
+    {
         win32_argv_utf8[i] = &argstr_flat[offset];
         offset += WideCharToMultiByte(CP_UTF8, 0, argv_w[i], -1,
                                       &argstr_flat[offset],
