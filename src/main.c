@@ -110,7 +110,7 @@ void play_audio(char *filename)
             {
                 if (pst->req_seek && pst->timestamp > 0)
                 {
-                    int64_t target_timestamp = pst->timestamp + pst->req_rel;
+                    int64_t target_timestamp = pst->timestamp + pst->seek_incr;
                     av_log(NULL,
                            AV_LOG_DEBUG,
                            "Seeking from %.2fs to %.2fs.\n",
@@ -130,7 +130,7 @@ void play_audio(char *filename)
                                av_err2str(ret));
                     }
                     pst->req_seek = false;
-                    pst->req_rel = 0;
+                    pst->seek_incr = 0;
                 }
 
                 err = avcodec_receive_frame(sst->audiodec->avctx, frame);
@@ -223,14 +223,14 @@ DWORD WINAPI monitor_keypress(LPVOID lpParam)
         else if (GetAsyncKeyState(VK_RIGHT) & 0x8001)
         {
             pst->req_seek = true;
-            pst->req_rel = 5000;
+            pst->seek_incr = 5000;
             pst->keypress = true;
             pst->keypress_cooldown = ms2us(10);
         }
         else if (GetAsyncKeyState(VK_LEFT) & 0x8001)
         {
             pst->req_seek = true;
-            pst->req_rel = -5000;
+            pst->seek_incr = -5000;
             pst->keypress = true;
             pst->keypress_cooldown = ms2us(10);
         }
