@@ -28,6 +28,8 @@ typedef struct StreamState
 typedef struct PlayerState
 {
     bool paused;
+    bool req_stop;
+    bool hide_cursor;
 
     bool req_seek;
     int64_t seek_incr;
@@ -36,14 +38,15 @@ typedef struct PlayerState
     bool keypress;
     int64_t keypress_cooldown;
 
+    int64_t last_print_info;
+    int64_t print_cooldown;
+
     int64_t timestamp;
 
     float volume;
     float target_volume;
     float volume_incr;
     float volume_lerp;
-
-    bool hide_cursor;
 } PlayerState;
 
 #endif // _STRUCT_H
