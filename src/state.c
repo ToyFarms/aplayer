@@ -10,12 +10,18 @@ PlayerState *state_player_init()
     }
 
     pst->paused = false;
+    pst->req_stop = false;
+    pst->hide_cursor = true;
 
     pst->req_seek = false;
     pst->seek_incr = 0;
 
+    pst->last_keypress = 0;
     pst->keypress = false;
     pst->keypress_cooldown = 0;
+
+    pst->last_print_info = 0;
+    pst->print_cooldown = ms2us(100);
 
     pst->timestamp = 0;
 
@@ -24,18 +30,16 @@ PlayerState *state_player_init()
     pst->volume_incr = 0.01f;
     pst->volume_lerp = 0.5f;
 
-    pst->hide_cursor = true;
-
     return pst;
 }
 
-void state_player_free(PlayerState *pst)
+void state_player_free(PlayerState **pst)
 {
     if (!pst)
         return;
 
-    free(pst);
-    pst = NULL;
+    free(*pst);
+    *pst = NULL;
 }
 
 /* Initialize StreamState, returns NULL on fail */
@@ -93,31 +97,31 @@ StreamState *state_stream_init(char *filename)
     return sst;
 
 fail:
-    state_stream_free(sst);
+    state_stream_free(&sst);
 
     return NULL;
 }
 
-void state_stream_free(StreamState *sst)
+void state_stream_free(StreamState **sst)
 {
-    if (sst == NULL)
+    if (!sst)
         return;
 
-    if (sst->ic)
+    if ((*sst)->ic)
     {
         av_log(NULL, AV_LOG_DEBUG, "Cleanup: Close AVFormatContext.\n");
-        avformat_close_input(&sst->ic);
+        avformat_close_input(&(*sst)->ic);
     }
 
     av_log(NULL, AV_LOG_DEBUG, "Cleanup: Free audio decoder.\n");
-    decoder_free(sst->audiodec);
+    decoder_free((*sst)->audiodec);
 
-    if (sst->swr_ctx)
+    if ((*sst)->swr_ctx)
     {
         av_log(NULL, AV_LOG_DEBUG, "Cleanup: Free SwrContext.\n");
-        swr_free(&sst->swr_ctx);
+        swr_free(&(*sst)->swr_ctx);
     }
 
-    free(sst);
-    sst = NULL;
+    free(*sst);
+    *sst = NULL;
 }

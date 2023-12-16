@@ -22,8 +22,6 @@ target_link_libraries(aplayer PUBLIC
   avformat
   avcodec
   avutil
-  avutil
   swresample
   portaudio
-  sdl2
 )
