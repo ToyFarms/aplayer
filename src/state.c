@@ -35,7 +35,7 @@ PlayerState *state_player_init()
 
 void state_player_free(PlayerState **pst)
 {
-    if (!pst)
+    if (!pst || !*pst)
         return;
 
     free(*pst);
@@ -104,7 +104,7 @@ fail:
 
 void state_stream_free(StreamState **sst)
 {
-    if (!sst)
+    if (!sst || !*sst)
         return;
 
     if ((*sst)->ic)
@@ -114,7 +114,7 @@ void state_stream_free(StreamState **sst)
     }
 
     av_log(NULL, AV_LOG_DEBUG, "Cleanup: Free audio decoder.\n");
-    decoder_free((*sst)->audiodec);
+    decoder_free(&(*sst)->audiodec);
 
     if ((*sst)->swr_ctx)
     {

@@ -62,15 +62,15 @@ int decoder_init(Decoder **dec, AVStream *stream)
     return 1;
 }
 
-void decoder_free(Decoder *dec)
+void decoder_free(Decoder **dec)
 {
-    if (!dec)
+    if (!dec || !*dec)
         return;
     av_log(NULL, AV_LOG_DEBUG, "Free decoder packet.\n");
-    av_packet_free(&dec->pkt);
+    av_packet_free(&(*dec)->pkt);
     av_log(NULL, AV_LOG_DEBUG, "Free decoder codec context.\n");
-    avcodec_free_context(&dec->avctx);
+    avcodec_free_context(&(*dec)->avctx);
 
-    free(dec);
-    dec = NULL;
+    free(*dec);
+    *dec = NULL;
 }
