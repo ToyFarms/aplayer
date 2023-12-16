@@ -103,7 +103,14 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    audio_start(argv[1]);
+    pthread_t audio_thread = audio_start_async(argv[1]);
+    if (audio_thread < 0)
+    {
+        av_log(NULL, AV_LOG_FATAL, "Could not create audio thread.\n");
+        return 1;
+    }
+
+    audio_wait_until_finished();
 
     return 0;
 }

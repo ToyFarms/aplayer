@@ -9,6 +9,7 @@
 #include <libavutil/time.h>
 #include <libswresample/swresample.h>
 #include <math.h>
+#include <pthread.h>
 
 #include "libaudio.h"
 #include "libhelper.h"
@@ -25,5 +26,9 @@ void audio_pause();
 void audio_toggle_play();
 void audio_stop();
 void audio_start(char *filename);
+pthread_t audio_start_async(char *filename);
+void audio_wait_until_initialized();
+void audio_wait_until_finished();
+bool audio_is_finished();
 
 #endif // _LIBAUDIO_H

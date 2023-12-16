@@ -282,3 +282,33 @@ cleanup:
     av_log(NULL, AV_LOG_DEBUG, "Cleanup: Free PlayerState.\n");
     state_player_free(&pst);
 }
+
+static void *_audio_start_bridge(void *arg)
+{
+    audio_start((char *)arg);
+}
+
+/* Run audio_start in another thread, returns -1 on fail, otherwise the thread id */
+pthread_t audio_start_async(char *filename)
+{
+    pthread_t audio_thread_id;
+    if (pthread_create(&audio_thread_id, NULL, _audio_start_bridge, filename) != 0)
+        return -1;
+
+    return audio_thread_id;
+}
+
+void audio_wait_until_initialized()
+{
+    while (!pst) av_usleep(ms2us(50));
+}
+
+void audio_wait_until_finished()
+{
+    while (pst) av_usleep(ms2us(1000));
+}
+
+bool audio_is_finished()
+{
+    return (bool)!pst;
+}
