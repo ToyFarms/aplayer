@@ -15,6 +15,7 @@ PlayerState *state_player_init()
 
     pst->req_seek = false;
     pst->seek_incr = 0;
+    pst->seek_absolute = false;
 
     pst->last_keypress = 0;
     pst->keypress = false;

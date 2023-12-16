@@ -33,6 +33,7 @@ typedef struct PlayerState
 
     bool req_seek;
     int64_t seek_incr;
+    bool seek_absolute;
 
     int64_t last_keypress;
     bool keypress;

@@ -46,6 +46,14 @@ void audio_set_volume(float volume)
 void audio_seek(float ms)
 {
     pst->req_seek = true;
+    pst->seek_absolute = false;
+    pst->seek_incr = ms;
+}
+
+void audio_seek_to(float ms)
+{
+    pst->req_seek = true;
+    pst->seek_absolute = true;
     pst->seek_incr = ms;
 }
 
@@ -157,7 +165,7 @@ void audio_start(char *filename)
     {
         while (pst->paused)
             av_usleep(ms2us(100));
-        
+
         if (pst->req_stop)
             break;
 
@@ -174,10 +182,8 @@ void audio_start(char *filename)
             {
                 if (pst->req_seek && pst->timestamp > 0)
                 {
-                    int64_t target_timestamp = FFMIN(
-                        FFMAX(
-                            pst->timestamp + pst->seek_incr, 0),
-                        us2ms(sst->ic->duration));
+                    int64_t target_timestamp = pst->seek_absolute ? pst->seek_incr : pst->timestamp + pst->seek_incr;
+                    target_timestamp = FFMAX(FFMIN(target_timestamp, sst->ic->duration), 0);
 
                     av_log(NULL,
                            AV_LOG_DEBUG,
@@ -198,6 +204,7 @@ void audio_start(char *filename)
                                av_err2str(ret));
                     }
                     pst->req_seek = false;
+                    pst->seek_absolute = false;
                     pst->seek_incr = 0;
                 }
 

@@ -16,13 +16,14 @@
 
 #define _USE_SIMD
 
-void audio_start(char *filename);
-PlayerState *audio_get_state();
 void audio_set_volume(float volume);
+void audio_seek_to(float ms);
 void audio_seek(float ms);
+PlayerState *audio_get_state();
 void audio_play();
 void audio_pause();
 void audio_toggle_play();
 void audio_stop();
+void audio_start(char *filename);
 
 #endif // _LIBAUDIO_H
