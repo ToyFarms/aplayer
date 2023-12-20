@@ -3,114 +3,253 @@
 
 #include "libaudio.h"
 #include "libhelper.h"
-
-#define ARRLEN(x) ((sizeof(x) / sizeof(0 [x])) / ((size_t)(!(sizeof(x) % sizeof(0 [x])))))
+#include "libwindows.h"
+#include "libcli.h"
 
 void *event_thread(void *arg)
 {
-    PlayerState *pst = audio_get_state();
+    av_log(NULL, AV_LOG_DEBUG, "Starting event_thread.\n");
+    audio_wait_until_initialized();
+
+    int64_t last_keypress = 0;
+    int64_t keypress_cooldown = 0;
+    bool keypress = false;
+    float volume_incr = 0.05f;
+    float volume_max = 2.0f;
+
     while (true)
     {
-        if (av_gettime() - pst->last_keypress < pst->keypress_cooldown)
+        if (av_gettime() - last_keypress < keypress_cooldown)
         {
-            Sleep(us2ms(pst->keypress_cooldown - (av_gettime() - pst->last_keypress)));
+            av_usleep(keypress_cooldown - (av_gettime() - last_keypress));
             continue;
         }
 
-        if (GetAsyncKeyState(VK_END) & 0x8001)
+        if (GetAsyncKeyState(VK_MEDIA_STOP) & 0x8001)
         {
             audio_toggle_play();
-            pst->keypress = true;
-            pst->keypress_cooldown = ms2us(100);
+            keypress = true;
+            keypress_cooldown = ms2us(100);
         }
-        else if (GetAsyncKeyState(VK_RIGHT) & 0x8001)
+        else if (GetAsyncKeyState(VK_VOLUME_UP) & 0x8001)
         {
-            audio_seek(5000);
-            pst->keypress = true;
-            pst->keypress_cooldown = ms2us(50);
+            audio_set_volume(FFMIN(audio_get_volume() + volume_incr, volume_max));
+            keypress = true;
+            keypress_cooldown = ms2us(100);
         }
-        else if (GetAsyncKeyState(VK_LEFT) & 0x8001)
+        else if (GetAsyncKeyState(VK_VOLUME_DOWN) & 0x8001)
         {
-            audio_seek(-5000);
-            pst->keypress = true;
-            pst->keypress_cooldown = ms2us(50);
+            audio_set_volume(FFMAX(audio_get_volume() - volume_incr, 0.0f));
+            keypress = true;
+            keypress_cooldown = ms2us(100);
         }
-        else if (GetAsyncKeyState(VK_UP) & 0x8001)
+        else if (GetAsyncKeyState(VK_MEDIA_NEXT_TRACK) & 0x8001)
         {
-            audio_set_volume(FFMIN(pst->target_volume + pst->volume_incr, 1.0f));
-            pst->keypress = true;
-            pst->keypress_cooldown = ms2us(100);
-        }
-        else if (GetAsyncKeyState(VK_DOWN) & 0x8001)
-        {
-            audio_set_volume(FFMAX(pst->target_volume - pst->volume_incr, 0.0f));
-            pst->keypress = true;
-            pst->keypress_cooldown = ms2us(100);
-        }
-        else if (GetAsyncKeyState(VK_HOME) & 0x8001)
-        {
-            audio_stop();
-            pst->keypress = true;
-            pst->keypress_cooldown = ms2us(500);
+            audio_exit();
+            keypress = true;
+            keypress_cooldown = ms2us(500);
         }
 
-        if (pst->keypress)
+        if (keypress)
         {
-            pst->keypress = false;
-            pst->last_keypress = av_gettime();
+            keypress = false;
+            last_keypress = av_gettime();
         }
         else
-            Sleep(100);
+            av_usleep(ms2us(100));
     }
 
     return 0;
 }
 
-void *update_thread(void *arg)
+void play(char *filename)
 {
-    PlayerState *pst = audio_get_state();
-    while (true)
+    if (!audio_is_finished())
     {
-        pst->volume = lerpf(pst->volume, pst->target_volume, pst->volume_lerp);
-
-        Sleep(pst->paused ? 100 : 10);
+        audio_exit();
+        audio_wait_until_finished();
     }
+
+    audio_start_async(filename);
+    audio_wait_until_initialized();
 }
 
 int main(int argc, char **argv)
 {
-    prepare_app_arguments(&argc, &argv);
+    if (argc < 2)
+    {
+        av_log(NULL, AV_LOG_FATAL, "Usage: %s <directory>\n", argv[0]);
+        return 1;
+    }
 
     av_log_set_level(AV_LOG_DEBUG);
 
-    if (argc < 2)
-    {
-        av_log(NULL, AV_LOG_FATAL, "Usage: %s [audio_file, ...]\n", argv[0]);
-        return 1;
-    }
+    prepare_app_arguments(&argc, &argv);
+
+    // TODO: Fix line shifted up when resizing (shrink up), causing a "ghost" line that cannot be cleared even after switching to main buffer. (i don't know how to fix this one)
+    // TODO: Add more features to the cli
+    // TODO: Make a gui
+    // TODO: Add audio volume normalization
 
     pthread_t event_thread_id;
-    if (pthread_create(&event_thread_id, NULL, event_thread, NULL) != 0)
-    {
-        av_log(NULL, AV_LOG_FATAL, "Could not create event_thread.\n");
+    pthread_create(&event_thread_id, NULL, event_thread, NULL);
+
+    CLIState *cst = cli_state_init();
+    cst->entries = list_directory(argv[1], &cst->entry_size);
+    cli_get_console_size(cst);
+
+    cli_buffer_switch(BUF_ALTERNATE);
+
+    HANDLE out_main = cli_get_handle(BUF_MAIN);
+    cst->out = cli_get_handle(BUF_ALTERNATE);
+
+    if (!cst->out)
         return 1;
+
+    cst->force_redraw = true;
+    cli_draw(cst);
+
+    unsigned long rec_size;
+    bool exit = false;
+
+    while (!exit)
+    {
+        INPUT_RECORD *rec = cli_read_in(&rec_size);
+        if (!rec)
+        {
+            exit = true;
+            break;
+        }
+        for (int i = 0; i < rec_size; i++)
+        {
+            INPUT_RECORD e = rec[i];
+            switch (e.EventType)
+            {
+            case KEY_EVENT:
+                if (!e.Event.KeyEvent.bKeyDown)
+                    break;
+
+                KEY_EVENT_RECORD ke = e.Event.KeyEvent;
+                char key = ke.uChar.AsciiChar;
+
+                bool selected_idx_changed = false;
+
+                if (key == 'q')
+                    exit = true;
+                else if (key == 'j' || ke.wVirtualKeyCode == VK_DOWN)
+                {
+                    cst->selected_idx += 1;
+                    selected_idx_changed = true;
+                }
+                else if (key == 'k' || ke.wVirtualKeyCode == VK_UP)
+                {
+                    cst->selected_idx -= 1;
+                    selected_idx_changed = true;
+                }
+
+                cst->force_redraw = false;
+                if (selected_idx_changed)
+                {
+                    if (cst->selected_idx < 0)
+                    {
+                        cst->selected_idx = cst->entry_size - 1;
+                        cst->entry_offset = cst->entry_size - cst->height;
+                        cst->force_redraw = true;
+                    }
+                    else if (cst->selected_idx > cst->entry_size - 1)
+                    {
+                        cst->selected_idx = 0;
+                        cst->entry_offset = 0;
+                        cst->force_redraw = true;
+                    }
+                }
+
+                int scroll_margin = cst->height > 12 ? 5 : 1;
+
+                if (cst->selected_idx - cst->entry_offset > cst->height - scroll_margin)
+                {
+                    cst->entry_offset = FFMIN(cst->entry_offset + ((cst->selected_idx - cst->entry_offset) - (cst->height - scroll_margin)), cst->entry_size - cst->height);
+                    cst->force_redraw = true;
+                }
+                else if (cst->selected_idx - cst->entry_offset < scroll_margin)
+                {
+                    cst->entry_offset = FFMAX(cst->entry_offset - (scroll_margin - (cst->selected_idx - cst->entry_offset)), 0);
+                    cst->force_redraw = true;
+                }
+
+                if (ke.wVirtualKeyCode == VK_RETURN)
+                {
+                    if (cst->selected_idx >= 0)
+                    {
+                        cst->playing_idx = cst->selected_idx;
+                        cst->force_redraw = false;
+                        cli_draw(cst);
+                        play(cst->entries[cst->playing_idx]);
+                    }
+                }
+                else if (ke.wVirtualKeyCode == VK_ESCAPE)
+                    cst->selected_idx = -1;
+
+                cli_draw(cst);
+
+                break;
+            case MOUSE_EVENT:
+                MOUSE_EVENT_RECORD me = e.Event.MouseEvent;
+                DWORD button = me.dwButtonState;
+
+                if (me.dwEventFlags & MOUSE_WHEELED)
+                {
+                    GET_WHEEL_DELTA_WPARAM(me.dwButtonState) > 0 ? cst->entry_offset-- : cst->entry_offset++;
+
+                    cst->force_redraw = true;
+                    if (cst->entry_offset < 0 || cst->entry_offset > cst->entry_size - cst->height)
+                        cst->force_redraw = false;
+
+                    cst->entry_offset = FFMIN(FFMAX(cst->entry_offset, 0), cst->entry_size - cst->height);
+
+                    cli_draw(cst);
+                }
+                else if (me.dwEventFlags & MOUSE_MOVED)
+                {
+                    cst->hovered_idx = cst->entry_offset + me.dwMousePosition.Y;
+                    cst->force_redraw = false;
+                    cli_draw(cst);
+                }
+
+                if (button & FROM_LEFT_1ST_BUTTON_PRESSED)
+                    cst->selected_idx = cst->hovered_idx;
+                if (button & FROM_LEFT_1ST_BUTTON_PRESSED && me.dwEventFlags == DOUBLE_CLICK)
+                {
+                    cst->playing_idx = cst->selected_idx;
+                    cst->force_redraw = false;
+                    cli_draw(cst);
+                    play(cst->entries[cst->playing_idx]);
+                }
+
+                cst->force_redraw = false;
+                cli_draw(cst);
+
+                break;
+            case WINDOW_BUFFER_SIZE_EVENT:
+                cli_get_console_size(cst);
+                SetConsoleWindowInfo(out_main,
+                                     true,
+                                     &(SMALL_RECT){0, 0, cst->width - 1, cst->height - 1});
+                cst->force_redraw = true;
+                cli_draw(cst);
+
+                break;
+            case FOCUS_EVENT:
+                break;
+            case MENU_EVENT:
+                break;
+            default:
+                break;
+            }
+        }
     }
 
-    pthread_t update_thread_id;
-    if (pthread_create(&update_thread_id, NULL, update_thread, NULL) != 0)
-    {
-        av_log(NULL, AV_LOG_FATAL, "Could not create event_thread.\n");
-        return 1;
-    }
-
-    pthread_t audio_thread = audio_start_async(argv[1]);
-    if (audio_thread < 0)
-    {
-        av_log(NULL, AV_LOG_FATAL, "Could not create audio thread.\n");
-        return 1;
-    }
-
-    audio_wait_until_finished();
-
+    cli_buffer_switch(BUF_MAIN);
+    cli_state_free(&cst);
     return 0;
 }

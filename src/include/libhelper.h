@@ -3,6 +3,14 @@
 
 #include <stdint.h>
 #include <libavutil/mem.h>
+#include <windows.h>
+#include <shellapi.h>
+#include <libavutil/log.h>
+
+#define ARRLEN(x) ((sizeof(x) / sizeof(0 [x])) / ((size_t)(!(sizeof(x) % sizeof(0 [x])))))
+#define PR printf("%s:%d\n", __FILE__, __LINE__);
+#define PRM(x) printf("%s:%d - %s\n", __FILE__, __LINE__, x);
+#define PRPTR(x) printf("%s:%d - %s: %p\n", __FILE__, __LINE__, #x, (void *)x);
 
 static inline float lerpf(float v0, float v1, float t)
 {
@@ -24,11 +32,13 @@ static inline int64_t ms2us(int64_t ms)
     return ms * 1000;
 }
 
-#include <windows.h>
-#include <shellapi.h>
-/* Will be leaked on exit */
-static char **win32_argv_utf8 = NULL;
-static int win32_argc = 0;
+static inline int wrap_around(int n, int min, int max)
+{
+    return (((n - min) % (max - min)) + (max - min)) % (max - min) + min;
+}
+
+void av_log_turn_off();
+void av_log_turn_on();
 
 /**
  * Prepare command line arguments for executable.

@@ -4,8 +4,13 @@
 #include <libavformat/avformat.h>
 #include <libavcodec/avcodec.h>
 
-#include "struct.h"
-#include "libstream.h"
+#include "libhelper.h"
+
+typedef struct Decoder
+{
+    AVCodecContext *avctx;
+    AVPacket *pkt;
+} Decoder;
 
 int decoder_init(Decoder **dec, AVStream *stream);
 void decoder_free(Decoder **dec);

@@ -1,5 +1,98 @@
 #include "libstream.h"
-#include <wchar.h>
+
+/* Initialize StreamState, returns NULL on fail */
+StreamState *stream_state_init(char *filename)
+{
+    av_log(NULL, AV_LOG_DEBUG, "Initializing StreamState.\n");
+
+    StreamState *sst = (StreamState *)malloc(sizeof(StreamState));
+    if (!sst)
+    {
+        av_log(NULL, AV_LOG_FATAL, "Could not allocate StreamState.\n");
+        goto fail;
+    }
+    memset(sst, 0, sizeof(StreamState));
+
+    sst->filename = filename;
+
+    if (stream_open(sst) < 0)
+        goto fail;
+
+    if (stream_init_stream(sst, AVMEDIA_TYPE_AUDIO) < 0)
+        goto fail;
+
+    if (stream_init_swr(sst) < 0)
+        goto fail;
+
+    av_log(NULL, AV_LOG_DEBUG, "Allocating AVFrame frame.\n");
+    sst->frame = av_frame_alloc();
+    if (!sst->frame)
+    {
+        av_log(NULL, AV_LOG_FATAL, "Could not allocate AVFrame frame.\n");
+        goto fail;
+    }
+
+    av_log(NULL, AV_LOG_DEBUG, "Allocating AVFrame swr_frame\n");
+    sst->swr_frame = av_frame_alloc();
+    if (!sst->swr_frame)
+    {
+        av_log(NULL, AV_LOG_FATAL, "Could not allocate swr_frame.\n");
+        goto fail;
+    }
+
+    return sst;
+
+fail:
+    stream_state_free(&sst);
+
+    return NULL;
+}
+
+void stream_state_free(StreamState **sst)
+{
+    av_log(NULL, AV_LOG_DEBUG, "Free StreamState.\n");
+
+    if (!sst)
+        return;
+
+    if (!(*sst))
+        return;
+
+    if ((*sst)->ic)
+    {
+        av_log(NULL, AV_LOG_DEBUG, "Cleanup: Close AVFormatContext.\n");
+        avformat_close_input(&(*sst)->ic);
+        av_log(NULL, AV_LOG_DEBUG, "Cleanup: Free AVFormatContext.\n");
+        avformat_free_context((*sst)->ic);
+    }
+
+    if ((*sst)->audiodec)
+    {
+        av_log(NULL, AV_LOG_DEBUG, "Cleanup: Free audio decoder.\n");
+        decoder_free(&(*sst)->audiodec);
+    }
+
+    if ((*sst)->swr_ctx)
+    {
+        av_log(NULL, AV_LOG_DEBUG, "Cleanup: Free SwrContext.\n");
+        swr_free(&(*sst)->swr_ctx);
+    }
+
+    if ((*sst)->frame)
+    {
+        av_log(NULL, AV_LOG_DEBUG, "Cleanup: Free AVFrame frame.\n");
+        av_frame_free(&(*sst)->frame);
+    }
+
+    if ((*sst)->swr_frame)
+    {
+        av_log(NULL, AV_LOG_DEBUG, "Cleanup: Free AVFrame swr_frame.\n");
+        av_frame_free(&(*sst)->swr_frame);
+    }
+
+    free(*sst);
+    *sst = NULL;
+}
 
 int stream_open(StreamState *sst)
 {
@@ -56,7 +149,12 @@ int stream_alloc_context(StreamState *sst)
 int stream_get_info(StreamState *sst)
 {
     av_log(NULL, AV_LOG_DEBUG, "Getting stream info.\n");
+    av_log_turn_off();
+
     int err = avformat_find_stream_info(sst->ic, NULL);
+
+    av_log_turn_on();
+
     if (err < 0)
     {
         av_log(NULL, AV_LOG_FATAL,
@@ -179,6 +277,47 @@ int stream_get_input_format(StreamState *sst, char *filename)
     }
 
     sst->iformat = iformat;
+
+    return 1;
+}
+
+int stream_init_swr(StreamState *sst)
+{
+    av_log(NULL, AV_LOG_DEBUG, "Initializing SwrContext parameter.\n");
+    av_channel_layout_default(&sst->audiodec->avctx->ch_layout, sst->audiodec->avctx->ch_layout.nb_channels);
+
+    int err = swr_alloc_set_opts2(&sst->swr_ctx,
+                                  &(AVChannelLayout)AV_CHANNEL_LAYOUT_STEREO,
+                                  AV_SAMPLE_FMT_FLT,
+                                  sst->audiodec->avctx->sample_rate,
+                                  &(AVChannelLayout)AV_CHANNEL_LAYOUT_STEREO,
+                                  sst->audiodec->avctx->sample_fmt,
+                                  sst->audiodec->avctx->sample_rate,
+                                  AV_LOG_DEBUG, NULL);
+
+    if (err < 0)
+    {
+        av_log(NULL,
+               AV_LOG_FATAL,
+               "Could not initialize SwrContext parameter. %s.\n",
+               av_err2str(err));
+        return -1;
+    }
+
+    if (!sst->swr_ctx)
+    {
+        av_log(NULL,
+               AV_LOG_FATAL,
+               "Null pointer: SwrContext.\n");
+        return -1;
+    }
+
+    av_log(NULL, AV_LOG_DEBUG, "Initializing SwrContext.\n");
+    if ((err = swr_init(sst->swr_ctx)) < 0)
+    {
+        av_log(NULL, AV_LOG_FATAL, "Could not initialize SwrContext. %s.\n", av_err2str(err));
+        return -1;
+    }
 
     return 1;
 }
