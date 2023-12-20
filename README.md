@@ -11,17 +11,24 @@ It is developed for Windows, though most of the code are cross-platform. There a
 
 ### How to build:
 
-Install dependencies. For simplicity, we will use [vcpkg](https://github.com/microsoft/vcpkg).
+Before proceeding, you will need:
+
+* [msys64](https://www.msys2.org/) (For mingw (gcc, make, cmake) command)
+* [vcpkg](https://github.com/microsoft/vcpkg) (For package manager)
+* [git](https://git-scm.com/) (For cloning repo, or download manually)
+
+Install dependencies.
 ```Shell
+# install all the packages
 vcpkg install ffmpeg
 vcpkg install portaudio
 vcpkg install sdl2
 
+# clone the repo
+git clone https://github.com/ToyFarms/aplayer [your_project]
 cd [your_project]
-vcpkg new
-vcpkg add ffmpeg
-vcpkg add portaudio
-vcpkg add sdl2
+
+# install the package to your project folder
 vcpkg install
 ```
 
@@ -33,9 +40,15 @@ All you need to do now is copy all the DLL and build the project.
 mkdir build
 cd build
 
+# copy all the DLL to ./build/
 cp ../vcpkg_installed/[os]/bin/* .
 
+# generate the Makefiles
 cmake .. -G "Unix Makefiles"
+
+# build the project
 make
+
+# run the application
 ./aplayer.exe
 ```
