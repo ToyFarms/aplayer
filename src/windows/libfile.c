@@ -1,6 +1,6 @@
-#include "libwindows.h"
+#include "libfile.h"
 
-char *get_last_error_string()
+static char *get_last_error_string()
 {
     DWORD error_code = GetLastError();
     if (error_code == 0)
@@ -20,7 +20,7 @@ char *get_last_error_string()
     return (char *)msg_buf;
 }
 
-char *wchar2mbs(const wchar_t *wchar_str)
+static char *wchar2mbs(const wchar_t *wchar_str)
 {
     if (!wchar_str)
         return NULL;

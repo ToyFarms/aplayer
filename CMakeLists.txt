@@ -2,15 +2,30 @@ cmake_minimum_required(VERSION 3.10)
 
 project(audio_player)
 
-file(GLOB SOURCE src/*.c)
+if(WIN32)
+  set(OS-DIR windows)
+elseif(UNIX AND NOT APPLE)
+  set(OS-DIR linux)
+elseif(APPLE)
+  set(OS-DIR macos)
+endif()
 
 add_executable(
   aplayer
-  ${SOURCE}
+  src/main.c
+  src/libaudio.c
+  src/libdecoder.c
+  src/libhelper.c
+  src/libplayer.c
+  src/libstream.c
+  src/sb.c
+  src/${OS-DIR}/libcli.c
+  src/${OS-DIR}/libfile.c
 )
 
 # set(CMAKE_CXX_FLAGS "-O3")
 target_include_directories(aplayer PUBLIC src/include)
+target_include_directories(aplayer PUBLIC src/interface)
 
 target_include_directories(aplayer PUBLIC vcpkg_installed/x64-windows/include)
 target_link_directories(aplayer PUBLIC vcpkg_installed/x64-windows/lib)

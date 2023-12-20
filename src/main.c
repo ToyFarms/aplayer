@@ -3,9 +3,10 @@
 
 #include "libaudio.h"
 #include "libhelper.h"
-#include "libwindows.h"
+#include "libfile.h"
 #include "libcli.h"
 
+#ifdef AP_WINDOWS
 void *event_thread(void *arg)
 {
     av_log(NULL, AV_LOG_DEBUG, "Starting event_thread.\n");
@@ -25,25 +26,25 @@ void *event_thread(void *arg)
             continue;
         }
 
-        if (GetAsyncKeyState(VK_MEDIA_STOP) & 0x8001)
+        if (GetAsyncKeyState(VIRT_MEDIA_STOP) & 0x8001)
         {
             audio_toggle_play();
             keypress = true;
             keypress_cooldown = ms2us(100);
         }
-        else if (GetAsyncKeyState(VK_VOLUME_UP) & 0x8001)
+        else if (GetAsyncKeyState(VIRT_VOLUME_UP) & 0x8001)
         {
             audio_set_volume(FFMIN(audio_get_volume() + volume_incr, volume_max));
             keypress = true;
             keypress_cooldown = ms2us(100);
         }
-        else if (GetAsyncKeyState(VK_VOLUME_DOWN) & 0x8001)
+        else if (GetAsyncKeyState(VIRT_VOLUME_DOWN) & 0x8001)
         {
             audio_set_volume(FFMAX(audio_get_volume() - volume_incr, 0.0f));
             keypress = true;
             keypress_cooldown = ms2us(100);
         }
-        else if (GetAsyncKeyState(VK_MEDIA_NEXT_TRACK) & 0x8001)
+        else if (GetAsyncKeyState(VIRT_MEDIA_NEXT_TRACK) & 0x8001)
         {
             audio_exit();
             keypress = true;
@@ -61,6 +62,7 @@ void *event_thread(void *arg)
 
     return 0;
 }
+#endif // AP_WINDOWS
 
 void play(char *filename)
 {
@@ -90,10 +92,11 @@ int main(int argc, char **argv)
     // TODO: Add more features to the cli
     // TODO: Make a gui
     // TODO: Add audio volume normalization
-    // TODO: Factor out windows specific code to `src/windows/`
 
+#ifdef AP_WINDOWS
     pthread_t event_thread_id;
     pthread_create(&event_thread_id, NULL, event_thread, NULL);
+#endif // AP_WINDOWS
 
     CLIState *cst = cli_state_init();
     cst->entries = list_directory(argv[1], &cst->entry_size);
@@ -101,48 +104,49 @@ int main(int argc, char **argv)
 
     cli_buffer_switch(BUF_ALTERNATE);
 
-    HANDLE out_main = cli_get_handle(BUF_MAIN);
+    Handle out_main = cli_get_handle(BUF_MAIN);
     cst->out = cli_get_handle(BUF_ALTERNATE);
 
-    if (!cst->out)
+    if (!cst->out.handle)
         return 1;
 
     cst->force_redraw = true;
     cli_draw(cst);
 
-    unsigned long rec_size;
     bool exit = false;
 
     while (!exit)
     {
-        INPUT_RECORD *rec = cli_read_in(&rec_size);
-        if (!rec)
+        Events rec = cli_read_in();
+        if (!rec.event)
         {
             exit = true;
             break;
         }
-        for (int i = 0; i < rec_size; i++)
+
+        for (int i = 0; i < rec.event_size; i++)
         {
-            INPUT_RECORD e = rec[i];
-            switch (e.EventType)
+            Event e = rec.event[i];
+            switch (e.type)
             {
-            case KEY_EVENT:
-                if (!e.Event.KeyEvent.bKeyDown)
+            case KEY_EVENT_TYPE:
+                KeyEvent ke = e.key_event;
+
+                if (!ke.key_down)
                     break;
 
-                KEY_EVENT_RECORD ke = e.Event.KeyEvent;
-                char key = ke.uChar.AsciiChar;
-
                 bool selected_idx_changed = false;
+                char key = ke.acsii_key;
 
                 if (key == 'q')
                     exit = true;
-                else if (key == 'j' || ke.wVirtualKeyCode == VK_DOWN)
+
+                else if (key == 'j' || ke.vk_key == VIRT_DOWN)
                 {
                     cst->selected_idx += 1;
                     selected_idx_changed = true;
                 }
-                else if (key == 'k' || ke.wVirtualKeyCode == VK_UP)
+                else if (key == 'k' || ke.vk_key == VIRT_UP)
                 {
                     cst->selected_idx -= 1;
                     selected_idx_changed = true;
@@ -178,7 +182,7 @@ int main(int argc, char **argv)
                     cst->force_redraw = true;
                 }
 
-                if (ke.wVirtualKeyCode == VK_RETURN)
+                if (ke.vk_key == VIRT_RETURN)
                 {
                     if (cst->selected_idx >= 0)
                     {
@@ -188,19 +192,18 @@ int main(int argc, char **argv)
                         play(cst->entries[cst->playing_idx]);
                     }
                 }
-                else if (ke.wVirtualKeyCode == VK_ESCAPE)
+                else if (ke.vk_key == VIRT_ESCAPE)
                     cst->selected_idx = -1;
 
                 cli_draw(cst);
 
                 break;
-            case MOUSE_EVENT:
-                MOUSE_EVENT_RECORD me = e.Event.MouseEvent;
-                DWORD button = me.dwButtonState;
+            case MOUSE_EVENT_TYPE:
+                MouseEvent me = e.mouse_event;
 
-                if (me.dwEventFlags & MOUSE_WHEELED)
+                if (me.scrolled)
                 {
-                    GET_WHEEL_DELTA_WPARAM(me.dwButtonState) > 0 ? cst->entry_offset-- : cst->entry_offset++;
+                    me.scroll_delta > 0 ? cst->entry_offset-- : cst->entry_offset++;
 
                     cst->force_redraw = true;
                     if (cst->entry_offset < 0 || cst->entry_offset > cst->entry_size - cst->height)
@@ -210,16 +213,17 @@ int main(int argc, char **argv)
 
                     cli_draw(cst);
                 }
-                else if (me.dwEventFlags & MOUSE_MOVED)
+                else if (me.moved)
                 {
-                    cst->hovered_idx = cst->entry_offset + me.dwMousePosition.Y;
+                    cst->hovered_idx = cst->entry_offset + me.y;
                     cst->force_redraw = false;
                     cli_draw(cst);
                 }
 
-                if (button & FROM_LEFT_1ST_BUTTON_PRESSED)
+                if (me.state & LEFT_MOUSE_CLICKED)
                     cst->selected_idx = cst->hovered_idx;
-                if (button & FROM_LEFT_1ST_BUTTON_PRESSED && me.dwEventFlags == DOUBLE_CLICK)
+
+                if (me.state & LEFT_MOUSE_CLICKED && me.double_clicked)
                 {
                     cst->playing_idx = cst->selected_idx;
                     cst->force_redraw = false;
@@ -231,18 +235,14 @@ int main(int argc, char **argv)
                 cli_draw(cst);
 
                 break;
-            case WINDOW_BUFFER_SIZE_EVENT:
+            case BUFFER_CHANGED_EVENT_TYPE:
                 cli_get_console_size(cst);
-                SetConsoleWindowInfo(out_main,
+                SetConsoleWindowInfo(out_main.handle,
                                      true,
                                      &(SMALL_RECT){0, 0, cst->width - 1, cst->height - 1});
                 cst->force_redraw = true;
                 cli_draw(cst);
 
-                break;
-            case FOCUS_EVENT:
-                break;
-            case MENU_EVENT:
                 break;
             default:
                 break;
