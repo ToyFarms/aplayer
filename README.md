@@ -2,7 +2,7 @@
 
 APlayer is an audio player written in C using mainly FFMPEG for reading audio file, and PortAudio to produce the sound.
 
-It is developed for Windows, though most of the code are cross-platform. There are some Windows specific code lying around the place, it should not be too tangled to factor out.
+It is developed for Windows, though most of the code are cross-platform. There are some Windows specific code lying around the place, it shouldn't be too tangled to factor out.
 
 ### Dependencies:
 * [FFMPEG](https://github.com/FFmpeg/FFmpeg)
