@@ -4,7 +4,6 @@
     "dependencies": [
         "portaudio",
         "ffmpeg",
-        "sdl2",
-        "utf8proc"
+        "sdl2"
     ]
 }
