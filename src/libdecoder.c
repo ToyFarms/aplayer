@@ -14,9 +14,15 @@ const AVCodec *stream_get_codec(AVStream *stream)
     return codec;
 }
 
-/* Initialize decoder for the given stream, returns NULL on fail */
+/* Initialize decoder for the given stream, returns -1 on fail */
 int decoder_init(Decoder **dec, AVStream *stream)
 {
+    if (!dec)
+    {
+        av_log(NULL, AV_LOG_FATAL, "Could not allocate AVCodecContext.\n");
+        return -1;
+    }
+
     const AVCodec *codec = stream_get_codec(stream);
     if (!codec)
         return -1;
@@ -30,13 +36,19 @@ int decoder_init(Decoder **dec, AVStream *stream)
     }
 
     av_log(NULL, AV_LOG_DEBUG, "Initialize AVCodecContext to use the given AVCodec.\n");
+    av_log_turn_off();
+
     int err = avcodec_open2(avctx, codec, NULL);
+
+    av_log_turn_on();
+
     if (err < 0)
     {
         av_log(NULL,
                AV_LOG_FATAL,
                "Could not open codec. %s.\n",
                av_err2str(err));
+        avcodec_free_context(&avctx);
         return -1;
     }
 
@@ -45,14 +57,17 @@ int decoder_init(Decoder **dec, AVStream *stream)
     if (!pkt)
     {
         av_log(NULL, AV_LOG_DEBUG, "Could not allocate AVPacket.\n");
+        avcodec_free_context(&avctx);
         return -1;
     }
 
-    av_log(NULL, AV_LOG_DEBUG, "Initializing Decoder.\n");
+    av_log(NULL, AV_LOG_DEBUG, "Allocating Decoder.\n");
     *dec = (Decoder *)malloc(sizeof(Decoder));
-    if (!dec)
+    if (!(*dec))
     {
         av_log(NULL, AV_LOG_FATAL, "Could not allocate decoder.\n");
+        avcodec_free_context(&avctx);
+        av_packet_free(&pkt);
         return -1;
     }
 
@@ -64,8 +79,12 @@ int decoder_init(Decoder **dec, AVStream *stream)
 
 void decoder_free(Decoder **dec)
 {
-    if (!dec || !*dec)
+    if (!dec)
         return;
+
+    if (!(*dec))
+        return;
+
     av_log(NULL, AV_LOG_DEBUG, "Free decoder packet.\n");
     av_packet_free(&(*dec)->pkt);
     av_log(NULL, AV_LOG_DEBUG, "Free decoder codec context.\n");

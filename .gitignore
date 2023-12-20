@@ -2,6 +2,7 @@
 build/
 notes/
 vcpkg_installed/
+.vs/
 
 # Prerequisites
 *.d
