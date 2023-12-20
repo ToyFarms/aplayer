@@ -90,6 +90,7 @@ int main(int argc, char **argv)
     // TODO: Add more features to the cli
     // TODO: Make a gui
     // TODO: Add audio volume normalization
+    // TODO: Factor out windows specific code to `src/windows/`
 
     pthread_t event_thread_id;
     pthread_create(&event_thread_id, NULL, event_thread, NULL);
