@@ -33,7 +33,7 @@ All you need to do now is copy all the DLL and build the project.
 mkdir build
 cd build
 
-cp ../vcpkg_installekd/[os]/bin/* .
+cp ../vcpkg_installed/[os]/bin/* .
 
 cmake .. -G "Unix Makefiles"
 make
