@@ -91,17 +91,17 @@ static wchar_t strw[2048];
 
 static wchar_t *cli_line_routine(CLIState *cst, int idx, LineState line_state, int *out_strlen)
 {
-    sb_appendf(sb, "\x1b[0m%d ", idx);
+    sb_appendf(sb, "\x1b[39;48;2;41;41;41m%d ", idx);
     switch (line_state)
     {
     case LINE_PLAYING:
-        sb_appendf(sb, "\x1b[38;2;0;0;0;48;2;91;201;77m%s\x1b[0m", cst->entries[idx]);
+        sb_appendf(sb, "\x1b[38;2;0;0;0;48;2;91;201;77m%s", cst->entries[idx]);
         break;
     case LINE_SELECTED:
-        sb_appendf(sb, "\x1b[38;2;0;0;0;48;2;255;255;255m%s\x1b[0m", cst->entries[idx]);
+        sb_appendf(sb, "\x1b[38;2;0;0;0;48;2;255;255;255m%s", cst->entries[idx]);
         break;
     case LINE_HOVERED:
-        sb_appendf(sb, "\x1b[38;2;0;0;0;48;2;150;150;150m%s\x1b[0m", cst->entries[idx]);
+        sb_appendf(sb, "\x1b[38;2;0;0;0;48;2;150;150;150m%s", cst->entries[idx]);
         break;
     case LINE_NORMAL:
         sb_appendf(sb, "%s", cst->entries[idx]);
@@ -158,6 +158,17 @@ static void _cli_draw(CLIState *cst)
 
         str = cli_line_routine(cst, abs_entry_idx, line_state, &str_len);
         WriteConsoleW(cst->out.handle, str, str_len, NULL, NULL);
+
+        CONSOLE_SCREEN_BUFFER_INFO csbi;
+        GetConsoleScreenBufferInfo(cst->out.handle, &csbi);
+
+        int pad = cst->width - csbi.dwCursorPosition.X;
+        if (pad <= 0)
+            continue;
+
+        char padding[pad];
+        memset(padding, ' ', sizeof(padding));
+        WriteConsole(cst->out.handle, padding, pad, NULL, NULL);
     }
 }
 
