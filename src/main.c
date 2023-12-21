@@ -131,7 +131,7 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    // av_log_set_level(AV_LOG_DEBUG);
+    av_log_set_level(AV_LOG_QUIET);
 
     prepare_app_arguments(&argc, &argv);
 
