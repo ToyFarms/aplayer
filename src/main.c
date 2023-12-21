@@ -32,18 +32,6 @@ void *event_thread(void *arg)
             keypress = true;
             keypress_cooldown = ms2us(100);
         }
-        else if (GetAsyncKeyState(VIRT_VOLUME_UP) & 0x8001)
-        {
-            audio_set_volume(FFMIN(audio_get_volume() + volume_incr, volume_max));
-            keypress = true;
-            keypress_cooldown = ms2us(100);
-        }
-        else if (GetAsyncKeyState(VIRT_VOLUME_DOWN) & 0x8001)
-        {
-            audio_set_volume(FFMAX(audio_get_volume() - volume_incr, 0.0f));
-            keypress = true;
-            keypress_cooldown = ms2us(100);
-        }
         else if (GetAsyncKeyState(VIRT_MEDIA_NEXT_TRACK) & 0x8001)
         {
             audio_exit();
