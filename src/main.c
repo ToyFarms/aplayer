@@ -42,7 +42,7 @@ void compute_offset(CLIState *cst)
 void cycle_next()
 {
     cst->playing_idx = wrap_around(cst->playing_idx + 1, 0, cst->entry_size);
-    cst->selected_idx = wrap_around(cst->playing_idx, 0, cst->entry_size);
+    cst->selected_idx = cst->playing_idx;
     compute_offset(cst);
 
     cli_draw(cst);
@@ -52,7 +52,7 @@ void cycle_next()
 void cycle_prev()
 {
     cst->playing_idx = wrap_around(cst->playing_idx - 1, 0, cst->entry_size);
-    cst->selected_idx = wrap_around(cst->playing_idx, 0, cst->entry_size);
+    cst->selected_idx = cst->playing_idx;
     compute_offset(cst);
 
     cli_draw(cst);
