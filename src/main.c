@@ -211,6 +211,10 @@ int main(int argc, char **argv)
                     cst->selected_idx += 1;
                     need_redraw = true;
                 }
+                else if (ke.vk_key == VIRT_LEFT)
+                    audio_seek(-2500);
+                else if (ke.vk_key == VIRT_RIGHT)
+                    audio_seek(2500);
 
                 if (need_redraw)
                     compute_offset(cst);
