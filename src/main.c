@@ -39,6 +39,18 @@ void compute_offset(CLIState *cst)
     }
 }
 
+void play(char *filename)
+{
+    if (!audio_is_finished())
+    {
+        audio_exit();
+        audio_wait_until_finished();
+    }
+
+    audio_start_async(filename);
+    audio_wait_until_initialized();
+}
+
 void cycle_next()
 {
     cst->playing_idx = wrap_around(cst->playing_idx + 1, 0, cst->entry_size);
@@ -111,18 +123,6 @@ void *event_thread(void *arg)
 }
 #endif // AP_WINDOWS
 
-void play(char *filename)
-{
-    if (!audio_is_finished())
-    {
-        audio_exit();
-        audio_wait_until_finished();
-    }
-
-    audio_start_async(filename);
-    audio_wait_until_initialized();
-}
-
 int main(int argc, char **argv)
 {
     if (argc < 2)
@@ -131,7 +131,7 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    av_log_set_level(AV_LOG_DEBUG);
+    // av_log_set_level(AV_LOG_DEBUG);
 
     prepare_app_arguments(&argc, &argv);
 
