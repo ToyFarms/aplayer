@@ -1,14 +1,11 @@
 #include "libaudio.h"
 
-#ifdef _USE_SIMD
 #include <immintrin.h>
-#endif // _USE_SIMD
 
 static PlayerState *pst;
 
 static void _audio_set_volume(AVFrame *frame, float factor)
 {
-#ifdef _USE_SIMD
     int sample;
     __m128 scale_factor = _mm_set1_ps(factor);
 
@@ -16,9 +13,9 @@ static void _audio_set_volume(AVFrame *frame, float factor)
     {
         for (sample = 0; sample < frame->nb_samples - 3; sample += 4)
         {
-            __m128 data = _mm_load_ps(&((float *)frame->data[ch])[sample]);
+            __m128 data = _mm_loadu_ps(&((float *)frame->data[ch])[sample]);
             data = _mm_mul_ps(data, scale_factor);
-            _mm_store_ps(&((float *)frame->data[ch])[sample], data);
+            _mm_storeu_ps(&((float *)frame->data[ch])[sample], data);
         }
 
         for (; sample < frame->nb_samples; sample++)
@@ -26,16 +23,6 @@ static void _audio_set_volume(AVFrame *frame, float factor)
             ((float *)frame->data[ch])[sample] *= factor;
         }
     }
-#else
-    for (int ch = 0; ch < nb_channels; ch++)
-    {
-#pragma omp parallel for
-        for (int sample = 0; sample < frame->nb_samples; sample++)
-        {
-            ((float *)frame->data[ch])[sample] *= factor;
-        }
-    }
-#endif // _USE_SIMD
 }
 
 void audio_set_volume(float volume)
@@ -183,36 +170,52 @@ bool audio_is_finished()
     return pst->finished;
 }
 
-static float calculate_lufs(AVFrame *frame)
+static inline float dB_to_factor(float dB)
 {
-    float sum_squared[frame->ch_layout.nb_channels];
-    memset(sum_squared, 0, sizeof(sum_squared));
-
-    for (int ch = 0; ch < frame->ch_layout.nb_channels; ch++)
-    {
-        for (int sample = 0; sample < frame->nb_samples; sample++)
-        {
-            float sample_value = ((float *)frame->data[ch])[sample];
-            sum_squared[ch] += sample_value * sample_value;
-        }
-    }
-
-    float power_sum = 0.0f;
-
-    for (int ch = 0; ch < frame->ch_layout.nb_channels; ch++)
-    {
-        float relative_loudness = 20.0f * log10f(sqrtf(sum_squared[ch] / (float)frame->nb_samples));
-        power_sum += powf(10.0f, relative_loudness / 10.0f);
-    }
-
-    float lufs = -0.691f + 10.0f * log10f((1.0f / frame->ch_layout.nb_channels) * power_sum);
-
-    return lufs == -INFINITY ? 0.0f : lufs;
+    return powf(10.0f, (dB / 20.0f));
 }
 
-static void audio_set_lufs(AVFrame *frame, float lufs, float target_lufs)
+static inline float factor_to_dB(float factor)
 {
-    float gain = powf(10.0f, (target_lufs - lufs) / 20.0f);
+    return 20.0f * log10f(factor);
+}
+
+static float calculate_lufs(AVFrame *frame)
+{
+    float power_sum = 0.0f;
+    int sample;
+
+    for (int ch = 0; ch < frame->ch_layout.nb_channels; ch++)
+    {
+        __m128 sum_squared = _mm_setzero_ps();
+        float *channel = (float *)frame->data[ch];
+
+        for (sample = 0; sample < frame->nb_samples - 3; sample += 4)
+        {
+            __m128 sample_value = _mm_loadu_ps(&channel[sample]);
+            sample_value = _mm_mul_ps(sample_value, sample_value);
+            sum_squared = _mm_add_ps(sum_squared, sample_value);
+        }
+
+        float results[4];
+        _mm_storeu_ps(results, sum_squared);
+        float result = results[0] + results[1] + results[2] + results[3];
+
+        for (; sample < frame->nb_samples; sample++)
+            result += channel[sample] * channel[sample];
+
+        power_sum += result / (float)frame->nb_samples;
+    }
+
+    if (power_sum == 0.0f)
+        return 0.0f;
+
+    return -0.691f + 10.0f * log10f(power_sum);
+}
+
+static void audio_apply_gain(AVFrame *frame, float target_dB, float dB)
+{
+    float gain = dB_to_factor(target_dB - dB);
 
     _audio_set_volume(frame, gain);
 }
@@ -328,7 +331,6 @@ static double audio_get_lufs(char *filename, int sample_hard_cap)
 
 cleanup:
     stream_state_free(&sst);
-
     return lufs_sum / (double)lufs_sampled;
 }
 
@@ -351,8 +353,16 @@ void audio_start(char *filename)
     if (pst)
         pst->finished = false;
 
-    float lufs = (float)audio_get_lufs(filename, pst ? pst->lufs_sample_hard_cap : 50000);
-    av_log(NULL, AV_LOG_DEBUG, "LUFS for \"%s\" is %f\n", filename, lufs);
+    float lufs = (float)audio_get_lufs(filename, pst ? pst->dB_sample_cap : 50000);
+    float gain = (pst ? pst->dB_target : -14.0f) - lufs;
+    float gain_factor = dB_to_factor(gain);
+    av_log(NULL,
+           AV_LOG_INFO,
+           "\"%s\":\n    LUFS: %f dB\n    gain: %f dB\n    factor: %f\n",
+           filename,
+           lufs,
+           gain,
+           gain_factor);
 
     StreamState *sst = stream_state_init(filename);
     if (!sst)
@@ -502,8 +512,9 @@ void audio_start(char *filename)
                 if (pst)
                     pst->timestamp = sst->frame->best_effort_timestamp;
 
-                audio_set_lufs(sst->frame, lufs, pst ? pst->lufs_target : -20.0f);
-                _audio_set_volume(sst->frame, pst ? pst->volume : 1.0f);
+                _audio_set_volume(sst->frame, gain_factor);
+                if (pst && (pst->volume > (1.0f + 1e-3) && pst->volume < (1.0f - 1e-3)))
+                    _audio_set_volume(sst->frame, pst->volume);
 
                 int dst_nb_samples = av_rescale_rnd(swr_get_delay(sst->swr_ctx,
                                                                   sst->audiodec->avctx->sample_rate) +

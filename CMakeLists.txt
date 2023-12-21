@@ -23,7 +23,6 @@ add_executable(
   src/${OS-DIR}/libfile.c
 )
 
-# set(CMAKE_CXX_FLAGS "-O3")
 target_include_directories(aplayer PUBLIC src/include)
 target_include_directories(aplayer PUBLIC src/interface)
 

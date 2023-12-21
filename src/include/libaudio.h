@@ -16,8 +16,6 @@
 #include "libstream.h"
 #include "libplayer.h"
 
-#define _USE_SIMD
-
 void audio_set_volume(float volume);
 float audio_get_volume();
 void audio_seek(float ms);

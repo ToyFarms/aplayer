@@ -31,8 +31,8 @@ PlayerState *player_state_init()
     pst->volume_incr = 0.05f;
     pst->volume_lerp = 0.8f;
     pst->volume_max = 2.0f;
-    pst->lufs_target = -20.0f;
-    pst->lufs_sample_hard_cap = 50000;
+    pst->dB_target = -14.0f;
+    pst->dB_sample_cap = 50000;
 
     return pst;
 }
