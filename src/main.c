@@ -224,9 +224,8 @@ int main(int argc, char **argv)
                     if (cst->selected_idx >= 0)
                     {
                         cst->playing_idx = cst->selected_idx;
-                        cst->force_redraw = false;
-                        cli_draw(cst);
                         play(cst->entries[cst->playing_idx]);
+                        need_redraw = true;
                     }
                 }
                 else if (ke.vk_key == VIRT_ESCAPE)
