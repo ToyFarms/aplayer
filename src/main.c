@@ -293,5 +293,6 @@ int main(int argc, char **argv)
 
     cli_buffer_switch(BUF_MAIN);
     cli_state_free(&cst);
+    audio_free();
     return 0;
 }
