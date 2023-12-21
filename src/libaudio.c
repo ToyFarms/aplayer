@@ -337,7 +337,7 @@ cleanup:
 void audio_start(char *filename)
 {
     av_log(NULL,
-           AV_LOG_INFO,
+           AV_LOG_DEBUG,
            "Starting audio stream from file %s.\n",
            filename);
 
