@@ -326,7 +326,7 @@ void audio_start(char *filename)
                     {
                         av_log(NULL,
                                AV_LOG_DEBUG,
-                               "Could not seek to %.2fms. %s.\n",
+                               "Could not seek to %.2fs. %s.\n",
                                (double)target_timestamp / 1000.0,
                                av_err2str(err_nf));
                     }
