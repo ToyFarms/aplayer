@@ -25,10 +25,11 @@ typedef struct PlayerState
     int64_t timestamp;
 
     float volume;
-    float volume_target;
     float volume_incr;
     float volume_lerp;
     float volume_max;
+    float lufs_target;
+    int lufs_sample_hard_cap;
 } PlayerState;
 
 PlayerState *player_state_init();
