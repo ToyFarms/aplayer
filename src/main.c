@@ -1,6 +1,7 @@
 #include <stdbool.h>
 #include <pthread.h>
 
+#include "libos.h"
 #include "libaudio.h"
 #include "libhelper.h"
 #include "libfile.h"

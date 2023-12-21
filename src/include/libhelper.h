@@ -3,8 +3,6 @@
 
 #include <stdint.h>
 #include <libavutil/mem.h>
-#include <windows.h>
-#include <shellapi.h>
 #include <libavutil/log.h>
 
 #define ARRLEN(x) ((sizeof(x) / sizeof(0 [x])) / ((size_t)(!(sizeof(x) % sizeof(0 [x])))))
@@ -40,13 +38,11 @@ static inline int wrap_around(int n, int min, int max)
 void av_log_turn_off();
 void av_log_turn_on();
 
-/**
- * Prepare command line arguments for executable.
- * For Windows - perform wide-char to UTF-8 conversion.
- * Input arguments should be main() function arguments.
- * @param argc_ptr Arguments number (including executable)
- * @param argv_ptr Arguments list.
- */
+#ifdef AP_WINDOWS
+#include <windows.h>
+#include <shellapi.h>
+#endif // AP_WINDOWS
+
 void prepare_app_arguments(int *argc_ptr, char ***argv_ptr);
 
 #endif // _LIBHELPER_H
