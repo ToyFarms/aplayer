@@ -353,12 +353,12 @@ void audio_start(char *filename)
     if (pst)
         pst->finished = false;
 
-    float lufs = (float)audio_get_lufs(filename, pst ? pst->dB_sample_cap : 50000);
-    float gain = (pst ? pst->dB_target : -14.0f) - lufs;
+    float lufs = (float)audio_get_lufs(filename, pst ? pst->LUFS_sample_cap : 50000);
+    float gain = (pst ? pst->LUFS_target : -14.0f) - lufs;
     float gain_factor = dB_to_factor(gain);
     av_log(NULL,
            AV_LOG_INFO,
-           "\"%s\":\n    LUFS: %f dB\n    gain: %f dB\n    factor: %f\n",
+           "\"%s\":\n    loudness: %f LUFS\n    gain: %f LUFS\n    factor: %f\n",
            filename,
            lufs,
            gain,
