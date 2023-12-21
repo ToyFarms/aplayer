@@ -512,9 +512,7 @@ void audio_start(char *filename)
                 if (pst)
                     pst->timestamp = sst->frame->best_effort_timestamp;
 
-                _audio_set_volume(sst->frame, gain_factor);
-                if (pst && (pst->volume > (1.0f + 1e-3) && pst->volume < (1.0f - 1e-3)))
-                    _audio_set_volume(sst->frame, pst->volume);
+                _audio_set_volume(sst->frame, gain_factor * (pst ? pst->volume : 1.0f));
 
                 int dst_nb_samples = av_rescale_rnd(swr_get_delay(sst->swr_ctx,
                                                                   sst->audiodec->avctx->sample_rate) +

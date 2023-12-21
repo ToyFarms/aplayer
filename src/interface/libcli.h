@@ -21,8 +21,8 @@ typedef struct Events Events;
 #define RIGHT_MOUSE_CLICKED 0x00100
 
 #define SHIFT_KEY_PRESSED 0x00001
-#define CTRL_KEY_PRESSED 0x00010
-#define ALT_KEY_PRESSED 0x00100
+#define CTRL_KEY_PRESSED  0x00010
+#define ALT_KEY_PRESSED   0x00100
 
 typedef struct KeyEvent
 {

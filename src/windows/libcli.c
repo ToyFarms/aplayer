@@ -308,7 +308,7 @@ Events cli_read_in()
             key_event.vk_key = k.wVirtualKeyCode;
 
             DWORD ks = k.dwControlKeyState;
-            key_event.modifier_key = (ks & SHIFT_PRESSED << 0) | (ks & LEFT_CTRL_PRESSED << 1) | (ks & RIGHT_CTRL_PRESSED << 1) | (ks & LEFT_ALT_PRESSED << 2) | (ks & RIGHT_ALT_PRESSED << 2);
+            key_event.modifier_key = ((ks & SHIFT_PRESSED) << 0) | ((ks & LEFT_CTRL_PRESSED) << 1) | ((ks & RIGHT_CTRL_PRESSED) << 1) | ((ks & LEFT_ALT_PRESSED) << 2) | ((ks & RIGHT_ALT_PRESSED) << 2);
 
             break;
         case MOUSE_EVENT:
@@ -317,7 +317,7 @@ Events cli_read_in()
             mouse_event.x = m.dwMousePosition.X;
             mouse_event.y = m.dwMousePosition.Y;
             DWORD ms = m.dwButtonState;
-            mouse_event.state = (ms & FROM_LEFT_1ST_BUTTON_PRESSED << 0) | (ms & FROM_LEFT_2ND_BUTTON_PRESSED << 1) | (ms & FROM_LEFT_3RD_BUTTON_PRESSED << 2);
+            mouse_event.state = ((ms & FROM_LEFT_1ST_BUTTON_PRESSED) << 0) | ((ms & FROM_LEFT_2ND_BUTTON_PRESSED) << 1) | ((ms & FROM_LEFT_3RD_BUTTON_PRESSED) << 2);
             mouse_event.double_clicked = m.dwEventFlags == DOUBLE_CLICK;
             mouse_event.moved = m.dwEventFlags & MOUSE_MOVED;
             mouse_event.scrolled = m.dwEventFlags & MOUSE_WHEELED;
