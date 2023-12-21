@@ -621,6 +621,7 @@ pthread_t audio_start_async(char *filename)
 
 void audio_free()
 {
+    av_log(NULL, AV_LOG_DEBUG, "Free PlayerState");
     if (pst)
     {
         player_state_free(&pst);

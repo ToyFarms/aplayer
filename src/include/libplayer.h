@@ -26,8 +26,6 @@ typedef struct PlayerState
 
     float volume;
     float volume_incr;
-    float volume_lerp;
-    float volume_max;
     float LUFS_target;
     int LUFS_sample_cap;
 } PlayerState;
