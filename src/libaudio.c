@@ -6,13 +6,13 @@
 
 static PlayerState *pst;
 
-static void _audio_set_volume(AVFrame *frame, int nb_channels, float factor)
+static void _audio_set_volume(AVFrame *frame, float factor)
 {
 #ifdef _USE_SIMD
     int sample;
     __m128 scale_factor = _mm_set1_ps(factor);
 
-    for (int ch = 0; ch < nb_channels; ch++)
+    for (int ch = 0; ch < frame->ch_layout.nb_channels; ch++)
     {
         for (sample = 0; sample < frame->nb_samples - 3; sample += 4)
         {
@@ -183,6 +183,153 @@ bool audio_is_finished()
     return pst->finished;
 }
 
+static float calculate_lufs(AVFrame *frame)
+{
+    float sum_squared[frame->ch_layout.nb_channels];
+    memset(sum_squared, 0, sizeof(sum_squared));
+
+    for (int ch = 0; ch < frame->ch_layout.nb_channels; ch++)
+    {
+        for (int sample = 0; sample < frame->nb_samples; sample++)
+        {
+            float sample_value = ((float *)frame->data[ch])[sample];
+            sum_squared[ch] += sample_value * sample_value;
+        }
+    }
+
+    float power_sum = 0.0f;
+
+    for (int ch = 0; ch < frame->ch_layout.nb_channels; ch++)
+    {
+        float relative_loudness = 20.0f * log10f(sqrtf(sum_squared[ch] / (float)frame->nb_samples));
+        power_sum += powf(10.0f, relative_loudness / 10.0f);
+    }
+
+    float lufs = -0.691f + 10.0f * log10f((1.0f / frame->ch_layout.nb_channels) * power_sum);
+
+    return lufs == -INFINITY ? 0.0f : lufs;
+}
+
+static void audio_set_lufs(AVFrame *frame, float lufs, float target_lufs)
+{
+    float gain = powf(10.0f, (target_lufs - lufs) / 20.0f);
+
+    _audio_set_volume(frame, gain);
+}
+
+static double audio_get_lufs(char *filename, int sample_hard_cap)
+{
+    StreamState *sst = stream_state_init(filename);
+    double lufs_sum = 0.0;
+    int lufs_sampled = 0;
+
+    int err;
+    while (true)
+    {
+    read_frame:
+        err = av_read_frame(sst->ic, sst->audiodec->pkt);
+        if (err == AVERROR_EOF)
+            goto cleanup;
+        else if (err < 0)
+        {
+            av_log(NULL, AV_LOG_FATAL, "Error while reading frame. %s.\n", av_err2str(err));
+            goto cleanup;
+        }
+
+        while (pst && pst->paused)
+            av_usleep(ms2us(100));
+
+        if (pst && pst->req_exit)
+        {
+            pst->req_exit = false;
+            goto cleanup;
+        }
+
+        if (sst->audiodec->pkt->stream_index == sst->audio_stream_index)
+        {
+            err = avcodec_send_packet(sst->audiodec->avctx, sst->audiodec->pkt);
+
+            if (err < 0)
+            {
+                av_log(NULL,
+                       AV_LOG_WARNING,
+                       "Error sending a packet for decoding. %s.\n",
+                       av_err2str(err));
+                goto cleanup;
+            }
+
+            while (true)
+            {
+                err = avcodec_receive_frame(sst->audiodec->avctx, sst->frame);
+
+                if (err == AVERROR(EAGAIN))
+                    goto read_frame;
+                else if (err == AVERROR_EOF)
+                    goto cleanup;
+                else if (err < 0)
+                {
+                    av_log(NULL, AV_LOG_FATAL, "Error during decoding. %s.\n", av_err2str(err));
+                    goto cleanup;
+                }
+
+                if (pst)
+                    pst->timestamp = sst->frame->best_effort_timestamp;
+
+                int dst_nb_samples = av_rescale_rnd(swr_get_delay(sst->swr_ctx,
+                                                                  sst->audiodec->avctx->sample_rate) +
+                                                        sst->frame->nb_samples,
+                                                    sst->audiodec->avctx->sample_rate,
+                                                    sst->audiodec->avctx->sample_rate, AV_ROUND_UP);
+
+                sst->swr_frame->nb_samples = dst_nb_samples;
+                sst->swr_frame->format = AV_SAMPLE_FMT_FLT;
+                sst->swr_frame->ch_layout = sst->audiodec->avctx->ch_layout;
+
+                err = av_frame_get_buffer(sst->swr_frame, 0);
+
+                if (err < 0)
+                {
+                    av_log(NULL,
+                           AV_LOG_FATAL,
+                           "Could not allocate new buffer for AVFrame swr_frame. %s.\n",
+                           av_err2str(err));
+                    goto cleanup;
+                }
+
+                err = swr_convert(sst->swr_ctx,
+                                  sst->swr_frame->data,
+                                  dst_nb_samples,
+                                  (const uint8_t **)sst->frame->data,
+                                  sst->frame->nb_samples);
+
+                if (err < 0)
+                {
+                    av_log(NULL,
+                           AV_LOG_FATAL,
+                           "Could not convert audio data. %s.\n",
+                           av_err2str(err));
+                    goto cleanup;
+                }
+
+                lufs_sum += (double)calculate_lufs(sst->frame);
+                lufs_sampled++;
+
+                if (lufs_sampled > sample_hard_cap)
+                    goto cleanup;
+
+                av_frame_unref(sst->swr_frame);
+                av_frame_unref(sst->frame);
+                av_packet_unref(sst->audiodec->pkt);
+            }
+        }
+    }
+
+cleanup:
+    stream_state_free(&sst);
+
+    return lufs_sum / (double)lufs_sampled;
+}
+
 void audio_start(char *filename)
 {
     av_log(NULL,
@@ -201,6 +348,8 @@ void audio_start(char *filename)
 
     if (pst)
         pst->finished = false;
+
+    float lufs = (float)audio_get_lufs(filename, pst ? pst->lufs_sample_hard_cap : 50000);
 
     StreamState *sst = stream_state_init(filename);
     if (!sst)
@@ -350,9 +499,8 @@ void audio_start(char *filename)
                 if (pst)
                     pst->timestamp = sst->frame->best_effort_timestamp;
 
-                _audio_set_volume(sst->frame,
-                                  sst->audiodec->avctx->ch_layout.nb_channels,
-                                  pst->volume);
+                audio_set_lufs(sst->frame, lufs, pst ? pst->lufs_target : -20.0f);
+                _audio_set_volume(sst->frame, pst ? pst->volume : 1.0f);
 
                 int dst_nb_samples = av_rescale_rnd(swr_get_delay(sst->swr_ctx,
                                                                   sst->audiodec->avctx->sample_rate) +

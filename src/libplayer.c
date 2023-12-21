@@ -27,11 +27,12 @@ PlayerState *player_state_init()
 
     pst->timestamp = 0;
 
-    pst->volume = 0.1f;
-    pst->volume_target = 0.1f;
+    pst->volume = 1.0f;
     pst->volume_incr = 0.05f;
     pst->volume_lerp = 0.8f;
     pst->volume_max = 2.0f;
+    pst->lufs_target = -20.0f;
+    pst->lufs_sample_hard_cap = 50000;
 
     return pst;
 }
