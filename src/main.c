@@ -181,24 +181,38 @@ int main(int argc, char **argv)
                 if (!ke.key_down)
                     break;
 
-                bool selected_idx_changed = false;
+                bool need_redraw = false;
                 char key = ke.acsii_key;
 
                 if (key == 'q')
                     exit = true;
 
-                else if (key == 'j' || ke.vk_key == VIRT_DOWN)
+                else if (key == 'j')
                 {
                     cst->selected_idx += 1;
-                    selected_idx_changed = true;
+                    need_redraw = true;
                 }
-                else if (key == 'k' || ke.vk_key == VIRT_UP)
+                else if (key == 'k')
                 {
                     cst->selected_idx -= 1;
-                    selected_idx_changed = true;
+                    need_redraw = true;
+                }
+                else if (ke.vk_key == VIRT_DOWN && ke.modifier_key & CTRL_KEY_PRESSED)
+                    audio_set_volume(FFMAX(audio_get_volume() - 0.05f, 0));
+                else if (ke.vk_key == VIRT_UP && ke.modifier_key & CTRL_KEY_PRESSED)
+                    audio_set_volume(FFMIN(audio_get_volume() + 0.05f, 1.25f));
+                else if (ke.vk_key == VIRT_UP)
+                {
+                    cst->selected_idx -= 1;
+                    need_redraw = true;
+                }
+                else if (ke.vk_key == VIRT_DOWN)
+                {
+                    cst->selected_idx += 1;
+                    need_redraw = true;
                 }
 
-                if (selected_idx_changed)
+                if (need_redraw)
                     compute_offset(cst);
 
                 if (ke.vk_key == VIRT_RETURN)
@@ -212,9 +226,13 @@ int main(int argc, char **argv)
                     }
                 }
                 else if (ke.vk_key == VIRT_ESCAPE)
+                {
                     cst->selected_idx = -1;
+                    need_redraw = true;
+                }
 
-                cli_draw(cst);
+                if (need_redraw)
+                    cli_draw(cst);
 
                 break;
             case MOUSE_EVENT_TYPE:
