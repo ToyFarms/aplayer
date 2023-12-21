@@ -219,6 +219,8 @@ static void audio_set_lufs(AVFrame *frame, float lufs, float target_lufs)
 
 static double audio_get_lufs(char *filename, int sample_hard_cap)
 {
+    av_log(NULL, AV_LOG_DEBUG, "Getting LUFS from %s, cap=%d.\n", filename, sample_hard_cap);
+
     StreamState *sst = stream_state_init(filename);
     double lufs_sum = 0.0;
     int lufs_sampled = 0;
@@ -350,6 +352,7 @@ void audio_start(char *filename)
         pst->finished = false;
 
     float lufs = (float)audio_get_lufs(filename, pst ? pst->lufs_sample_hard_cap : 50000);
+    av_log(NULL, AV_LOG_DEBUG, "LUFS for \"%s\" is %f\n", filename, lufs);
 
     StreamState *sst = stream_state_init(filename);
     if (!sst)
