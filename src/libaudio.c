@@ -357,7 +357,7 @@ void audio_start(char *filename)
     float gain = (pst ? pst->LUFS_target : -14.0f) - lufs;
     float gain_factor = dB_to_factor(gain);
     av_log(NULL,
-           AV_LOG_INFO,
+           AV_LOG_DEBUG,
            "\"%s\":\n    loudness: %f LUFS\n    gain: %f LUFS\n    factor: %f\n",
            filename,
            lufs,
