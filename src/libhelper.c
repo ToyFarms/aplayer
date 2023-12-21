@@ -13,10 +13,18 @@ void av_log_turn_on()
     av_log_set_level(prev_level);
 }
 
+#ifdef AP_WINDOWS
 /* Will be leaked on exit */
 static char **win32_argv_utf8 = NULL;
 static int win32_argc = 0;
 
+/**
+ * Prepare command line arguments for executable.
+ * For Windows - perform wide-char to UTF-8 conversion.
+ * Input arguments should be main() function arguments.
+ * @param argc_ptr Arguments number (including executable)
+ * @param argv_ptr Arguments list.
+ */
 void prepare_app_arguments(int *argc_ptr, char ***argv_ptr)
 {
     char *argstr_flat;
@@ -61,3 +69,9 @@ void prepare_app_arguments(int *argc_ptr, char ***argv_ptr)
     *argc_ptr = win32_argc;
     *argv_ptr = win32_argv_utf8;
 }
+#else
+void prepare_app_arguments(int *argc_ptr, char ***argv_ptr)
+{
+    /* nothing to do */
+}
+#endif
