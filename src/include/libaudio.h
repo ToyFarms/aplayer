@@ -28,8 +28,8 @@ void audio_exit();
 void audio_wait_until_initialized();
 void audio_wait_until_finished();
 bool audio_is_finished();
-void audio_start(char *filename);
-pthread_t audio_start_async(char *filename);
+void audio_start(char *filename, void (*finished_callback)(void));
+pthread_t audio_start_async(char *filename, void (*finished_callback)(void));
 void audio_free();
 
 #endif // _LIBAUDIO_H

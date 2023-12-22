@@ -334,7 +334,7 @@ cleanup:
     return lufs_sum / (double)lufs_sampled;
 }
 
-void audio_start(char *filename)
+void audio_start(char *filename, void(*finished_callback)(void))
 {
     av_log(NULL,
            AV_LOG_INFO,
@@ -599,18 +599,25 @@ cleanup:
         pst->finished = true;
         pst->initialized = false;
     }
+
+    if (finished_callback)
+        finished_callback();
+
     pthread_exit(NULL);
 }
 
+void (*_finished_callback)(void);
+
 static void *_audio_start_bridge(void *arg)
 {
-    audio_start((char *)arg);
+    audio_start((char *)arg, _finished_callback);
 }
 
 /* Run audio_start in another thread, returns -1 on fail, otherwise the thread id */
-pthread_t audio_start_async(char *filename)
+pthread_t audio_start_async(char *filename, void (*finished_callback)(void))
 {
     av_log(NULL, AV_LOG_DEBUG, "Starting audio thread.\n");
+    _finished_callback = finished_callback;
 
     pthread_t audio_thread_id;
     if (pthread_create(&audio_thread_id, NULL, _audio_start_bridge, (void *)filename) != 0)
