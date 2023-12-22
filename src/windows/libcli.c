@@ -168,7 +168,8 @@ static void cli_draw_padding(CLIState *cst,
                              int fr, int fg, int fb,
                              int br, int bg, int bb)
 {
-    pad_sb = sb_create();
+    if (!pad_sb)
+        pad_sb = sb_create();
 
     char padding[length + 1];
     memset(padding, ' ', sizeof(padding));
