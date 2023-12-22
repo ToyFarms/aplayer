@@ -144,7 +144,7 @@ static LineState cli_get_line_state(CLIState *cst, int idx)
 
 static LineState *lines_state_cache;
 
-static void _cli_draw(CLIState *cst)
+static void cli_draw_list(CLIState *cst)
 {
     int str_len;
     wchar_t *str;
@@ -197,7 +197,7 @@ void cli_draw(CLIState *cst)
     else if (sizeof(lines_state_cache) / sizeof(LineState) != cst->entry_size)
         realloc(lines_state_cache, cst->entry_size * sizeof(LineState));
 
-    _cli_draw(cst);
+    cli_draw_list(cst);
 
     cli_draw_overlay(cst);
 
@@ -213,27 +213,27 @@ static void cli_draw_rect(CLIState *cst, int x, int y, int w, int h, int r, int 
     if (x < 0 || y < 0 || w <= 0 || h <= 0)
         return;
 
+    char padding[w];
+    memset(padding, ' ', sizeof(padding));
+
     for (int current_y = y; current_y < y + h; current_y++)
     {
-        char padding[w];
-        memset(padding, ' ', sizeof(padding));
+        cli_cursor_to(cst->out.handle, x, current_y);
 
-        sb_appendf(osb, "\x1b[48;2;%d;%d;%dm%s\x1b[0m", r, g, b, padding);
-
+        sb_appendf(osb, "\x1b[48;2;%d;%d;%dm", r, g, b);
         char *str = sb_concat(osb);
 
-        cli_cursor_to(cst->out.handle, x, current_y);
         WriteConsole(cst->out.handle, str, strlen(str), NULL, NULL);
+        WriteConsole(cst->out.handle, padding, w, NULL, NULL);
+        WriteConsole(cst->out.handle, "\x1b[0m", 4, NULL, NULL);
 
         free(str);
-
-        sb_reset(osb);
     }
 
     cli_cursor_to(cst->out.handle, 0, 0);
 }
 
-void cli_draw_timestamp(CLIState *cst, int r, int g, int b)
+static void cli_draw_timestamp(CLIState *cst, int r, int g, int b)
 {
     sb_appendf(osb,
                "\x1b[38;2;%d;%d;%dm%.2fs / %.2fs\x1b[0m",
@@ -250,7 +250,7 @@ void cli_draw_timestamp(CLIState *cst, int r, int g, int b)
     sb_reset(osb);
 }
 
-void cli_draw_volume(CLIState *cst, int r, int g, int b)
+static void cli_draw_volume(CLIState *cst, int r, int g, int b)
 {
     char *volume_icon;
 
@@ -260,13 +260,13 @@ void cli_draw_volume(CLIState *cst, int r, int g, int b)
         volume_icon = wchar2mbs(L"🔉");
     else
         volume_icon = wchar2mbs(L"🔊");
-    
+
     sb_appendf(osb,
-               "%s\x1b[38;2;%d;%d;%dm%d\x1b[0m",
+               "%s\x1b[38;2;%d;%d;%dm%.0f\x1b[0m",
                volume_icon,
                r, g, b,
-               (int)(cst->media_volume * 100.0f));
-    
+               cst->media_volume * 100.0f);
+
     char *str = sb_concat(osb);
     wchar_t strw[256];
     int strw_len = MultiByteToWideChar(CP_UTF8, 0, str, -1, strw, sizeof(strw) / sizeof(wchar_t));
@@ -283,6 +283,9 @@ void cli_draw_overlay(CLIState *cst)
 {
     if (!osb)
         osb = sb_create();
+
+    if (cst->width <= 0 || cst->height <= 0)
+        return;
 
     cli_draw_rect(cst, 0, cst->height - 3, cst->width + 10, 3, 10, 10, 10);
     cli_draw_timestamp(cst, 230, 200, 150);
