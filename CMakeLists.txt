@@ -17,12 +17,13 @@ add_executable(
   src/main.c
   src/libaudio.c
   src/libdecoder.c
-  src/libhelper.c
   src/libplayer.c
   src/libstream.c
   src/sb.c
   src/${OS-DIR}/libcli.c
   src/${OS-DIR}/libfile.c
+  src/${OS-DIR}/libhelper.c
+  src/common/libhelperc.c
 )
 
 target_include_directories(aplayer PUBLIC src/include)

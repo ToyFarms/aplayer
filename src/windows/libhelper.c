@@ -1,19 +1,5 @@
 #include "libhelper.h"
 
-static int prev_level;
-
-void av_log_turn_off()
-{
-    prev_level = av_log_get_level();
-    av_log_set_level(AV_LOG_QUIET);
-}
-
-void av_log_turn_on()
-{
-    av_log_set_level(prev_level);
-}
-
-#ifdef AP_WINDOWS
 /* Will be leaked on exit */
 static char **win32_argv_utf8 = NULL;
 static int win32_argc = 0;
@@ -121,9 +107,3 @@ char *wchar2mbs(const wchar_t *wchar_str)
 
     return char_utf8;
 }
-#else
-void prepare_app_arguments(int *argc_ptr, char ***argv_ptr)
-{
-    /* nothing to do */
-}
-#endif

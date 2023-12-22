@@ -42,9 +42,9 @@ static inline float mapf(float value, float min, float max, float new_min, float
 {
     if (min == max)
         return 0.0f;
-    
+
     value = FFMIN(FFMAX(value, min), max);
-    
+
     return (value - min) * (new_max - new_min) / (max - min) + min;
 }
 
@@ -54,6 +54,9 @@ void av_log_turn_on();
 #ifdef AP_WINDOWS
 #include <windows.h>
 #include <shellapi.h>
+
+#elif defined(AP_MACOS)
+#elif defined(AP_LINUX)
 #endif // AP_WINDOWS
 
 void prepare_app_arguments(int *argc_ptr, char ***argv_ptr);
