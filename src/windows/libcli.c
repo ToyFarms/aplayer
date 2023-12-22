@@ -34,6 +34,8 @@ CLIState *cli_state_init()
     cst->width = 0;
     cst->cursor_x = 0;
     cst->cursor_y = 0;
+
+    return cst;
 }
 
 void cli_state_free(CLIState **cst)

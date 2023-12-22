@@ -5,7 +5,7 @@ char **list_directory(char *directory, int *out_size)
     WIN32_FIND_DATAW ffd;
     HANDLE find;
     int count = 0;
-    char **filenames = (char **)malloc(MAX_FILES * sizeof(char *));
+    char **filenames = (char **)malloc(MAX_FILES * MAX_PATH * sizeof(char));
 
     wchar_t wide_directory[MAX_PATH];
     MultiByteToWideChar(CP_UTF8, 0, directory, -1, wide_directory, MAX_PATH);
