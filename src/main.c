@@ -125,6 +125,8 @@ int main(int argc, char **argv)
                     audio_seek(-2500);
                 else if (ke.vk_key == VIRT_RIGHT)
                     audio_seek(2500);
+                else if (ke.vk_key == VIRT_SPACE)
+                    audio_toggle_play();
 
                 if (need_redraw)
                     compute_offset(cst);
