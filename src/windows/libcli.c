@@ -328,7 +328,7 @@ static void cli_draw_timestamp(CLIState *cst, int x, int y, int r, int g, int b)
                "\x1b[38;2;%d;%d;%dm%.2fs / %.2fs\x1b[0m",
                r, g, b,
                (double)cst->media_timestamp / 1000.0,
-               (double)us2ms(cst->media_duration) / 1000.0);
+               (double)cst->media_duration / 1000.0);
 
     char *str = sb_concat(osb);
 
@@ -404,7 +404,7 @@ void cli_draw_overlay(CLIState *cst)
                           cst->cursor_x + timestamp_right_pad, cst->height - progress_bottom_pad,
                           cst->width - cst->cursor_x - (volume_right_pad + timestamp_right_pad + volume_left_pad),
                           (float)cst->media_timestamp,
-                          (float)us2ms(cst->media_duration),
+                          (float)cst->media_duration,
                           255, 0, 0,
                           0, 0, 0);
 }

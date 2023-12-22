@@ -448,7 +448,7 @@ void audio_start(char *filename, void (*finished_callback)(void))
     if (pst)
     {
         pst->initialized = true;
-        pst->duration = sst->ic->duration;
+        pst->duration = us2ms(sst->ic->duration);
     }
 
     int err;
