@@ -45,6 +45,7 @@ int main(int argc, char **argv)
     pthread_t event_thread_id;
     pthread_create(&event_thread_id, NULL, event_thread, NULL);
 #endif // AP_WINDOWS
+
     audio_init();
 
     cst = cli_state_init();
