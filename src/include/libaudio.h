@@ -21,6 +21,7 @@ float audio_get_volume();
 void audio_seek(float ms);
 void audio_seek_to(float ms);
 int64_t audio_get_timestamp();
+int64_t audio_get_duration();
 void audio_play();
 void audio_pause();
 void audio_toggle_play();
