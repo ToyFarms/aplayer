@@ -26,7 +26,6 @@ add_executable(
 )
 
 target_include_directories(aplayer PUBLIC src/include)
-target_include_directories(aplayer PUBLIC src/interface)
 
 target_include_directories(aplayer PUBLIC vcpkg_installed/x64-windows/include)
 target_link_directories(aplayer PUBLIC vcpkg_installed/x64-windows/lib)
