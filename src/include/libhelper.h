@@ -2,8 +2,11 @@
 #define _LIBHELPER_H
 
 #include <stdint.h>
+#include <stdio.h>
 #include <libavutil/mem.h>
 #include <libavutil/log.h>
+
+#include "libos.h"
 
 #define ARRLEN(x) ((sizeof(x) / sizeof(0 [x])) / ((size_t)(!(sizeof(x) % sizeof(0 [x])))))
 #define PR printf("%s:%d\n", __FILE__, __LINE__);
@@ -44,5 +47,6 @@ void av_log_turn_on();
 #endif // AP_WINDOWS
 
 void prepare_app_arguments(int *argc_ptr, char ***argv_ptr);
+char *wchar2mbs(const wchar_t *wchar_str);
 
 #endif // _LIBHELPER_H

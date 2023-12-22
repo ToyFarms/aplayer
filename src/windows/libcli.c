@@ -13,6 +13,8 @@ CLIState *cli_state_init()
 
     memset(cst, 0, sizeof(CLIState));
 
+    pthread_mutex_init(&cst->mutex, NULL);
+
     cst->entries = NULL;
     cst->entry_size = 0;
     cst->entry_offset = 0;
@@ -23,6 +25,7 @@ CLIState *cli_state_init()
 
     cst->media_duration = 0;
     cst->media_timestamp = 0;
+    cst->media_volume = 0.0f;
 
     cst->force_redraw = false;
 
@@ -54,6 +57,11 @@ void cli_state_free(CLIState **cst)
     *cst = NULL;
 }
 
+static inline void cli_cursor_to(HANDLE out, int x, int y)
+{
+    SetConsoleCursorPosition(out, (COORD){x, y});
+}
+
 static void _cli_get_console_size(HANDLE out, int *out_width, int *out_height)
 {
     CONSOLE_SCREEN_BUFFER_INFO csbi;
@@ -78,7 +86,7 @@ void cli_clear_screen(HANDLE out)
     FillConsoleOutputCharacter(out, ' ', w * h, (COORD){0, 0}, &written);
     FillConsoleOutputAttribute(out, 0, w * h, (COORD){0, 0}, &written);
 
-    SetConsoleCursorPosition(out, (COORD){0, 0});
+    cli_cursor_to(out, 0, 0);
 }
 
 typedef enum LineState
@@ -157,7 +165,7 @@ static void _cli_draw(CLIState *cst)
 
         lines_state_cache[abs_entry_idx] = line_state;
 
-        SetConsoleCursorPosition(cst->out.handle, (COORD){0, viewport_offset});
+        cli_cursor_to(cst->out.handle, 0, viewport_offset);
 
         str = cli_line_routine(cst, abs_entry_idx, line_state, &str_len);
         WriteConsoleW(cst->out.handle, str, str_len, NULL, NULL);
@@ -177,6 +185,8 @@ static void _cli_draw(CLIState *cst)
 
 void cli_draw(CLIState *cst)
 {
+    pthread_mutex_lock(&cst->mutex);
+
     if (!sb)
         sb = sb_create();
 
@@ -189,12 +199,94 @@ void cli_draw(CLIState *cst)
 
     _cli_draw(cst);
 
+    cli_draw_overlay(cst);
+
     sb_reset(sb);
+
+    pthread_mutex_unlock(&cst->mutex);
 }
 
-void cli_draw_overlay(CLIState* cst)
-{
+static StringBuilder *osb;
 
+static void cli_draw_rect(CLIState *cst, int x, int y, int w, int h, int r, int g, int b)
+{
+    if (x < 0 || y < 0 || w <= 0 || h <= 0)
+        return;
+
+    for (int current_y = y; current_y < y + h; current_y++)
+    {
+        char padding[w];
+        memset(padding, ' ', sizeof(padding));
+
+        sb_appendf(osb, "\x1b[48;2;%d;%d;%dm%s\x1b[0m", r, g, b, padding);
+
+        char *str = sb_concat(osb);
+
+        cli_cursor_to(cst->out.handle, x, current_y);
+        WriteConsole(cst->out.handle, str, strlen(str), NULL, NULL);
+
+        free(str);
+
+        sb_reset(osb);
+    }
+
+    cli_cursor_to(cst->out.handle, 0, 0);
+}
+
+void cli_draw_timestamp(CLIState *cst, int r, int g, int b)
+{
+    sb_appendf(osb,
+               "\x1b[38;2;%d;%d;%dm%.2fs / %.2fs\x1b[0m",
+               r, g, b,
+               (double)cst->media_timestamp / 1000.0,
+               (double)us2ms(cst->media_duration) / 1000.0);
+
+    char *str = sb_concat(osb);
+
+    cli_cursor_to(cst->out.handle, 1, cst->height - 2);
+    WriteConsole(cst->out.handle, str, strlen(str), NULL, NULL);
+
+    free(str);
+    sb_reset(osb);
+}
+
+void cli_draw_volume(CLIState *cst, int r, int g, int b)
+{
+    char *volume_icon;
+
+    if (cst->media_volume - 1e-3 < 0.0f)
+        volume_icon = wchar2mbs(L"🔈");
+    else if (cst->media_volume < 0.5f)
+        volume_icon = wchar2mbs(L"🔉");
+    else
+        volume_icon = wchar2mbs(L"🔊");
+    
+    sb_appendf(osb,
+               "%s\x1b[38;2;%d;%d;%dm%d\x1b[0m",
+               volume_icon,
+               r, g, b,
+               (int)(cst->media_volume * 100.0f));
+    
+    char *str = sb_concat(osb);
+    wchar_t strw[256];
+    int strw_len = MultiByteToWideChar(CP_UTF8, 0, str, -1, strw, sizeof(strw) / sizeof(wchar_t));
+
+    cli_cursor_to(cst->out.handle, cst->width - 6, cst->height - 2);
+    WriteConsoleW(cst->out.handle, strw, strw_len, NULL, NULL);
+
+    free(str);
+    free(volume_icon);
+    sb_reset(osb);
+}
+
+void cli_draw_overlay(CLIState *cst)
+{
+    if (!osb)
+        osb = sb_create();
+
+    cli_draw_rect(cst, 0, cst->height - 3, cst->width + 10, 3, 10, 10, 10);
+    cli_draw_timestamp(cst, 230, 200, 150);
+    cli_draw_volume(cst, 230, 200, 150);
 }
 
 static HANDLE out_main;
