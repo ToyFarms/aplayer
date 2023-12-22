@@ -10,6 +10,8 @@ elseif(APPLE)
   set(OS-DIR macos)
 endif()
 
+set(CMAKE_C_FLAGS "-Wno-unused-result")
+
 add_executable(
   aplayer
   src/main.c

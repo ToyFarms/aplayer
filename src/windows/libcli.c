@@ -32,6 +32,8 @@ CLIState *cli_state_init()
     cst->out.handle = NULL;
     cst->width = 0;
     cst->width = 0;
+    cst->cursor_x = 0;
+    cst->cursor_y = 0;
 }
 
 void cli_state_free(CLIState **cst)
@@ -74,6 +76,20 @@ static void _cli_get_console_size(HANDLE out, int *out_width, int *out_height)
 void cli_get_console_size(CLIState *cst)
 {
     _cli_get_console_size(cst->out.handle, &cst->width, &cst->height);
+}
+
+static void _cli_get_cursor_pos(HANDLE out, int *out_x, int *out_y)
+{
+    CONSOLE_SCREEN_BUFFER_INFO csbi;
+    GetConsoleScreenBufferInfo(out, &csbi);
+
+    *out_x = csbi.dwCursorPosition.X;
+    *out_y = csbi.dwCursorPosition.Y;
+}
+
+void cli_get_cursor_pos(CLIState *cst)
+{
+    _cli_get_cursor_pos(cst->out.handle, &cst->cursor_x, &cst->cursor_y);
 }
 
 void cli_clear_screen(HANDLE out)
@@ -170,15 +186,16 @@ static void cli_draw_list(CLIState *cst)
         str = cli_line_routine(cst, abs_entry_idx, line_state, &str_len);
         WriteConsoleW(cst->out.handle, str, str_len, NULL, NULL);
 
-        CONSOLE_SCREEN_BUFFER_INFO csbi;
-        GetConsoleScreenBufferInfo(cst->out.handle, &csbi);
+        cli_get_cursor_pos(cst);
 
-        int pad = cst->width - csbi.dwCursorPosition.X;
+        int pad = cst->width - cst->cursor_x;
         if (pad <= 0)
             continue;
 
-        char padding[pad];
+        char padding[pad + 1];
         memset(padding, ' ', sizeof(padding));
+        padding[pad + 1] = '\0';
+
         WriteConsole(cst->out.handle, padding, pad, NULL, NULL);
     }
 }
@@ -213,27 +230,99 @@ static void cli_draw_rect(CLIState *cst, int x, int y, int w, int h, int r, int 
     if (x < 0 || y < 0 || w <= 0 || h <= 0)
         return;
 
-    char padding[w];
+    char padding[w + 1];
     memset(padding, ' ', sizeof(padding));
+    padding[w + 1] = '\0';
 
     for (int current_y = y; current_y < y + h; current_y++)
     {
         cli_cursor_to(cst->out.handle, x, current_y);
 
-        sb_appendf(osb, "\x1b[48;2;%d;%d;%dm", r, g, b);
+        sb_appendf(osb, "\x1b[48;2;%d;%d;%dm%s\x1b[0m", r, g, b, padding);
         char *str = sb_concat(osb);
 
         WriteConsole(cst->out.handle, str, strlen(str), NULL, NULL);
-        WriteConsole(cst->out.handle, padding, w, NULL, NULL);
-        WriteConsole(cst->out.handle, "\x1b[0m", 4, NULL, NULL);
 
         free(str);
+        sb_reset(osb);
     }
 
     cli_cursor_to(cst->out.handle, 0, 0);
 }
 
-static void cli_draw_timestamp(CLIState *cst, int r, int g, int b)
+static const wchar_t blocks[] = {L'█', L'▉', L'▊', L'▋', L'▌', L'▍', L'▎', L'▎', L' '};
+static const int block_len = 9;
+static const float block_increment = 1.0f / (float)block_len;
+
+static void cli_draw_hlinef(CLIState *cst,
+                            int x, int y,
+                            float length,
+                            int fr, int fg, int fb,
+                            int br, int bg, int bb,
+                            bool reset_bg_color)
+{
+    int int_part = (int)length;
+    float float_part = length - (float)int_part;
+
+    cli_cursor_to(cst->out.handle, x, y);
+
+    char *str;
+
+    if (int_part > 0)
+    {
+        char padding[int_part + 1];
+        memset(padding, ' ', sizeof(padding));
+        padding[int_part + 1] = '\0';
+
+        sb_appendf(osb, "\x1b[48;2;%d;%d;%dm%s", fr, fg, fb, padding);
+        str = sb_concat(osb);
+        WriteConsole(cst->out.handle, str, strlen(str), NULL, NULL);
+        free(str);
+        sb_reset(osb);
+    }
+
+    sb_appendf(osb, "\x1b[48;2;%d;%d;%d;38;2;%d;%d;%dm", br, bg, bg, fr, fg, fb);
+    str = sb_concat(osb);
+    WriteConsole(cst->out.handle, str, strlen(str), NULL, NULL);
+    free(str);
+    sb_reset(osb);
+
+    int block_index = block_len - (int)(roundf(float_part / block_increment) * block_increment * block_len);
+    wchar_t final_block = blocks[block_index];
+    WriteConsoleW(cst->out.handle, &final_block, 1, NULL, NULL);
+
+    if (reset_bg_color)
+        WriteConsole(cst->out.handle, "\x1b[0m", 4, NULL, NULL);
+    else
+        WriteConsole(cst->out.handle, "\x1b[39m", 5, NULL, NULL);
+}
+
+static void cli_draw_progress(CLIState *cst,
+                              int x, int y,
+                              int length,
+                              float current,
+                              float max,
+                              int fr, int fg, int fb,
+                              int br, int bg, int bb)
+{
+    float mapped_length = mapf(current, 0.0f, max, 0.0f, (float)length);
+
+    cli_draw_hlinef(cst, x, y, mapped_length, fr, fg, fb, br, bg, bb, false);
+
+    cli_get_cursor_pos(cst);
+    int remaining = (x + length) - cst->cursor_x;
+
+    char padding[remaining + 1];
+    memset(padding, ' ', sizeof(padding));
+    padding[remaining + 1] = '\0';
+
+    WriteConsole(cst->out.handle, padding, remaining, NULL, NULL);
+    WriteConsole(cst->out.handle, "\x1b[0m", 4, NULL, NULL);
+
+    sb_reset(osb);
+}
+
+static void cli_draw_timestamp(CLIState *cst, int x, int y, int r, int g, int b)
 {
     sb_appendf(osb,
                "\x1b[38;2;%d;%d;%dm%.2fs / %.2fs\x1b[0m",
@@ -243,14 +332,14 @@ static void cli_draw_timestamp(CLIState *cst, int r, int g, int b)
 
     char *str = sb_concat(osb);
 
-    cli_cursor_to(cst->out.handle, 1, cst->height - 2);
+    cli_cursor_to(cst->out.handle, x, y);
     WriteConsole(cst->out.handle, str, strlen(str), NULL, NULL);
 
     free(str);
     sb_reset(osb);
 }
 
-static void cli_draw_volume(CLIState *cst, int r, int g, int b)
+static void cli_draw_volume(CLIState *cst, int x, int y, int r, int g, int b)
 {
     char *volume_icon;
 
@@ -271,7 +360,7 @@ static void cli_draw_volume(CLIState *cst, int r, int g, int b)
     wchar_t strw[256];
     int strw_len = MultiByteToWideChar(CP_UTF8, 0, str, -1, strw, sizeof(strw) / sizeof(wchar_t));
 
-    cli_cursor_to(cst->out.handle, cst->width - 6, cst->height - 2);
+    cli_cursor_to(cst->out.handle, x, y);
     WriteConsoleW(cst->out.handle, strw, strw_len, NULL, NULL);
 
     free(str);
@@ -287,9 +376,37 @@ void cli_draw_overlay(CLIState *cst)
     if (cst->width <= 0 || cst->height <= 0)
         return;
 
+    static const int timestamp_left_pad = 1;
+    static const int timestamp_right_pad = 2;
+    static const int timestamp_bottom_pad = 2;
+
+    static const int volume_left_pad = 2;
+    static const int volume_right_pad = 6;
+    static const int volume_bottom_pad = 2;
+
+    static const int progress_bottom_pad = 2;
+
     cli_draw_rect(cst, 0, cst->height - 3, cst->width + 10, 3, 10, 10, 10);
-    cli_draw_timestamp(cst, 230, 200, 150);
-    cli_draw_volume(cst, 230, 200, 150);
+    cli_draw_timestamp(cst,
+                       timestamp_left_pad,
+                       cst->height - timestamp_bottom_pad,
+                       230, 200, 150);
+
+    cli_get_cursor_pos(cst);
+
+    cli_draw_volume(cst,
+                    cst->width - volume_right_pad,
+                    cst->height - volume_bottom_pad,
+                    230, 200, 150);
+
+    if (!cst->media_duration <= 0 || !cst->media_timestamp <= 0)
+        cli_draw_progress(cst,
+                          cst->cursor_x + timestamp_right_pad, cst->height - progress_bottom_pad,
+                          cst->width - cst->cursor_x - (volume_right_pad + timestamp_right_pad + volume_left_pad),
+                          (float)cst->media_timestamp,
+                          (float)us2ms(cst->media_duration),
+                          255, 0, 0,
+                          0, 0, 0);
 }
 
 static HANDLE out_main;
