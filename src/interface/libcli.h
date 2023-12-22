@@ -7,6 +7,7 @@
 #include <libavutil/common.h>
 #include <libavutil/log.h>
 #include <pthread.h>
+#include <wchar.h>
 
 #include "libos.h"
 #include "sb.h"
@@ -306,6 +307,8 @@ typedef struct CLIState
     Handle out;
     int width;
     int height;
+    int cursor_x;
+    int cursor_y;
 } CLIState;
 
 typedef struct Events
@@ -327,5 +330,6 @@ void cli_draw(CLIState *cst);
 void cli_draw_overlay(CLIState *cst);
 Handle cli_get_handle(BUFFER_TYPE type);
 void cli_get_console_size(CLIState *cst);
+void cli_get_cursor_pos(CLIState *cst);
 
 #endif // _LIBCLI_H
