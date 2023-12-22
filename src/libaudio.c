@@ -445,10 +445,7 @@ void audio_start(char *filename, void(*finished_callback)(void))
             av_usleep(ms2us(100));
 
         if (pst && pst->req_exit)
-        {
-            pst->req_exit = false;
             goto cleanup;
-        }
 
         if (sst->audiodec->pkt->stream_index == sst->audio_stream_index)
         {
@@ -594,14 +591,15 @@ cleanup:
     av_log(NULL, AV_LOG_DEBUG, "Cleanup: Terminate PortAudio.\n");
     Pa_Terminate();
 
+    if (finished_callback && !pst->req_exit)
+        finished_callback();
+
     if (pst)
     {
+        pst->req_exit = false;
         pst->finished = true;
         pst->initialized = false;
     }
-
-    if (finished_callback)
-        finished_callback();
 
     pthread_exit(NULL);
 }
