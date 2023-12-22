@@ -59,7 +59,6 @@ void cycle_next()
     compute_offset(cst);
 
     cli_draw(cst);
-    play(cst->entries[cst->playing_idx]);
 }
 
 void cycle_prev()
@@ -69,7 +68,6 @@ void cycle_prev()
     compute_offset(cst);
 
     cli_draw(cst);
-    play(cst->entries[cst->playing_idx]);
 }
 
 #ifdef AP_WINDOWS
@@ -101,12 +99,14 @@ void *event_thread(void *arg)
         else if (GetAsyncKeyState(VIRT_MEDIA_NEXT_TRACK) & 0x8001)
         {
             cycle_next();
+            play(cst->entries[cst->playing_idx]);
             keypress = true;
             keypress_cooldown = ms2us(500);
         }
         else if (GetAsyncKeyState(VIRT_MEDIA_PREV_TRACK) & 0x8001)
         {
             cycle_prev();
+            play(cst->entries[cst->playing_idx]);
             keypress = true;
             keypress_cooldown = ms2us(500);
         }
