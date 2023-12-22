@@ -256,6 +256,8 @@ void play(char *filename)
 
     audio_start_async(filename, finished_callback);
     audio_wait_until_initialized();
+
+    // cst->media_duration = audio_get_duration();
 }
 
 #ifdef AP_WINDOWS

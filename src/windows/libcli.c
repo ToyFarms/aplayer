@@ -21,6 +21,9 @@ CLIState *cli_state_init()
     cst->playing_idx = -1;
     cst->selected_idx = -1;
 
+    cst->media_duration = 0;
+    cst->media_timestamp = 0;
+
     cst->force_redraw = false;
 
     cst->out.handle = NULL;
@@ -187,6 +190,11 @@ void cli_draw(CLIState *cst)
     _cli_draw(cst);
 
     sb_reset(sb);
+}
+
+void cli_draw_overlay(CLIState* cst)
+{
+
 }
 
 static HANDLE out_main;

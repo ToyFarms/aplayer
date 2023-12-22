@@ -7,9 +7,9 @@
 #include <libavutil/common.h>
 #include <libavutil/log.h>
 
+#include "libos.h"
 #include "sb.h"
 #include "libhelper.h"
-#include "libos.h"
 
 typedef enum BUFFER_TYPE BUFFER_TYPE;
 typedef struct Handle Handle;
@@ -294,6 +294,9 @@ typedef struct CLIState
     int playing_idx;
     int selected_idx;
 
+    int64_t media_duration;
+    int64_t media_timestamp;
+
     bool force_redraw;
 
     Handle out;
@@ -317,6 +320,7 @@ void cli_state_free(CLIState **cst);
 void cli_buffer_switch(BUFFER_TYPE type);
 Events cli_read_in();
 void cli_draw(CLIState *cst);
+void cli_draw_overlay(CLIState *cst);
 Handle cli_get_handle(BUFFER_TYPE type);
 void cli_get_console_size(CLIState *cst);
 

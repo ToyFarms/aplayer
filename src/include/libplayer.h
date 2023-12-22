@@ -5,6 +5,7 @@
 #include <stdbool.h>
 #include <stdlib.h>
 #include <libavutil/log.h>
+#include <string.h>
 
 #include "libhelper.h"
 
@@ -23,6 +24,7 @@ typedef struct PlayerState
     int64_t print_cooldown;
 
     int64_t timestamp;
+    int64_t duration;
 
     float volume;
     float volume_incr;

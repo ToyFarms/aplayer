@@ -26,6 +26,7 @@ PlayerState *player_state_init()
     pst->print_cooldown = ms2us(100);
 
     pst->timestamp = 0;
+    pst->duration = 0;
 
     pst->volume = 1.0f;
     pst->LUFS_target = -14.0f;

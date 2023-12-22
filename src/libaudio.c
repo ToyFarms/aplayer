@@ -79,6 +79,16 @@ int64_t audio_get_timestamp()
     return pst->timestamp;
 }
 
+int64_t audio_get_duration()
+{
+    if (!pst)
+    {
+        av_log(NULL, AV_LOG_WARNING, "audio_get_duration: Audio is not initialized.\n");
+        return 0;
+    }
+    return pst->duration;
+}
+
 void audio_play()
 {
     av_log(NULL, AV_LOG_DEBUG, "Paused audio: 0.\n");
@@ -334,7 +344,7 @@ cleanup:
     return lufs_sum / (double)lufs_sampled;
 }
 
-void audio_start(char *filename, void(*finished_callback)(void))
+void audio_start(char *filename, void (*finished_callback)(void))
 {
     av_log(NULL,
            AV_LOG_INFO,
@@ -351,7 +361,10 @@ void audio_start(char *filename, void(*finished_callback)(void))
     }
 
     if (pst)
+    {
         pst->finished = false;
+        pst->req_exit = false;
+    }
 
     float lufs = (float)audio_get_lufs(filename, pst ? pst->LUFS_sample_cap : 50000);
     float gain = (pst ? pst->LUFS_target : -14.0f) - lufs;
@@ -367,6 +380,9 @@ void audio_start(char *filename, void(*finished_callback)(void))
     StreamState *sst = stream_state_init(filename);
     if (!sst)
         goto cleanup;
+
+    if (pst)
+        pst->duration = sst->ic->duration;
 
     av_log(NULL, AV_LOG_DEBUG, "Initializing PortAudio.\n");
     PaError pa_err;
@@ -591,15 +607,17 @@ cleanup:
     av_log(NULL, AV_LOG_DEBUG, "Cleanup: Terminate PortAudio.\n");
     Pa_Terminate();
 
+    if (pst)
+    {
+        pst->finished = true;
+        pst->initialized = false;
+    }
+
     if (finished_callback && !pst->req_exit)
         finished_callback();
 
     if (pst)
-    {
         pst->req_exit = false;
-        pst->finished = true;
-        pst->initialized = false;
-    }
 
     pthread_exit(NULL);
 }
