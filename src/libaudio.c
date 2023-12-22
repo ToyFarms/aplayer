@@ -190,6 +190,16 @@ bool audio_is_initialized()
     return pst->initialized;
 }
 
+bool audio_is_paused()
+{
+    if (!pst)
+    {
+        av_log(NULL, AV_LOG_WARNING, "audio_is_paused: Audio is not initialized.\n");
+        return true;
+    }
+    return pst->paused;
+}
+
 static inline float dB_to_factor(float dB)
 {
     return powf(10.0f, (dB / 20.0f));

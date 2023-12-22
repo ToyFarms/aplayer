@@ -251,10 +251,7 @@ void cli_draw(CLIState *cst)
         realloc(lines_state_cache, cst->entry_size * sizeof(LineState));
 
     cli_draw_list(cst);
-
     cli_draw_overlay(cst);
-
-    sb_reset(list_sb);
 
     pthread_mutex_unlock(&cst->mutex);
 }
@@ -409,7 +406,7 @@ void cli_draw_overlay(CLIState *cst)
                           (float)cst->media_timestamp,
                           (float)cst->media_duration,
                           255, 0, 0,
-                          0, 0, 0);
+                          150, 150, 150);
 }
 
 static HANDLE out_main;

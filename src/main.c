@@ -48,8 +48,11 @@ int main(int argc, char **argv)
     audio_init();
 
     cst = cli_state_init();
+
     cst->entries = list_directory(argv[1], &cst->entry_size);
+
     cli_get_console_size(cst);
+
     cst->media_volume = audio_get_volume();
 
     pthread_t update_thread_id;
@@ -342,6 +345,6 @@ void *update_thread(void *arg)
         cli_draw_overlay(cst);
         pthread_mutex_unlock(&cst->mutex);
 
-        av_usleep(ms2us(100));
+        av_usleep(ms2us(audio_is_paused() ? 200 : 50));
     }
 }
