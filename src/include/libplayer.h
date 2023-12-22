@@ -29,7 +29,7 @@ typedef struct PlayerState
     float volume;
     float volume_incr;
     float LUFS_target;
-    int LUFS_sample_cap;
+    int LUFS_sampling_cap;
 } PlayerState;
 
 PlayerState *player_state_init();

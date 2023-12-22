@@ -30,7 +30,7 @@ PlayerState *player_state_init()
 
     pst->volume = 1.0f;
     pst->LUFS_target = -14.0f;
-    pst->LUFS_sample_cap = 50000;
+    pst->LUFS_sampling_cap = 50000;
 
     return pst;
 }

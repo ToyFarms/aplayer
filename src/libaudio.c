@@ -240,9 +240,9 @@ static void audio_apply_gain(AVFrame *frame, float target_dB, float dB)
     _audio_set_volume(frame, gain);
 }
 
-static double audio_get_lufs(char *filename, int sample_hard_cap)
+static double audio_get_lufs(char *filename, int sampling_cap)
 {
-    av_log(NULL, AV_LOG_DEBUG, "Getting LUFS from %s, cap=%d.\n", filename, sample_hard_cap);
+    av_log(NULL, AV_LOG_DEBUG, "Getting LUFS from %s, cap=%d.\n", filename, sampling_cap);
 
     StreamState *sst = stream_state_init(filename);
     double lufs_sum = 0.0;
@@ -339,7 +339,7 @@ static double audio_get_lufs(char *filename, int sample_hard_cap)
                 lufs_sum += (double)calculate_lufs(sst->frame);
                 lufs_sampled++;
 
-                if (lufs_sampled > sample_hard_cap)
+                if (lufs_sampled > sampling_cap)
                     goto cleanup;
 
                 av_frame_unref(sst->swr_frame);
@@ -374,7 +374,7 @@ void audio_start(char *filename, void (*finished_callback)(void))
         pst->req_exit = false;
     }
 
-    float lufs = (float)audio_get_lufs(filename, pst ? pst->LUFS_sample_cap : 50000);
+    float lufs = (float)audio_get_lufs(filename, pst ? pst->LUFS_sampling_cap : 50000);
     float gain = (pst ? pst->LUFS_target : -14.0f) - lufs;
     float gain_factor = dB_to_factor(gain);
     av_log(NULL,
