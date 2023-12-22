@@ -144,7 +144,7 @@ void audio_wait_until_initialized()
     while (!pst)
         av_usleep(ms2us(100));
 
-    while (!pst->initialized && !pst->finished)
+    while (!pst->initialized)
         av_usleep(ms2us(100));
 
     av_log(NULL, AV_LOG_DEBUG, "Audio is initialized.\n");
@@ -178,6 +178,16 @@ bool audio_is_finished()
         return true;
     }
     return pst->finished;
+}
+
+bool audio_is_initialized()
+{
+    if (!pst)
+    {
+        av_log(NULL, AV_LOG_WARNING, "audio_is_initialized: Audio is not initialized.\n");
+        return true;
+    }
+    return pst->initialized;
 }
 
 static inline float dB_to_factor(float dB)
@@ -352,10 +362,8 @@ void audio_start(char *filename, void (*finished_callback)(void))
            filename);
 
     if (!pst)
-        pst = player_state_init();
-    else if (pst && !pst->finished)
     {
-        av_log(NULL, AV_LOG_FATAL, "Trying to start audio stream while another stream is still active.\n");
+        av_log(NULL, AV_LOG_FATAL, "Audio is not initialized, call audio_init().\n");
         pthread_exit(NULL);
         return;
     }
@@ -380,9 +388,6 @@ void audio_start(char *filename, void (*finished_callback)(void))
     StreamState *sst = stream_state_init(filename);
     if (!sst)
         goto cleanup;
-
-    if (pst)
-        pst->duration = sst->ic->duration;
 
     av_log(NULL, AV_LOG_DEBUG, "Initializing PortAudio.\n");
     PaError pa_err;
@@ -441,7 +446,10 @@ void audio_start(char *filename, void (*finished_callback)(void))
     }
 
     if (pst)
+    {
         pst->initialized = true;
+        pst->duration = sst->ic->duration;
+    }
 
     int err;
     int err_nf; // error non-fatal
@@ -642,9 +650,13 @@ pthread_t audio_start_async(char *filename, void (*finished_callback)(void))
     return audio_thread_id;
 }
 
+void audio_init()
+{
+    pst = player_state_init();
+}
+
 void audio_free()
 {
-    av_log(NULL, AV_LOG_DEBUG, "Free PlayerState");
     if (pst)
     {
         player_state_free(&pst);

@@ -1,57 +1,5 @@
 #include "libfile.h"
 
-static char *get_last_error_string()
-{
-    DWORD error_code = GetLastError();
-    if (error_code == 0)
-        return "Success";
-
-    LPVOID msg_buf;
-
-    size_t size = FormatMessage(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
-                                NULL,
-                                error_code,
-                                MAKELANGID(LANG_NEUTRAL,
-                                           SUBLANG_DEFAULT),
-                                (LPSTR)&msg_buf,
-                                0,
-                                NULL);
-
-    return (char *)msg_buf;
-}
-
-static char *wchar2mbs(const wchar_t *wchar_str)
-{
-    if (!wchar_str)
-        return NULL;
-
-    int bufsize = WideCharToMultiByte(CP_UTF8, 0, &wchar_str[0], -1, NULL, 0, NULL, NULL);
-    if (bufsize == 0)
-    {
-        wprintf(L"\x1b[38;2;255;0;0mError converting wide char \"%ls\": ", wchar_str);
-        av_log(NULL, AV_LOG_FATAL, "%s.\n", get_last_error_string());
-        return NULL;
-    }
-
-    char *char_utf8 = (char *)malloc(bufsize * sizeof(char));
-    if (!char_utf8)
-    {
-        av_log(NULL, AV_LOG_FATAL, "Could not allocate memory");
-        return NULL;
-    }
-
-    bufsize = WideCharToMultiByte(CP_UTF8, 0, &wchar_str[0], -1, &char_utf8[0], bufsize, NULL, NULL);
-    if (bufsize == 0)
-    {
-        wprintf(L"\x1b[38;2;255;0;0mError converting wide char \"%ls\": ", wchar_str);
-        av_log(NULL, AV_LOG_FATAL, "%s.\n", get_last_error_string());
-        free(char_utf8);
-        return NULL;
-    }
-
-    return char_utf8;
-}
-
 char **list_directory(char *directory, int *out_size)
 {
     WIN32_FIND_DATAW ffd;
@@ -70,8 +18,7 @@ char **list_directory(char *directory, int *out_size)
 
     if (find == INVALID_HANDLE_VALUE)
     {
-        wprintf(L"\x1b[38;2;255;0;0m\"%ls\": ", search_path);
-        av_log(NULL, AV_LOG_FATAL, "%s.\n", get_last_error_string());
+        av_log(NULL, AV_LOG_FATAL, "FindFirstFileW Failed: %d.\n", GetLastError());
         return NULL;
     }
 

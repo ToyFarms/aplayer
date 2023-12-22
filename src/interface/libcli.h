@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <libavutil/common.h>
 #include <libavutil/log.h>
+#include <pthread.h>
 
 #include "libos.h"
 #include "sb.h"
@@ -286,6 +287,8 @@ typedef struct Handle
 
 typedef struct CLIState
 {
+    pthread_mutex_t mutex;
+
     char **entries;
     int entry_size;
     int entry_offset;
@@ -296,6 +299,7 @@ typedef struct CLIState
 
     int64_t media_duration;
     int64_t media_timestamp;
+    float media_volume;
 
     bool force_redraw;
 

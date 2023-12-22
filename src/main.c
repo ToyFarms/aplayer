@@ -17,6 +17,9 @@ void play(char *filename);
 #ifdef AP_WINDOWS
 void *event_thread(void *arg);
 #endif // AP_WINDOWS
+void *update_thread(void *arg);
+
+#define DEBUG 0
 
 int main(int argc, char **argv)
 {
@@ -26,7 +29,11 @@ int main(int argc, char **argv)
         return 1;
     }
 
+#if DEBUG == 1
+    av_log_set_level(AV_LOG_DEBUG);
+#else
     av_log_set_level(AV_LOG_QUIET);
+#endif // DEBUG == 1
 
     prepare_app_arguments(&argc, &argv);
 
@@ -38,12 +45,20 @@ int main(int argc, char **argv)
     pthread_t event_thread_id;
     pthread_create(&event_thread_id, NULL, event_thread, NULL);
 #endif // AP_WINDOWS
+    audio_init();
 
     cst = cli_state_init();
     cst->entries = list_directory(argv[1], &cst->entry_size);
     cli_get_console_size(cst);
+    cst->media_volume = audio_get_volume();
+
+    pthread_t update_thread_id;
+    pthread_create(&update_thread_id, NULL, update_thread, NULL);
 
     cli_buffer_switch(BUF_ALTERNATE);
+#if DEBUG == 1
+    cli_buffer_switch(BUF_MAIN);
+#endif // DEBUG == 1
 
     Handle out_main = cli_get_handle(BUF_MAIN);
     cst->out = cli_get_handle(BUF_ALTERNATE);
@@ -248,7 +263,7 @@ void finished_callback(void)
 
 void play(char *filename)
 {
-    if (!audio_is_finished())
+    if (!audio_is_finished() && audio_is_initialized())
     {
         audio_exit();
         audio_wait_until_finished();
@@ -257,7 +272,7 @@ void play(char *filename)
     audio_start_async(filename, finished_callback);
     audio_wait_until_initialized();
 
-    // cst->media_duration = audio_get_duration();
+    cst->media_duration = audio_get_duration();
 }
 
 #ifdef AP_WINDOWS
@@ -313,3 +328,18 @@ void *event_thread(void *arg)
     return 0;
 }
 #endif // AP_WINDOWS
+
+void *update_thread(void *arg)
+{
+    while (true)
+    {
+        cst->media_timestamp = audio_get_timestamp();
+        cst->media_volume = audio_get_volume();
+
+        pthread_mutex_lock(&cst->mutex);
+        cli_draw_overlay(cst);
+        pthread_mutex_unlock(&cst->mutex);
+
+        av_usleep(ms2us(100));
+    }
+}
