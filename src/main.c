@@ -282,7 +282,7 @@ void *event_thread(void *arg)
         {
             audio_toggle_play();
             keypress = true;
-            keypress_cooldown = ms2us(100);
+            keypress_cooldown = ms2us(500);
         }
         else if (GetAsyncKeyState(VIRT_MEDIA_NEXT_TRACK) & 0x8001)
         {
