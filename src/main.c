@@ -9,119 +9,13 @@
 
 static CLIState *cst;
 
-void compute_offset(CLIState *cst)
-{
-    cst->force_redraw = false;
-
-    if (cst->selected_idx < 0)
-    {
-        cst->selected_idx = cst->entry_size - 1;
-        cst->entry_offset = cst->entry_size - cst->height;
-        cst->force_redraw = true;
-    }
-    else if (cst->selected_idx > cst->entry_size - 1)
-    {
-        cst->selected_idx = 0;
-        cst->entry_offset = 0;
-        cst->force_redraw = true;
-    }
-
-    int scroll_margin = cst->height > 12 ? 5 : 1;
-
-    if (cst->selected_idx - cst->entry_offset > cst->height - scroll_margin)
-    {
-        cst->entry_offset = FFMIN(cst->entry_offset + ((cst->selected_idx - cst->entry_offset) - (cst->height - scroll_margin)), cst->entry_size - cst->height);
-        cst->force_redraw = true;
-    }
-    else if (cst->selected_idx - cst->entry_offset < scroll_margin)
-    {
-        cst->entry_offset = FFMAX(cst->entry_offset - (scroll_margin - (cst->selected_idx - cst->entry_offset)), 0);
-        cst->force_redraw = true;
-    }
-}
-
-void play(char *filename)
-{
-    if (!audio_is_finished())
-    {
-        audio_exit();
-        audio_wait_until_finished();
-    }
-
-    audio_start_async(filename);
-    audio_wait_until_initialized();
-}
-
-void cycle_next()
-{
-    cst->playing_idx = wrap_around(cst->playing_idx + 1, 0, cst->entry_size);
-    cst->selected_idx = cst->playing_idx;
-    compute_offset(cst);
-
-    cli_draw(cst);
-}
-
-void cycle_prev()
-{
-    cst->playing_idx = wrap_around(cst->playing_idx - 1, 0, cst->entry_size);
-    cst->selected_idx = cst->playing_idx;
-    compute_offset(cst);
-
-    cli_draw(cst);
-}
-
+void compute_offset(CLIState *cst);
+void cycle_next();
+void cycle_prev();
+void finished_callback(void);
+void play(char *filename);
 #ifdef AP_WINDOWS
-void *event_thread(void *arg)
-{
-    av_log(NULL, AV_LOG_DEBUG, "Starting event_thread.\n");
-    audio_wait_until_initialized();
-
-    int64_t last_keypress = 0;
-    int64_t keypress_cooldown = 0;
-    bool keypress = false;
-    float volume_incr = 0.05f;
-    float volume_max = 2.0f;
-
-    while (true)
-    {
-        if (av_gettime() - last_keypress < keypress_cooldown)
-        {
-            av_usleep(keypress_cooldown - (av_gettime() - last_keypress));
-            continue;
-        }
-
-        if (GetAsyncKeyState(VIRT_MEDIA_STOP) & 0x8001)
-        {
-            audio_toggle_play();
-            keypress = true;
-            keypress_cooldown = ms2us(100);
-        }
-        else if (GetAsyncKeyState(VIRT_MEDIA_NEXT_TRACK) & 0x8001)
-        {
-            cycle_next();
-            play(cst->entries[cst->playing_idx]);
-            keypress = true;
-            keypress_cooldown = ms2us(500);
-        }
-        else if (GetAsyncKeyState(VIRT_MEDIA_PREV_TRACK) & 0x8001)
-        {
-            cycle_prev();
-            play(cst->entries[cst->playing_idx]);
-            keypress = true;
-            keypress_cooldown = ms2us(500);
-        }
-
-        if (keypress)
-        {
-            keypress = false;
-            last_keypress = av_gettime();
-        }
-        else
-            av_usleep(ms2us(100));
-    }
-
-    return 0;
-}
+void *event_thread(void *arg);
 #endif // AP_WINDOWS
 
 int main(int argc, char **argv)
@@ -296,3 +190,124 @@ int main(int argc, char **argv)
     audio_free();
     return 0;
 }
+
+void compute_offset(CLIState *cst)
+{
+    cst->force_redraw = false;
+
+    if (cst->selected_idx < 0)
+    {
+        cst->selected_idx = cst->entry_size - 1;
+        cst->entry_offset = cst->entry_size - cst->height;
+        cst->force_redraw = true;
+    }
+    else if (cst->selected_idx > cst->entry_size - 1)
+    {
+        cst->selected_idx = 0;
+        cst->entry_offset = 0;
+        cst->force_redraw = true;
+    }
+
+    int scroll_margin = cst->height > 12 ? 5 : 1;
+
+    if (cst->selected_idx - cst->entry_offset > cst->height - scroll_margin)
+    {
+        cst->entry_offset = FFMIN(cst->entry_offset + ((cst->selected_idx - cst->entry_offset) - (cst->height - scroll_margin)), cst->entry_size - cst->height);
+        cst->force_redraw = true;
+    }
+    else if (cst->selected_idx - cst->entry_offset < scroll_margin)
+    {
+        cst->entry_offset = FFMAX(cst->entry_offset - (scroll_margin - (cst->selected_idx - cst->entry_offset)), 0);
+        cst->force_redraw = true;
+    }
+}
+
+void cycle_next()
+{
+    cst->playing_idx = wrap_around(cst->playing_idx + 1, 0, cst->entry_size);
+    cst->selected_idx = cst->playing_idx;
+    compute_offset(cst);
+
+    cli_draw(cst);
+}
+
+void cycle_prev()
+{
+    cst->playing_idx = wrap_around(cst->playing_idx - 1, 0, cst->entry_size);
+    cst->selected_idx = cst->playing_idx;
+    compute_offset(cst);
+
+    cli_draw(cst);
+}
+
+void finished_callback(void)
+{
+    cycle_next();
+    play(cst->entries[cst->playing_idx]);
+}
+
+void play(char *filename)
+{
+    if (!audio_is_finished())
+    {
+        audio_exit();
+        audio_wait_until_finished();
+    }
+
+    audio_start_async(filename, finished_callback);
+    audio_wait_until_initialized();
+}
+
+#ifdef AP_WINDOWS
+void *event_thread(void *arg)
+{
+    av_log(NULL, AV_LOG_DEBUG, "Starting event_thread.\n");
+    audio_wait_until_initialized();
+
+    int64_t last_keypress = 0;
+    int64_t keypress_cooldown = 0;
+    bool keypress = false;
+    float volume_incr = 0.05f;
+    float volume_max = 2.0f;
+
+    while (true)
+    {
+        if (av_gettime() - last_keypress < keypress_cooldown)
+        {
+            av_usleep(keypress_cooldown - (av_gettime() - last_keypress));
+            continue;
+        }
+
+        if (GetAsyncKeyState(VIRT_MEDIA_STOP) & 0x8001)
+        {
+            audio_toggle_play();
+            keypress = true;
+            keypress_cooldown = ms2us(100);
+        }
+        else if (GetAsyncKeyState(VIRT_MEDIA_NEXT_TRACK) & 0x8001)
+        {
+            cycle_next();
+            play(cst->entries[cst->playing_idx]);
+            keypress = true;
+            keypress_cooldown = ms2us(500);
+        }
+        else if (GetAsyncKeyState(VIRT_MEDIA_PREV_TRACK) & 0x8001)
+        {
+            cycle_prev();
+            play(cst->entries[cst->playing_idx]);
+            keypress = true;
+            keypress_cooldown = ms2us(500);
+        }
+
+        if (keypress)
+        {
+            keypress = false;
+            last_keypress = av_gettime();
+        }
+        else
+            av_usleep(ms2us(100));
+    }
+
+    return 0;
+}
+#endif // AP_WINDOWS
