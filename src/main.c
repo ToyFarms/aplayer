@@ -368,6 +368,7 @@ void play(char *filename)
     if (!audio_is_finished() && audio_is_initialized())
     {
         audio_exit();
+        audio_play();
         audio_wait_until_finished();
     }
 
