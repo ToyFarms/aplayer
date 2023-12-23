@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <libavutil/common.h>
 #include <libavutil/log.h>
+#include <libavutil/avutil.h>
 #include <pthread.h>
 #include <wchar.h>
 

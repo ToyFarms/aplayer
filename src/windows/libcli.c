@@ -330,8 +330,8 @@ static void cli_draw_timestamp(CLIState *cst, int x, int y, int r, int g, int b)
     sb_appendf(overlay_sb,
                "\x1b[38;2;%d;%d;%dm%.2fs / %.2fs\x1b[0m",
                r, g, b,
-               (double)cst->media_timestamp / 1000.0,
-               (double)cst->media_duration / 1000.0);
+               (double)cst->media_timestamp / (double)AV_TIME_BASE,
+               (double)cst->media_duration / (double)AV_TIME_BASE);
 
     char *str = sb_concat(overlay_sb);
 
