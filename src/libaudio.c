@@ -54,7 +54,7 @@ void audio_seek(float ms)
     }
     pst->req_seek = true;
     pst->seek_absolute = false;
-    pst->seek_incr = ms;
+    pst->seek_incr = ms * 1000;
 }
 
 void audio_seek_to(float ms)
@@ -66,7 +66,7 @@ void audio_seek_to(float ms)
     }
     pst->req_seek = true;
     pst->seek_absolute = true;
-    pst->seek_incr = ms;
+    pst->seek_incr = ms * 1000;
 }
 
 int64_t audio_get_timestamp()
@@ -364,6 +364,43 @@ cleanup:
     return lufs_sum / (double)lufs_sampled;
 }
 
+static void _audio_seek(StreamState *sst, PlayerState *pst)
+{
+    int64_t target_timestamp =
+        pst->seek_absolute
+            ? pst->seek_incr
+            : pst->timestamp + pst->seek_incr;
+
+    target_timestamp =
+        FFMAX(FFMIN(target_timestamp, sst->ic->duration), 0);
+
+    av_log(NULL,
+           AV_LOG_DEBUG,
+           "Seeking from %.2fs to %.2fs.\n",
+           (double)pst->timestamp / (double)AV_TIME_BASE,
+           (double)target_timestamp / (double)AV_TIME_BASE);
+
+    int err = avformat_seek_file(sst->ic,
+                                 -1,
+                                 INT64_MIN,
+                                 target_timestamp,
+                                 INT64_MAX,
+                                 AVSEEK_FLAG_BACKWARD | AVSEEK_FLAG_ANY);
+
+    if (err < 0)
+    {
+        av_log(NULL,
+               AV_LOG_DEBUG,
+               "Could not seek to %.2fs. %s.\n",
+               (double)target_timestamp / (double)AV_TIME_BASE,
+               av_err2str(err));
+    }
+
+    pst->req_seek = false;
+    pst->seek_absolute = false;
+    pst->seek_incr = 0;
+}
+
 void audio_start(char *filename, void (*finished_callback)(void))
 {
     av_log(NULL,
@@ -458,7 +495,7 @@ void audio_start(char *filename, void (*finished_callback)(void))
     if (pst)
     {
         pst->initialized = true;
-        pst->duration = us2ms(sst->ic->duration);
+        pst->duration = sst->ic->duration;
     }
 
     int err;
@@ -497,36 +534,7 @@ void audio_start(char *filename, void (*finished_callback)(void))
             while (true)
             {
                 if (pst && (pst->req_seek && pst->timestamp > 0))
-                {
-                    int64_t target_timestamp =
-                        pst->seek_absolute
-                            ? pst->seek_incr
-                            : pst->timestamp + pst->seek_incr;
-                    target_timestamp =
-                        FFMAX(FFMIN(target_timestamp, sst->ic->duration), 0);
-
-                    av_log(NULL,
-                           AV_LOG_DEBUG,
-                           "\nSeeking from %.2fs to %.2fs.\n",
-                           (double)pst->timestamp / 1000.0,
-                           (double)target_timestamp / 1000.0);
-
-                    err_nf = av_seek_frame(sst->ic,
-                                           sst->audio_stream_index,
-                                           target_timestamp,
-                                           AVSEEK_FLAG_BACKWARD | AVSEEK_FLAG_ANY);
-                    if (err_nf < 0)
-                    {
-                        av_log(NULL,
-                               AV_LOG_DEBUG,
-                               "Could not seek to %.2fs. %s.\n",
-                               (double)target_timestamp / 1000.0,
-                               av_err2str(err_nf));
-                    }
-                    pst->req_seek = false;
-                    pst->seek_absolute = false;
-                    pst->seek_incr = 0;
-                }
+                    _audio_seek(sst, pst);
 
                 err = avcodec_receive_frame(sst->audiodec->avctx, sst->frame);
 
@@ -540,8 +548,7 @@ void audio_start(char *filename, void (*finished_callback)(void))
                     goto cleanup;
                 }
 
-                if (pst)
-                    pst->timestamp = sst->frame->best_effort_timestamp;
+                pst->timestamp = (sst->audiodec->pkt->pts * sst->audio_stream->time_base.num * AV_TIME_BASE) / sst->audio_stream->time_base.den;
 
                 _audio_set_volume(sst->frame, gain_factor * (pst ? pst->volume : 1.0f));
 
