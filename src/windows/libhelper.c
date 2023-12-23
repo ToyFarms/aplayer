@@ -76,15 +76,15 @@ static char *get_last_error_string()
     return (char *)msg_buf;
 }
 
-char *wchar2mbs(const wchar_t *wchar_str)
+char *wchar2mbs(const wchar_t *strw)
 {
-    if (!wchar_str)
+    if (!strw)
         return NULL;
 
-    int bufsize = WideCharToMultiByte(CP_UTF8, 0, &wchar_str[0], -1, NULL, 0, NULL, NULL);
+    int bufsize = WideCharToMultiByte(CP_UTF8, 0, &strw[0], -1, NULL, 0, NULL, NULL);
     if (bufsize == 0)
     {
-        wprintf(L"\x1b[38;2;255;0;0mError converting wide char \"%ls\": ", wchar_str);
+        wprintf(L"\x1b[38;2;255;0;0mError converting wide char \"%ls\": ", strw);
         av_log(NULL, AV_LOG_FATAL, "%s.\n", get_last_error_string());
         return NULL;
     }
@@ -96,14 +96,30 @@ char *wchar2mbs(const wchar_t *wchar_str)
         return NULL;
     }
 
-    bufsize = WideCharToMultiByte(CP_UTF8, 0, &wchar_str[0], -1, &char_utf8[0], bufsize, NULL, NULL);
+    bufsize = WideCharToMultiByte(CP_UTF8, 0, &strw[0], -1, &char_utf8[0], bufsize, NULL, NULL);
     if (bufsize == 0)
     {
-        wprintf(L"\x1b[38;2;255;0;0mError converting wide char \"%ls\": ", wchar_str);
+        wprintf(L"\x1b[38;2;255;0;0mError converting wide char \"%ls\": ", strw);
         av_log(NULL, AV_LOG_FATAL, "%s.\n", get_last_error_string());
         free(char_utf8);
         return NULL;
     }
 
     return char_utf8;
+}
+
+wchar_t *mbs2wchar(char *str, size_t wsize, int *strwlen_out)
+{
+    if (!str)
+        return NULL;
+
+    wchar_t *strw = (wchar_t *)malloc(wsize * sizeof(wchar_t));
+    if (!strw)
+        return NULL;
+
+    int len = MultiByteToWideChar(CP_UTF8, 0, str, -1, strw, wsize);
+    if (strwlen_out)
+        *strwlen_out = len;
+
+    return strw;
 }

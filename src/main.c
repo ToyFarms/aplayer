@@ -427,13 +427,15 @@ int sort_method_alphabetically(const void *a, const void *b)
     File *af = (File *)a;
     File *bf = (File *)b;
 
-    wchar_t strw_af[260];
-    MultiByteToWideChar(CP_UTF8, 0, af->filename, -1, strw_af, 260);
+    wchar_t *strw_af = mbs2wchar(af->filename, 260, NULL);
+    wchar_t *strw_bf = mbs2wchar(bf->filename, 260, NULL);
 
-    wchar_t strw_bf[260];
-    MultiByteToWideChar(CP_UTF8, 0, af->filename, -1, strw_bf, 260);
+    int ret = wcscoll(strw_af, strw_bf);
 
-    return wcscoll(strw_af, strw_bf);
+    free(strw_af);
+    free(strw_bf);
+
+    return ret;
 }
 
 int sort_method_ctime_desc(const void *a, const void *b)
