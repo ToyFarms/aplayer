@@ -52,6 +52,7 @@ void av_log_turn_off();
 void av_log_turn_on();
 
 #ifdef AP_WINDOWS
+
 #include <windows.h>
 #include <shellapi.h>
 
