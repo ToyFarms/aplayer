@@ -1,11 +1,25 @@
 #include "libfile.h"
 
-char **list_directory(char *directory, int *out_size)
+FileStat get_file_stat(wchar_t *filename)
+{
+    struct _stat stat;
+    _wstat(filename, &stat);
+
+    return (FileStat){
+        .st_mode = stat.st_mode,
+        .st_size = stat.st_size,
+        .st_atime = stat.st_atime,
+        .st_mtime = stat.st_mtime,
+        .st_ctime = stat.st_ctime,
+    };
+}
+
+File *list_directory(char *directory, int *out_size)
 {
     WIN32_FIND_DATAW ffd;
     HANDLE find;
     int count = 0;
-    char **filenames = (char **)malloc(MAX_FILES * MAX_PATH * sizeof(char));
+    File *files = (File *)malloc(MAX_FILES * MAX_PATH * sizeof(File));
 
     wchar_t wide_directory[MAX_PATH];
     MultiByteToWideChar(CP_UTF8, 0, directory, -1, wide_directory, MAX_PATH);
@@ -31,7 +45,11 @@ char **list_directory(char *directory, int *out_size)
             wcscat_s(filepath, MAX_PATH, L"\\");
             wcscat_s(filepath, MAX_PATH, ffd.cFileName);
 
-            filenames[count] = wchar2mbs(filepath);
+            files[count] = (File){
+                .path = wchar2mbs(filepath),
+                .filename = wchar2mbs(ffd.cFileName),
+                .stat = get_file_stat(ffd.cFileName),
+            };
             count++;
         }
     } while (FindNextFileW(find, &ffd) != 0 && count < MAX_FILES);
@@ -41,5 +59,5 @@ char **list_directory(char *directory, int *out_size)
     if (out_size)
         *out_size = count;
 
-    return filenames;
+    return files;
 }

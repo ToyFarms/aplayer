@@ -52,7 +52,10 @@ void cli_state_free(CLIState **cst)
     {
         av_log(NULL, AV_LOG_DEBUG, "Free CLIState entries.\n");
         for (int i = 0; i < (*cst)->entry_size; i++)
-            free((*cst)->entries[i]);
+        {
+            free((*cst)->entries[i].path);
+            free((*cst)->entries[i].filename);
+        }
 
         free((*cst)->entries);
     }
@@ -116,16 +119,16 @@ static wchar_t *cli_line_routine(CLIState *cst, int idx, LineState line_state, i
     switch (line_state)
     {
     case LINE_PLAYING:
-        sb_appendf(list_sb, "\x1b[38;2;0;0;0;48;2;91;201;77m%s", cst->entries[idx]);
+        sb_appendf(list_sb, "\x1b[38;2;0;0;0;48;2;91;201;77m%s", cst->entries[idx].filename);
         break;
     case LINE_SELECTED:
-        sb_appendf(list_sb, "\x1b[38;2;0;0;0;48;2;255;255;255m%s", cst->entries[idx]);
+        sb_appendf(list_sb, "\x1b[38;2;0;0;0;48;2;255;255;255m%s", cst->entries[idx].filename);
         break;
     case LINE_HOVERED:
-        sb_appendf(list_sb, "\x1b[38;2;0;0;0;48;2;150;150;150m%s", cst->entries[idx]);
+        sb_appendf(list_sb, "\x1b[38;2;0;0;0;48;2;150;150;150m%s", cst->entries[idx].filename);
         break;
     case LINE_NORMAL:
-        sb_appendf(list_sb, "%s", cst->entries[idx]);
+        sb_appendf(list_sb, "%s", cst->entries[idx].filename);
         break;
     default:
         break;
