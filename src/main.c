@@ -131,12 +131,12 @@ int main(int argc, char **argv)
                 else if (ke.acsii_key == 'N')
                 {
                     cycle_next();
-                    play(cst->entries[cst->playing_idx]);
+                    play(cst->entries[cst->playing_idx].path);
                 }
                 else if (ke.acsii_key == 'P')
                 {
                     cycle_prev();
-                    play(cst->entries[cst->playing_idx]);
+                    play(cst->entries[cst->playing_idx].path);
                 }
 
                 if (need_redraw)
@@ -147,7 +147,7 @@ int main(int argc, char **argv)
                     if (cst->selected_idx >= 0)
                     {
                         cst->playing_idx = cst->selected_idx;
-                        play(cst->entries[cst->playing_idx]);
+                        play(cst->entries[cst->playing_idx].path);
                         need_redraw = true;
                     }
                 }
@@ -191,7 +191,7 @@ int main(int argc, char **argv)
                     cst->playing_idx = cst->selected_idx;
                     cst->force_redraw = false;
                     cli_draw(cst);
-                    play(cst->entries[cst->playing_idx]);
+                    play(cst->entries[cst->playing_idx].path);
                 }
 
                 cst->force_redraw = false;
@@ -271,7 +271,7 @@ void cycle_prev()
 void finished_callback(void)
 {
     cycle_next();
-    play(cst->entries[cst->playing_idx]);
+    play(cst->entries[cst->playing_idx].path);
 }
 
 void play(char *filename)
@@ -317,14 +317,14 @@ void *event_thread(void *arg)
         else if (GetAsyncKeyState(VIRT_MEDIA_NEXT_TRACK) & 0x8001)
         {
             cycle_next();
-            play(cst->entries[cst->playing_idx]);
+            play(cst->entries[cst->playing_idx].path);
             keypress = true;
             keypress_cooldown = ms2us(500);
         }
         else if (GetAsyncKeyState(VIRT_MEDIA_PREV_TRACK) & 0x8001)
         {
             cycle_prev();
-            play(cst->entries[cst->playing_idx]);
+            play(cst->entries[cst->playing_idx].path);
             keypress = true;
             keypress_cooldown = ms2us(500);
         }

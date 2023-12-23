@@ -13,6 +13,7 @@
 #include "libos.h"
 #include "sb.h"
 #include "libhelper.h"
+#include "libfile.h"
 
 #ifdef __clang__
 #define ATTRIBUTE_USED __attribute__((used))
@@ -323,7 +324,7 @@ typedef struct CLIState
 {
     pthread_mutex_t mutex;
 
-    char **entries;
+    File *entries;
     int entry_size;
     int entry_offset;
 
