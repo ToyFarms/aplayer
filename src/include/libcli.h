@@ -23,14 +23,9 @@
 #define ATTRIBUTE_USED
 #endif // __GNUC__
 
-typedef enum BUFFER_TYPE BUFFER_TYPE;
-typedef struct Handle Handle;
-typedef struct CLIState CLIState;
-typedef struct Events Events;
-
-#define LEFT_MOUSE_CLICKED (1 << 0)
-#define MIDDLE_MOUSE_CLICKED (1 << 1)
-#define RIGHT_MOUSE_CLICKED (1 << 2)
+#define MOUSE_LEFT_CLICKED (1 << 0)
+#define MOUSE_MIDDLE_CLICKED (1 << 1)
+#define MOUSE_RIGHT_CLICKED (1 << 2)
 
 #define SHIFT_KEY_PRESSED (1 << 0)
 #define CTRL_KEY_PRESSED (1 << 1)
@@ -100,6 +95,32 @@ typedef enum LineState
     LINE_SELECTED,
     LINE_NORMAL,
 } LineState;
+
+typedef enum BUFFER_TYPE
+{
+    BUF_MAIN,
+    BUF_ALTERNATE,
+} BUFFER_TYPE;
+
+typedef struct UnicodeSymbol
+{
+    char *volume_mute;
+    char *volume_off;
+    char *volume_low;
+    char *volume_medium;
+    char *volume_high;
+
+    char *media_play;
+    char *media_pause;
+    char *media_next_track;
+    char *media_prev_track;
+} UnicodeSymbol;
+
+typedef struct Events
+{
+    Event *event;
+    int event_size;
+} Events;
 
 #if defined(AP_WINDOWS)
 
@@ -309,12 +330,6 @@ typedef enum LineState
 
 #endif // NOVIRTUALKEYCODES
 
-typedef enum BUFFER_TYPE
-{
-    BUF_MAIN,
-    BUF_ALTERNATE,
-} BUFFER_TYPE;
-
 typedef struct Handle
 {
     HANDLE handle;
@@ -335,6 +350,7 @@ typedef struct CLIState
     int64_t media_duration;
     int64_t media_timestamp;
     float media_volume;
+    bool media_paused;
 
     bool force_redraw;
 
@@ -343,13 +359,17 @@ typedef struct CLIState
     int height;
     int cursor_x;
     int cursor_y;
-} CLIState;
 
-typedef struct Events
-{
-    Event *event;
-    int event_size;
-} Events;
+    int mouse_x;
+    int mouse_y;
+
+    UnicodeSymbol icon;
+    UnicodeSymbol icon_nerdfont;
+
+    bool prev_button_hovered;
+    bool playback_button_hovered;
+    bool next_button_hovered;
+} CLIState;
 
 #elif defined(AP_MACOS)
 #elif defined(AP_LINUX)
