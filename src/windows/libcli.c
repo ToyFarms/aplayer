@@ -26,6 +26,7 @@ CLIState *cli_state_init()
     cst->media_duration = 0;
     cst->media_timestamp = 0;
     cst->media_volume = 0.0f;
+    cst->media_paused = false;
 
     cst->force_redraw = false;
 
@@ -34,6 +35,39 @@ CLIState *cli_state_init()
     cst->width = 0;
     cst->cursor_x = 0;
     cst->cursor_y = 0;
+
+    cst->mouse_x = 0;
+    cst->mouse_y = 0;
+
+    cst->icon = (UnicodeSymbol){
+        .volume_mute = wchar2mbs(L"🔇"),
+        .volume_off = wchar2mbs(L"🔈"),
+        .volume_low = wchar2mbs(L"🔉"),
+        .volume_medium = wchar2mbs(L"🔊"),
+        .volume_high = wchar2mbs(L"🔊"),
+
+        .media_play = wchar2mbs(L"⏵"),
+        .media_pause = wchar2mbs(L"⏸"),
+        .media_next_track = wchar2mbs(L"⏭"),
+        .media_prev_track = wchar2mbs(L"⏮"),
+    };
+
+    cst->icon_nerdfont = (UnicodeSymbol){
+        .volume_mute = wchar2mbs(L"󰝟"),
+        .volume_off = wchar2mbs(L"󰖁"),
+        .volume_low = wchar2mbs(L"󰕿"),
+        .volume_medium = wchar2mbs(L"󰖀"),
+        .volume_high = wchar2mbs(L"󰕾"),
+
+        .media_play = wchar2mbs(L""),
+        .media_pause = wchar2mbs(L""),
+        .media_next_track = wchar2mbs(L"󰒭"),
+        .media_prev_track = wchar2mbs(L"󰒮"),
+    };
+
+    cst->prev_button_hovered = false;
+    cst->playback_button_hovered = false;
+    cst->next_button_hovered = false;
 
     return cst;
 }
@@ -344,11 +378,13 @@ static void cli_draw_volume(CLIState *cst, Vec2 pos, Color color)
     char *volume_icon;
 
     if (cst->media_volume - 1e-3 < 0.0f)
-        volume_icon = wchar2mbs(L"🔈");
+        volume_icon = cst->icon.volume_off;
     else if (cst->media_volume < 0.5f)
-        volume_icon = wchar2mbs(L"🔉");
+        volume_icon = cst->icon.volume_low;
+    else if (cst->media_volume < 0.75f)
+        volume_icon = cst->icon.volume_medium;
     else
-        volume_icon = wchar2mbs(L"🔊");
+        volume_icon = cst->icon.volume_high;
 
     sb_appendf(overlay_sb,
                "%s\x1b[38;2;%d;%d;%dm%.0f\x1b[0m",
@@ -366,7 +402,53 @@ static void cli_draw_volume(CLIState *cst, Vec2 pos, Color color)
 
     free(strw);
     free(str);
-    free(volume_icon);
+    sb_reset(overlay_sb);
+}
+
+static void cli_draw_media_control(CLIState *cst, Vec2 center, Color color)
+{
+    bool prev_collision = false;
+    bool playback_collision = false;
+    bool next_collision = false;
+
+    if (cst->mouse_y == center.y)
+    {
+        if (FFABS(cst->mouse_x - (center.x - 4)) <= 1)
+            prev_collision = true;
+        else if (FFABS(cst->mouse_x - center.x) <= 1)
+            playback_collision = true;
+        else if (FFABS(cst->mouse_x - (center.x + 4)) <= 1)
+            next_collision = true;
+    }
+
+    cst->prev_button_hovered = prev_collision;
+    cst->playback_button_hovered = playback_collision;
+    cst->next_button_hovered = next_collision;
+
+    char *playback_icon = cst->media_paused ? cst->icon_nerdfont.media_play : cst->icon_nerdfont.media_pause;
+    const char *hovered_color = "\x1b[38;2;0;0;0;48;2;255;255;255m";
+
+    cli_cursor_to(cst->out.handle, center.x - 5, center.y);
+
+    sb_appendf(overlay_sb,
+               "\x1b[38;2;%d;%d;%dm%s %s \x1b[0m %s %s \x1b[0m %s %s \x1b[0m",
+               color.r, color.g, color.b,
+               prev_collision ? hovered_color : "",
+               cst->icon_nerdfont.media_prev_track,
+               playback_collision ? hovered_color : "",
+               playback_icon,
+               next_collision ? hovered_color : "",
+               cst->icon_nerdfont.media_next_track);
+
+    char *str = sb_concat(overlay_sb);
+
+    int strw_len;
+    wchar_t *strw = mbs2wchar(str, 128, &strw_len);
+
+    WriteConsoleW(cst->out.handle, strw, strw_len, NULL, NULL);
+
+    free(strw);
+    free(str);
     sb_reset(overlay_sb);
 }
 
@@ -409,6 +491,8 @@ void cli_draw_overlay(CLIState *cst)
                           (float)cst->media_duration,
                           (Color){255, 0, 0},
                           (Color){150, 150, 150});
+
+    cli_draw_media_control(cst, (Vec2){cst->width / 2, cst->height - 1}, (Color){255, 255, 255});
 }
 
 static HANDLE out_main;

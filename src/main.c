@@ -229,6 +229,30 @@ int main(int argc, char **argv)
             case MOUSE_EVENT_TYPE:
                 MouseEvent me = e.mouse_event;
 
+                cst->mouse_x = me.x;
+                cst->mouse_y = me.y;
+
+                // overlay area
+                if (me.y > cst->height - 3)
+                {
+                    if (me.state & MOUSE_LEFT_CLICKED)
+                    {
+                        if (cst->prev_button_hovered)
+                        {
+                            cycle_prev();
+                            play(cst->entries[cst->playing_idx].path);
+                        }
+                        else if (cst->playback_button_hovered)
+                            audio_toggle_play();
+                        else if (cst->next_button_hovered)
+                        {
+                            cycle_next();
+                            play(cst->entries[cst->playing_idx].path);
+                        }
+                    }
+                    break;
+                }
+
                 if (me.scrolled)
                 {
                     me.scroll_delta > 0 ? cst->entry_offset-- : cst->entry_offset++;
@@ -248,10 +272,10 @@ int main(int argc, char **argv)
                     cli_draw(cst);
                 }
 
-                if (me.state & LEFT_MOUSE_CLICKED)
+                if (me.state & MOUSE_LEFT_CLICKED)
                     cst->selected_idx = cst->hovered_idx;
 
-                if (me.state & LEFT_MOUSE_CLICKED && me.double_clicked)
+                if (me.state & MOUSE_LEFT_CLICKED && me.double_clicked)
                 {
                     cst->playing_idx = cst->selected_idx;
                     cst->force_redraw = false;
@@ -411,14 +435,17 @@ void *update_thread(void *arg)
 {
     while (true)
     {
+        pthread_mutex_lock(&cst->mutex);
+
         cst->media_timestamp = audio_get_timestamp();
         cst->media_volume = audio_get_volume();
+        cst->media_paused = audio_is_paused();
 
-        pthread_mutex_lock(&cst->mutex);
         cli_draw_overlay(cst);
+
         pthread_mutex_unlock(&cst->mutex);
 
-        av_usleep(ms2us(audio_is_paused() ? 200 : 50));
+        av_usleep(ms2us(50));
     }
 }
 
