@@ -111,10 +111,11 @@ void cli_clear_screen(HANDLE out)
 }
 
 static StringBuilder *list_sb;
+static const Color cli_overlay_fg_color = {230, 200, 150};
 
 static wchar_t *cli_line_routine(CLIState *cst, int idx, LineState line_state, int *out_strlen)
 {
-    sb_appendf(list_sb, "\x1b[39;48;2;41;41;41m%d ", idx);
+    sb_appendf(list_sb, "\x1b[38;2;%d;%d;%d;48;2;41;41;41m%3d \x1b[39m", cli_overlay_fg_color.r, cli_overlay_fg_color.g, cli_overlay_fg_color.b, idx);
     switch (line_state)
     {
     case LINE_PLAYING:
@@ -206,8 +207,8 @@ static void cli_draw_list(CLIState *cst)
     if (cst->force_redraw)
         cli_clear_screen(cst->out.handle);
 
-    for (int viewport_offset = 0;
-         viewport_offset < cst->height && cst->entry_offset + viewport_offset < cst->entry_size;
+    for (int viewport_offset = 0; //   - 3 : bottom overlay
+         viewport_offset < cst->height - 3 && cst->entry_offset + viewport_offset < cst->entry_size;
          viewport_offset++)
     {
         int abs_entry_idx = cst->entry_offset + viewport_offset;
@@ -249,7 +250,8 @@ void cli_draw(CLIState *cst)
         realloc(lines_state_cache, cst->entry_size * sizeof(LineState));
 
     cli_draw_list(cst);
-    cli_draw_overlay(cst);
+    if (cst->force_redraw)
+        cli_draw_overlay(cst);
 
     pthread_mutex_unlock(&cst->mutex);
 }
@@ -390,14 +392,14 @@ void cli_draw_overlay(CLIState *cst)
     cli_draw_timestamp(cst,
                        (Vec2){timestamp_left_pad,
                               cst->height - timestamp_bottom_pad},
-                       (Color){230, 200, 150});
+                       cli_overlay_fg_color);
 
     cli_get_cursor_pos(cst);
 
     cli_draw_volume(cst,
                     (Vec2){cst->width - volume_right_pad,
                            cst->height - volume_bottom_pad},
-                    (Color){230, 200, 150});
+                    cli_overlay_fg_color);
 
     if (!cst->media_duration <= 0 || !cst->media_timestamp <= 0)
         cli_draw_progress(cst,
