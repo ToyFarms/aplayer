@@ -3,9 +3,9 @@
 
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
 #define AP_WINDOWS
-#elif __APPLE__
+#elif defined(__APPLE__)
 #define AP_MACOS
-#elif __linux__
+#elif defined(__linux__)
 #define AP_LINUX
 #endif // WIN32
 
