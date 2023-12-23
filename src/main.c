@@ -128,6 +128,16 @@ int main(int argc, char **argv)
                     audio_seek(2500);
                 else if (ke.vk_key == VIRT_SPACE)
                     audio_toggle_play();
+                else if (ke.acsii_key == 'N')
+                {
+                    cycle_next();
+                    play(cst->entries[cst->playing_idx]);
+                }
+                else if (ke.acsii_key == 'P')
+                {
+                    cycle_prev();
+                    play(cst->entries[cst->playing_idx]);
+                }
 
                 if (need_redraw)
                     compute_offset(cst);
