@@ -107,14 +107,6 @@ void cli_clear_screen(HANDLE out)
     cli_cursor_to(out, 0, 0);
 }
 
-typedef enum LineState
-{
-    LINE_HOVERED,
-    LINE_PLAYING,
-    LINE_SELECTED,
-    LINE_NORMAL,
-} LineState;
-
 static StringBuilder *list_sb;
 static wchar_t strw[2048];
 
@@ -162,11 +154,12 @@ static LineState cli_get_line_state(CLIState *cst, int idx)
 
 static StringBuilder *pad_sb;
 
+ATTRIBUTE_USED
 static void cli_draw_padding(CLIState *cst,
-                             int x, int y,
+                             Vec2 pos,
                              int length,
-                             int fr, int fg, int fb,
-                             int br, int bg, int bb)
+                             Color fg,
+                             Color bg)
 {
     if (!pad_sb)
         pad_sb = sb_create();
@@ -175,15 +168,15 @@ static void cli_draw_padding(CLIState *cst,
     memset(padding, ' ', sizeof(padding));
     padding[length + 1] = '\0';
 
-    bool foreground_color = fr >= 0 && fg >= 0 && fb >= 0;
-    bool background_color = br >= 0 && bg >= 0 && bb >= 0;
+    bool foreground_color = fg.r >= 0 && fg.g >= 0 && fg.b >= 0;
+    bool background_color = bg.r >= 0 && bg.g >= 0 && bg.b >= 0;
 
     if (foreground_color && background_color)
-        sb_appendf(pad_sb, "\x1b[38;2;%d;%d;%d;48;2;%d;%d;%dm%s", fr, fg, fb, br, bg, bb, padding);
+        sb_appendf(pad_sb, "\x1b[38;2;%d;%d;%d;48;2;%d;%d;%dm%s", fg.r, fg.g, fg.b, bg.r, bg.g, bg.b, padding);
     else if (foreground_color)
-        sb_appendf(pad_sb, "\x1b[38;2;%d;%d;%dm%s", fr, fg, fb, padding);
+        sb_appendf(pad_sb, "\x1b[38;2;%d;%d;%dm%s", fg.r, fg.g, fg.b, padding);
     else if (background_color)
-        sb_appendf(pad_sb, "\x1b[48;2;%d;%d;%dm%s", br, bg, bb, padding);
+        sb_appendf(pad_sb, "\x1b[48;2;%d;%d;%dm%s", bg.r, bg.g, bg.b, padding);
     else
         sb_appendf(pad_sb, "%s", padding);
 
@@ -192,8 +185,8 @@ static void cli_draw_padding(CLIState *cst,
 
     char *str = sb_concat(pad_sb);
 
-    if (x >= 0 && y >= 0)
-        cli_cursor_to(cst->out.handle, x, y);
+    if (pos.x >= 0 && pos.y >= 0)
+        cli_cursor_to(cst->out.handle, pos.x, pos.y);
 
     WriteConsole(cst->out.handle, str, strlen(str), NULL, NULL);
 
@@ -235,7 +228,7 @@ static void cli_draw_list(CLIState *cst)
         if (pad <= 0)
             continue;
 
-        cli_draw_padding(cst, -1, -1, pad, -1, -1, -1, -1, -1, -1);
+        cli_draw_padding(cst, (Vec2){-1, -1}, pad, (Color){-1, -1, -1}, (Color){-1, -1, -1});
     }
 }
 
@@ -261,13 +254,13 @@ void cli_draw(CLIState *cst)
 
 static StringBuilder *overlay_sb;
 
-static void cli_draw_rect(CLIState *cst, int x, int y, int w, int h, int r, int g, int b)
+static void cli_draw_rect(CLIState *cst, Rect rect, Color color)
 {
-    if (x < 0 || y < 0 || w <= 0 || h <= 0)
+    if (rect.x < 0 || rect.y < 0 || rect.w <= 0 || rect.h <= 0)
         return;
 
-    for (int current_y = y; current_y < y + h; current_y++)
-        cli_draw_padding(cst, x, current_y, w, -1, -1, -1, r, g, b);
+    for (int current_y = rect.y; current_y < rect.y + rect.h; current_y++)
+        cli_draw_padding(cst, (Vec2){rect.x, current_y}, rect.w, (Color){-1, -1, -1}, color);
 }
 
 static const wchar_t blocks[] = {L'█', L'▉', L'▊', L'▋', L'▌', L'▍', L'▎', L'▎', L' '};
@@ -275,23 +268,23 @@ static const int block_len = 9;
 static const float block_increment = 1.0f / (float)block_len;
 
 static void cli_draw_hlinef(CLIState *cst,
-                            int x, int y,
+                            Vec2 pos,
                             float length,
-                            int fr, int fg, int fb,
-                            int br, int bg, int bb,
+                            Color fg,
+                            Color bg,
                             bool reset_bg_color)
 {
     int int_part = (int)length;
     float float_part = length - (float)int_part;
 
-    cli_cursor_to(cst->out.handle, x, y);
+    cli_cursor_to(cst->out.handle, pos.x, pos.y);
 
     char *str;
 
     if (int_part > 0)
-        cli_draw_padding(cst, -1, -1, int_part, -1, -1, -1, fr, fg, fb);
+        cli_draw_padding(cst, (Vec2){-1, -1}, int_part, (Color){-1, -1, -1}, fg);
 
-    sb_appendf(overlay_sb, "\x1b[48;2;%d;%d;%d;38;2;%d;%d;%dm", br, bg, bg, fr, fg, fb);
+    sb_appendf(overlay_sb, "\x1b[48;2;%d;%d;%d;38;2;%d;%d;%dm", bg.r, bg.g, bg.b, fg.r, fg.g, fg.b);
     str = sb_concat(overlay_sb);
     WriteConsole(cst->out.handle, str, strlen(str), NULL, NULL);
     free(str);
@@ -308,41 +301,41 @@ static void cli_draw_hlinef(CLIState *cst,
 }
 
 static void cli_draw_progress(CLIState *cst,
-                              int x, int y,
+                              Vec2 pos,
                               int length,
                               float current,
                               float max,
-                              int fr, int fg, int fb,
-                              int br, int bg, int bb)
+                              Color fg,
+                              Color bg)
 {
     float mapped_length = mapf(current, 0.0f, max, 0.0f, (float)length);
 
-    cli_draw_hlinef(cst, x, y, mapped_length, fr, fg, fb, br, bg, bb, false);
+    cli_draw_hlinef(cst, pos, mapped_length, fg, bg, false);
 
     cli_get_cursor_pos(cst);
-    cli_draw_padding(cst, -1, -1, (x + length) - cst->cursor_x, -1, -1, -1, -1, -1, -1);
+    cli_draw_padding(cst, (Vec2){-1, -1}, (pos.x + length) - cst->cursor_x, (Color){-1, -1, -1}, (Color){-1, -1, -1});
 
     WriteConsole(cst->out.handle, "\x1b[0m", 4, NULL, NULL);
 }
 
-static void cli_draw_timestamp(CLIState *cst, int x, int y, int r, int g, int b)
+static void cli_draw_timestamp(CLIState *cst, Vec2 pos, Color color)
 {
     sb_appendf(overlay_sb,
                "\x1b[38;2;%d;%d;%dm%.2fs / %.2fs\x1b[0m",
-               r, g, b,
+               color.r, color.g, color.b,
                (double)cst->media_timestamp / (double)AV_TIME_BASE,
                (double)cst->media_duration / (double)AV_TIME_BASE);
 
     char *str = sb_concat(overlay_sb);
 
-    cli_cursor_to(cst->out.handle, x, y);
+    cli_cursor_to(cst->out.handle, pos.x, pos.y);
     WriteConsole(cst->out.handle, str, strlen(str), NULL, NULL);
 
     free(str);
     sb_reset(overlay_sb);
 }
 
-static void cli_draw_volume(CLIState *cst, int x, int y, int r, int g, int b)
+static void cli_draw_volume(CLIState *cst, Vec2 pos, Color color)
 {
     char *volume_icon;
 
@@ -356,14 +349,14 @@ static void cli_draw_volume(CLIState *cst, int x, int y, int r, int g, int b)
     sb_appendf(overlay_sb,
                "%s\x1b[38;2;%d;%d;%dm%.0f\x1b[0m",
                volume_icon,
-               r, g, b,
+               color.r, color.g, color.b,
                cst->media_volume * 100.0f);
 
     char *str = sb_concat(overlay_sb);
     wchar_t strw[256];
     int strw_len = MultiByteToWideChar(CP_UTF8, 0, str, -1, strw, sizeof(strw) / sizeof(wchar_t));
 
-    cli_cursor_to(cst->out.handle, x, y);
+    cli_cursor_to(cst->out.handle, pos.x, pos.y);
     WriteConsoleW(cst->out.handle, strw, strw_len, NULL, NULL);
 
     free(str);
@@ -389,27 +382,27 @@ void cli_draw_overlay(CLIState *cst)
 
     static const int progress_bottom_pad = 2;
 
-    cli_draw_rect(cst, 0, cst->height - 3, cst->width + 10, 3, 10, 10, 10);
+    cli_draw_rect(cst, (Rect){0, cst->height - 3, cst->width + 10, 3}, (Color){10, 10, 10});
     cli_draw_timestamp(cst,
-                       timestamp_left_pad,
-                       cst->height - timestamp_bottom_pad,
-                       230, 200, 150);
+                       (Vec2){timestamp_left_pad,
+                              cst->height - timestamp_bottom_pad},
+                       (Color){230, 200, 150});
 
     cli_get_cursor_pos(cst);
 
     cli_draw_volume(cst,
-                    cst->width - volume_right_pad,
-                    cst->height - volume_bottom_pad,
-                    230, 200, 150);
+                    (Vec2){cst->width - volume_right_pad,
+                           cst->height - volume_bottom_pad},
+                    (Color){230, 200, 150});
 
     if (!cst->media_duration <= 0 || !cst->media_timestamp <= 0)
         cli_draw_progress(cst,
-                          cst->cursor_x + timestamp_right_pad, cst->height - progress_bottom_pad,
+                          (Vec2){cst->cursor_x + timestamp_right_pad, cst->height - progress_bottom_pad},
                           cst->width - cst->cursor_x - (volume_right_pad + timestamp_right_pad + volume_left_pad),
                           (float)cst->media_timestamp,
                           (float)cst->media_duration,
-                          255, 0, 0,
-                          150, 150, 150);
+                          (Color){255, 0, 0},
+                          (Color){150, 150, 150});
 }
 
 static HANDLE out_main;

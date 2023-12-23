@@ -14,6 +14,14 @@
 #include "sb.h"
 #include "libhelper.h"
 
+#ifdef __clang__
+#define ATTRIBUTE_USED __attribute__((used))
+#elif defined(__GNUC__) || defined(__GNUG__)
+#define ATTRIBUTE_USED __attribute__((used))
+#elif defined(_MSC_VER)
+#define ATTRIBUTE_USED
+#endif // __GNUC__
+
 typedef enum BUFFER_TYPE BUFFER_TYPE;
 typedef struct Handle Handle;
 typedef struct CLIState CLIState;
@@ -24,8 +32,8 @@ typedef struct Events Events;
 #define RIGHT_MOUSE_CLICKED (1 << 2)
 
 #define SHIFT_KEY_PRESSED (1 << 0)
-#define CTRL_KEY_PRESSED  (1 << 1)
-#define ALT_KEY_PRESSED   (1 << 2)
+#define CTRL_KEY_PRESSED (1 << 1)
+#define ALT_KEY_PRESSED (1 << 2)
 
 typedef struct KeyEvent
 {
@@ -67,6 +75,30 @@ typedef struct Event
     MouseEvent mouse_event;
     BufferChangedEvent buf_event;
 } Event;
+
+typedef struct Vec2
+{
+    int x, y;
+} Vec2;
+
+typedef struct Color
+{
+    int r, g, b;
+} Color;
+
+typedef struct Rect
+{
+    int x, y;
+    int w, h;
+} Rect;
+
+typedef enum LineState
+{
+    LINE_HOVERED,
+    LINE_PLAYING,
+    LINE_SELECTED,
+    LINE_NORMAL,
+} LineState;
 
 #if defined(AP_WINDOWS)
 
