@@ -111,7 +111,6 @@ void cli_clear_screen(HANDLE out)
 }
 
 static StringBuilder *list_sb;
-static wchar_t strw[2048];
 
 static wchar_t *cli_line_routine(CLIState *cst, int idx, LineState line_state, int *out_strlen)
 {
@@ -135,9 +134,10 @@ static wchar_t *cli_line_routine(CLIState *cst, int idx, LineState line_state, i
     }
 
     char *str = sb_concat(list_sb);
-    *out_strlen = MultiByteToWideChar(CP_UTF8, 0, str, -1, strw, sizeof(strw) / sizeof(wchar_t));
-    free(str);
 
+    wchar_t *strw = mbs2wchar(str, 2048, out_strlen);
+
+    free(str);
     sb_reset(list_sb);
 
     return strw;
@@ -201,9 +201,7 @@ static LineState *lines_state_cache;
 
 static void cli_draw_list(CLIState *cst)
 {
-    int str_len;
-    wchar_t *str;
-    LineState line_state;
+    int strw_len;
 
     if (cst->force_redraw)
         cli_clear_screen(cst->out.handle);
@@ -213,7 +211,7 @@ static void cli_draw_list(CLIState *cst)
          viewport_offset++)
     {
         int abs_entry_idx = cst->entry_offset + viewport_offset;
-        line_state = cli_get_line_state(cst, abs_entry_idx);
+        LineState line_state = cli_get_line_state(cst, abs_entry_idx);
 
         if (!cst->force_redraw && lines_state_cache[abs_entry_idx] && line_state == lines_state_cache[abs_entry_idx])
             continue;
@@ -222,8 +220,9 @@ static void cli_draw_list(CLIState *cst)
 
         cli_cursor_to(cst->out.handle, 0, viewport_offset);
 
-        str = cli_line_routine(cst, abs_entry_idx, line_state, &str_len);
-        WriteConsoleW(cst->out.handle, str, str_len, NULL, NULL);
+        wchar_t *strw = cli_line_routine(cst, abs_entry_idx, line_state, &strw_len);
+        WriteConsoleW(cst->out.handle, strw, strw_len, NULL, NULL);
+        free(strw);
 
         cli_get_cursor_pos(cst);
 
@@ -356,12 +355,14 @@ static void cli_draw_volume(CLIState *cst, Vec2 pos, Color color)
                cst->media_volume * 100.0f);
 
     char *str = sb_concat(overlay_sb);
-    wchar_t strw[256];
-    int strw_len = MultiByteToWideChar(CP_UTF8, 0, str, -1, strw, sizeof(strw) / sizeof(wchar_t));
+
+    int strw_len;
+    wchar_t *strw = mbs2wchar(str, 128, &strw_len);
 
     cli_cursor_to(cst->out.handle, pos.x, pos.y);
     WriteConsoleW(cst->out.handle, strw, strw_len, NULL, NULL);
 
+    free(strw);
     free(str);
     free(volume_icon);
     sb_reset(overlay_sb);
