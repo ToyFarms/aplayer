@@ -531,7 +531,11 @@ Events cli_read_in()
             key_event.vk_key = k.wVirtualKeyCode;
 
             DWORD ks = k.dwControlKeyState;
-            key_event.modifier_key = ((ks & SHIFT_PRESSED) << 0) | ((ks & LEFT_CTRL_PRESSED) << 1) | ((ks & RIGHT_CTRL_PRESSED) << 1) | ((ks & LEFT_ALT_PRESSED) << 2) | ((ks & RIGHT_ALT_PRESSED) << 2);
+
+            int control_key_pressed = ks & LEFT_CTRL_PRESSED || ks & RIGHT_CTRL_PRESSED;
+            int alt_key_pressed = ks & LEFT_ALT_PRESSED || ks & RIGHT_ALT_PRESSED;
+
+            key_event.modifier_key = ((ks & SHIFT_PRESSED) << 0) | (control_key_pressed << 1) | (alt_key_pressed << 2);
 
             break;
         case MOUSE_EVENT:

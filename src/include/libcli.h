@@ -18,13 +18,13 @@ typedef struct Handle Handle;
 typedef struct CLIState CLIState;
 typedef struct Events Events;
 
-#define LEFT_MOUSE_CLICKED 0x00001
-#define MIDDLE_MOUSE_CLICKED 0x00010
-#define RIGHT_MOUSE_CLICKED 0x00100
+#define LEFT_MOUSE_CLICKED (1 << 0)
+#define MIDDLE_MOUSE_CLICKED (1 << 1)
+#define RIGHT_MOUSE_CLICKED (1 << 2)
 
-#define SHIFT_KEY_PRESSED 0x00001
-#define CTRL_KEY_PRESSED  0x00010
-#define ALT_KEY_PRESSED   0x00100
+#define SHIFT_KEY_PRESSED (1 << 0)
+#define CTRL_KEY_PRESSED  (1 << 1)
+#define ALT_KEY_PRESSED   (1 << 2)
 
 typedef struct KeyEvent
 {
