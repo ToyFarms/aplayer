@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <libavutil/mem.h>
 #include <libavutil/log.h>
+#include <libavutil/time.h>
 
 #include "libos.h"
 
@@ -50,6 +51,8 @@ static inline float mapf(float value, float min, float max, float new_min, float
 
 void av_log_turn_off();
 void av_log_turn_on();
+void reverse_array(void *array, size_t array_len, size_t element_size);
+void shuffle_array(void *array, size_t array_len, size_t element_size);
 
 #ifdef AP_WINDOWS
 
