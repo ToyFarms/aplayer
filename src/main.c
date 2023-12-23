@@ -1,5 +1,6 @@
 #include <stdbool.h>
 #include <pthread.h>
+#include <stdlib.h>
 
 #include "libos.h"
 #include "libaudio.h"
@@ -18,6 +19,20 @@ void play(char *filename);
 void *event_thread(void *arg);
 #endif // AP_WINDOWS
 void *update_thread(void *arg);
+
+typedef enum SORT_METHOD
+{
+    SORT_CTIME,
+    SORT_ALPHABETICALLY,
+} SORT_METHOD;
+
+typedef enum SORT_FLAG
+{
+    SORT_FLAG_ASC,
+    SORT_FLAG_DESC,
+} SORT_FLAG;
+
+void sort_entries(CLIState *cst, SORT_METHOD sort, SORT_FLAG flag);
 
 #define DEBUG 0
 
@@ -137,6 +152,56 @@ int main(int argc, char **argv)
                 {
                     cycle_prev();
                     play(cst->entries[cst->playing_idx].path);
+                }
+                else if (ke.acsii_key == 'S')
+                {
+                    File prev;
+                    if (cst->playing_idx >= 0)
+                        prev = cst->entries[cst->playing_idx];
+                    else if (cst->selected_idx >= 0)
+                        prev = cst->entries[cst->selected_idx];
+
+                    sort_entries(cst, SORT_CTIME, SORT_FLAG_ASC);
+
+                    if (cst->playing_idx >= 0 || cst->selected_idx >= 0)
+                        for (int i = 0; i < cst->entry_size; i++)
+                        {
+                            if (prev.path == cst->entries[i].path)
+                            {
+                                cst->playing_idx = cst->playing_idx >= 0 ? i : cst->playing_idx;
+                                cst->selected_idx = cst->selected_idx >= 0 ? i : cst->selected_idx;
+                                compute_offset(cst);
+                                break;
+                            }
+                        }
+
+                    cst->force_redraw = true;
+                    cli_draw(cst);
+                }
+                else if (ke.acsii_key == 's')
+                {
+                    File prev;
+                    if (cst->playing_idx >= 0)
+                        prev = cst->entries[cst->playing_idx];
+                    else if (cst->selected_idx >= 0)
+                        prev = cst->entries[cst->selected_idx];
+
+                    shuffle_array(cst->entries, cst->entry_size, sizeof(cst->entries[0]));
+
+                    if (cst->playing_idx >= 0 || cst->selected_idx >= 0)
+                        for (int i = 0; i < cst->entry_size; i++)
+                        {
+                            if (prev.path == cst->entries[i].path)
+                            {
+                                cst->playing_idx = cst->playing_idx >= 0 ? i : cst->playing_idx;
+                                cst->selected_idx = cst->selected_idx >= 0 ? i : cst->selected_idx;
+                                compute_offset(cst);
+                                break;
+                            }
+                        }
+
+                    cst->force_redraw = true;
+                    cli_draw(cst);
                 }
 
                 if (need_redraw)
@@ -354,5 +419,58 @@ void *update_thread(void *arg)
         pthread_mutex_unlock(&cst->mutex);
 
         av_usleep(ms2us(audio_is_paused() ? 200 : 50));
+    }
+}
+
+int sort_method_alphabetically(const void *a, const void *b)
+{
+    File *af = (File *)a;
+    File *bf = (File *)b;
+
+    wchar_t strw_af[260];
+    MultiByteToWideChar(CP_UTF8, 0, af->filename, -1, strw_af, 260);
+
+    wchar_t strw_bf[260];
+    MultiByteToWideChar(CP_UTF8, 0, af->filename, -1, strw_bf, 260);
+
+    return wcscoll(strw_af, strw_bf);
+}
+
+int sort_method_ctime_desc(const void *a, const void *b)
+{
+    File *af = (File *)a;
+    File *bf = (File *)b;
+
+    return af->stat.st_ctime - bf->stat.st_ctime;
+}
+
+int sort_method_ctime_asc(const void *a, const void *b)
+{
+    File *af = (File *)a;
+    File *bf = (File *)b;
+
+    return bf->stat.st_ctime - af->stat.st_ctime;
+}
+
+void sort_entries(CLIState *cst, SORT_METHOD sort, SORT_FLAG flag)
+{
+    int sort_type = (sort << 16) | flag;
+    switch (sort_type)
+    {
+    case (SORT_CTIME << 16) | SORT_FLAG_ASC:
+        qsort(cst->entries, cst->entry_size, sizeof(cst->entries[0]), sort_method_ctime_asc);
+        break;
+    case (SORT_CTIME << 16) | SORT_FLAG_DESC:
+        qsort(cst->entries, cst->entry_size, sizeof(cst->entries[0]), sort_method_ctime_desc);
+        break;
+    case (SORT_ALPHABETICALLY << 16) | SORT_FLAG_ASC:
+        qsort(cst->entries, cst->entry_size, sizeof(cst->entries[0]), sort_method_alphabetically);
+        break;
+    case (SORT_ALPHABETICALLY << 16) | SORT_FLAG_DESC:
+        qsort(cst->entries, cst->entry_size, sizeof(cst->entries[0]), sort_method_alphabetically);
+        reverse_array(cst->entries, cst->entry_size, sizeof(cst->entries[0]));
+        break;
+    default:
+        break;
     }
 }
