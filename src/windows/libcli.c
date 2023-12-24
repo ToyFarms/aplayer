@@ -27,6 +27,7 @@ CLIState *cli_state_init()
     cst->media_timestamp = 0;
     cst->media_volume = 0.0f;
     cst->media_paused = false;
+    cst->media_is_muted = false;
 
     cst->force_redraw = false;
 
@@ -382,7 +383,9 @@ static void cli_draw_volume(CLIState *cst, Vec2 pos, Color fg, Color bg)
 {
     char *volume_icon;
 
-    if (cst->media_volume - 1e-3 < 0.0f)
+    if (cst->media_is_muted)
+        volume_icon = cst->icon.volume_mute;
+    else if (cst->media_volume - 1e-3 < 0.0f)
         volume_icon = cst->icon.volume_off;
     else if (cst->media_volume < 0.5f)
         volume_icon = cst->icon.volume_low;
