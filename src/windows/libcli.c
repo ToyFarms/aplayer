@@ -145,11 +145,11 @@ void cli_clear_screen(HANDLE out)
 }
 
 static StringBuilder *list_sb;
-static const Color cli_overlay_fg_color = {230, 200, 150};
+static const Color overlay_fg_color = {230, 200, 150};
 
 static wchar_t *cli_line_routine(CLIState *cst, int idx, LineState line_state, int *out_strlen)
 {
-    sb_appendf(list_sb, "\x1b[38;2;%d;%d;%d;48;2;41;41;41m%3d \x1b[39m", cli_overlay_fg_color.r, cli_overlay_fg_color.g, cli_overlay_fg_color.b, idx);
+    sb_appendf(list_sb, "\x1b[38;2;%d;%d;%d;48;2;41;41;41m%3d \x1b[39m", overlay_fg_color.r, overlay_fg_color.g, overlay_fg_color.b, idx);
     switch (line_state)
     {
     case LINE_PLAYING:
@@ -298,7 +298,7 @@ static void cli_draw_rect(CLIState *cst, Rect rect, Color color)
         return;
 
     for (int current_y = rect.y; current_y < rect.y + rect.h; current_y++)
-        cli_draw_padding(cst, (Vec2){rect.x, current_y}, rect.w, (Color){-1, -1, -1}, color);
+        cli_draw_padding(cst, (Vec2){rect.x, current_y}, rect.w, color, color);
 }
 
 static const wchar_t blocks[] = {L'█', L'▉', L'▊', L'▋', L'▌', L'▍', L'▎', L'▎', L' '};
@@ -356,11 +356,12 @@ static void cli_draw_progress(CLIState *cst,
     WriteConsole(cst->out.handle, "\x1b[0m", 4, NULL, NULL);
 }
 
-static void cli_draw_timestamp(CLIState *cst, Vec2 pos, Color color)
+static void cli_draw_timestamp(CLIState *cst, Vec2 pos, Color fg, Color bg)
 {
     sb_appendf(overlay_sb,
-               "\x1b[38;2;%d;%d;%dm%.2fs / %.2fs\x1b[0m",
-               color.r, color.g, color.b,
+               "\x1b[38;2;%d;%d;%d;48;2;%d;%d;%dm%.2fs / %.2fs\x1b[0m",
+               fg.r, fg.g, fg.b,
+               bg.r, bg.g, bg.b,
                (double)cst->media_timestamp / (double)AV_TIME_BASE,
                (double)cst->media_duration / (double)AV_TIME_BASE);
 
@@ -373,7 +374,7 @@ static void cli_draw_timestamp(CLIState *cst, Vec2 pos, Color color)
     sb_reset(overlay_sb);
 }
 
-static void cli_draw_volume(CLIState *cst, Vec2 pos, Color color)
+static void cli_draw_volume(CLIState *cst, Vec2 pos, Color fg, Color bg)
 {
     char *volume_icon;
 
@@ -387,9 +388,10 @@ static void cli_draw_volume(CLIState *cst, Vec2 pos, Color color)
         volume_icon = cst->icon.volume_high;
 
     sb_appendf(overlay_sb,
-               "%s\x1b[38;2;%d;%d;%dm%.0f\x1b[0m",
+               "\x1b[48;2;%d;%d;%dm%s\x1b[38;2;%d;%d;%dm%.0f\x1b[0m",
+               bg.r, bg.g, bg.b,
                volume_icon,
-               color.r, color.g, color.b,
+               fg.r, fg.g, fg.b,
                cst->media_volume * 100.0f);
 
     char *str = sb_concat(overlay_sb);
@@ -405,7 +407,7 @@ static void cli_draw_volume(CLIState *cst, Vec2 pos, Color color)
     sb_reset(overlay_sb);
 }
 
-static void cli_draw_media_control(CLIState *cst, Vec2 center, Color color)
+static void cli_draw_media_control(CLIState *cst, Vec2 center, Color fg, Color bg)
 {
     bool prev_collision = false;
     bool playback_collision = false;
@@ -428,27 +430,108 @@ static void cli_draw_media_control(CLIState *cst, Vec2 center, Color color)
     char *playback_icon = cst->media_paused ? cst->icon_nerdfont.media_play : cst->icon_nerdfont.media_pause;
     const char *hovered_color = "\x1b[38;2;0;0;0;48;2;255;255;255m";
 
+    sb_appendf(overlay_sb,
+               "\x1b[38;2;%d;%d;%d;48;2;%d;%d;%dm",
+               fg.r, fg.g, fg.b,
+               bg.r, bg.g, bg.b);
+
+    char *normal_color = sb_concat(overlay_sb);
+
+    sb_reset(overlay_sb);
+
     cli_cursor_to(cst->out.handle, center.x - 5, center.y);
 
     sb_appendf(overlay_sb,
-               "\x1b[38;2;%d;%d;%dm%s %s \x1b[0m %s %s \x1b[0m %s %s \x1b[0m",
-               color.r, color.g, color.b,
-               prev_collision ? hovered_color : "",
+               "%s %s %s %s %s %s %s %s %s",
+               prev_collision ? hovered_color : normal_color,
                cst->icon_nerdfont.media_prev_track,
-               playback_collision ? hovered_color : "",
+               prev_collision ? normal_color : "",
+
+               playback_collision ? hovered_color : normal_color,
                playback_icon,
-               next_collision ? hovered_color : "",
-               cst->icon_nerdfont.media_next_track);
+               playback_collision ? normal_color : "",
+
+               next_collision ? hovered_color : normal_color,
+               cst->icon_nerdfont.media_next_track,
+               next_collision ? normal_color : "");
 
     char *str = sb_concat(overlay_sb);
 
     int strw_len;
-    wchar_t *strw = mbs2wchar(str, 128, &strw_len);
+    wchar_t *strw = mbs2wchar(str, 1024, &strw_len);
 
     WriteConsoleW(cst->out.handle, strw, strw_len, NULL, NULL);
 
+    free(normal_color);
     free(strw);
     free(str);
+    sb_reset(overlay_sb);
+}
+
+static void cli_draw_now_playing(CLIState *cst, Vec2 pos, Color fg, Color bg)
+{
+    static bool text_overflow = false;
+    static int64_t last_shifted = 0;
+    static int shift_interval = 200;
+    static int offset = 0;
+    static int direction = 1;
+    static int text_len = 0;
+
+    cli_cursor_to(cst->out.handle, pos.x, pos.y);
+
+    sb_appendf(overlay_sb,
+               "\x1b[38;2;%d;%d;%d;48;2;%d;%d;%dm",
+               fg.r, fg.g, fg.b,
+               bg.r, bg.g, bg.b);
+
+    char *str = sb_concat(overlay_sb);
+    WriteConsole(cst->out.handle, str, strlen(str), NULL, NULL);
+
+    const char *playing = "Playing: ";
+    WriteConsole(cst->out.handle, playing, strlen(playing), NULL, NULL);
+
+    int max_len = ((cst->width / 2) - 5) - (pos.x + strlen(playing));
+
+    int strw_len;
+    wchar_t *strw = mbs2wchar(cst->entries[cst->playing_idx].filename, 1024, &strw_len);
+
+    if (text_overflow)
+    {
+        if (offset > 0 && text_len <= max_len)
+        {
+            direction = -1;
+            shift_interval = 1000;
+        }
+        else if (offset == 0)
+        {
+            direction = 1;
+            shift_interval = 1000;
+        }
+
+        if (us2ms(av_gettime()) - last_shifted > shift_interval)
+        {
+            offset += direction;
+            last_shifted = us2ms(av_gettime());
+            shift_interval = 200;
+        }
+    }
+    else
+        offset = 0;
+
+    cli_get_cursor_pos(cst);
+    int prev_x = cst->cursor_x;
+
+    WriteConsoleW(cst->out.handle, strw + offset, strw_len - offset, NULL, NULL);
+
+    cli_get_cursor_pos(cst);
+    text_len = cst->cursor_x - prev_x;
+
+    text_overflow = text_len >= max_len - 1;
+
+    WriteConsole(cst->out.handle, "\x1b[0m", 5, NULL, NULL);
+
+    free(str);
+    free(strw);
     sb_reset(overlay_sb);
 }
 
@@ -470,29 +553,49 @@ void cli_draw_overlay(CLIState *cst)
 
     static const int progress_bottom_pad = 2;
 
-    cli_draw_rect(cst, (Rect){0, cst->height - 3, cst->width + 10, 3}, (Color){10, 10, 10});
+    static const Color overlay_bg_color = {10, 10, 10};
+
+    cli_draw_rect(cst, (Rect){0, cst->height - 3, cst->width + 10, 3}, overlay_bg_color);
     cli_draw_timestamp(cst,
                        (Vec2){timestamp_left_pad,
                               cst->height - timestamp_bottom_pad},
-                       cli_overlay_fg_color);
+                       overlay_fg_color,
+                       overlay_bg_color);
 
     cli_get_cursor_pos(cst);
 
     cli_draw_volume(cst,
                     (Vec2){cst->width - volume_right_pad,
                            cst->height - volume_bottom_pad},
-                    cli_overlay_fg_color);
+                    overlay_fg_color,
+                    overlay_bg_color);
 
-    if (!cst->media_duration <= 0 || !cst->media_timestamp <= 0)
-        cli_draw_progress(cst,
-                          (Vec2){cst->cursor_x + timestamp_right_pad, cst->height - progress_bottom_pad},
-                          cst->width - cst->cursor_x - (volume_right_pad + timestamp_right_pad + volume_left_pad),
-                          (float)cst->media_timestamp,
-                          (float)cst->media_duration,
-                          (Color){255, 0, 0},
-                          (Color){150, 150, 150});
+    cli_draw_progress(cst,
+                      (Vec2){cst->cursor_x + timestamp_right_pad, cst->height - progress_bottom_pad},
+                      cst->width - cst->cursor_x - (volume_right_pad + timestamp_right_pad + volume_left_pad),
+                      (float)cst->media_timestamp,
+                      (float)cst->media_duration,
+                      (Color){255, 0, 0},
+                      (Color){150, 150, 150});
 
-    cli_draw_media_control(cst, (Vec2){cst->width / 2, cst->height - 1}, (Color){255, 255, 255});
+    cli_draw_now_playing(cst,
+                         (Vec2){1,
+                                cst->height - 1},
+                         overlay_fg_color,
+                         overlay_bg_color);
+
+    cli_draw_media_control(cst,
+                           (Vec2){cst->width / 2, cst->height - 1},
+                           (Color){255, 255, 255},
+                           overlay_bg_color);
+
+    cli_get_cursor_pos(cst);
+
+    cli_draw_padding(cst,
+                     (Vec2){-1, -1},
+                     cst->width - cst->cursor_x,
+                     (Color){-1, -1, -1},
+                     overlay_bg_color);
 }
 
 static HANDLE out_main;
