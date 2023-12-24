@@ -359,16 +359,41 @@ static void cli_draw_progress(CLIState *cst,
 
 static void cli_draw_timestamp(CLIState *cst, Vec2 pos, Color fg, Color bg)
 {
+    cli_cursor_to(cst->out.handle, pos.x, pos.y);
+
+    Time ts = time_from_us((double)cst->media_timestamp);
+    Time d = time_from_us((double)cst->media_duration);
+
     sb_appendf(overlay_sb,
-               "\x1b[38;2;%d;%d;%d;48;2;%d;%d;%dm%.2fs / %.2fs\x1b[0m",
+               "\x1b[38;2;%d;%d;%d;48;2;%d;%d;%dm",
                fg.r, fg.g, fg.b,
-               bg.r, bg.g, bg.b,
-               (double)cst->media_timestamp / (double)AV_TIME_BASE,
-               (double)cst->media_duration / (double)AV_TIME_BASE);
+               bg.r, bg.g, bg.b);
 
     char *str = sb_concat(overlay_sb);
 
-    cli_cursor_to(cst->out.handle, pos.x, pos.y);
+    WriteConsole(cst->out.handle, str, strlen(str), NULL, NULL);
+
+    free(str);
+    sb_reset(overlay_sb);
+
+    if (d.h >= 1.0)
+        sb_appendf(overlay_sb, "%01lld:", (int64_t)ts.h);
+
+    sb_appendf(overlay_sb,
+               d.h >= 1.0 ? "%02lld:%02lld / " : "%01lld:%02lld / ",
+               (int64_t)ts.m,
+               (int64_t)ts.s);
+
+    if (d.h >= 1.0)
+        sb_appendf(overlay_sb, "%01lld:", (int64_t)d.h);
+
+    sb_appendf(overlay_sb,
+               d.h >= 1.0 ? "%02lld:%02lld\x1b[0m" : "%01lld:%02lld\x1b[0m",
+               (int64_t)d.m,
+               (int64_t)d.s);
+
+    str = sb_concat(overlay_sb);
+
     WriteConsole(cst->out.handle, str, strlen(str), NULL, NULL);
 
     free(str);
