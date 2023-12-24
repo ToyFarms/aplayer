@@ -10,7 +10,7 @@ elseif(APPLE)
   set(OS-DIR macos)
 endif()
 
-set(CMAKE_C_FLAGS "-Wno-unused-result")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-unused-result")
 
 add_executable(
   aplayer
@@ -19,6 +19,7 @@ add_executable(
   src/libdecoder.c
   src/libplayer.c
   src/libstream.c
+  src/libtime.c
   src/sb.c
   src/${OS-DIR}/libcli.c
   src/${OS-DIR}/libfile.c

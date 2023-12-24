@@ -14,6 +14,7 @@
 #include "sb.h"
 #include "libhelper.h"
 #include "libfile.h"
+#include "libtime.h"
 
 #define MOUSE_LEFT_CLICKED (1 << 0)
 #define MOUSE_MIDDLE_CLICKED (1 << 1)
