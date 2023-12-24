@@ -350,6 +350,7 @@ typedef struct CLIState
     int64_t media_duration;
     int64_t media_timestamp;
     float media_volume;
+    bool media_is_muted;
     bool media_paused;
 
     bool force_redraw;

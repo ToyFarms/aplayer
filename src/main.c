@@ -86,6 +86,7 @@ int main(int argc, char **argv)
     cli_draw(cst);
 
     bool exit = false;
+    float volume_before_muted = 0.0f;
 
     while (!exit)
     {
@@ -124,9 +125,19 @@ int main(int argc, char **argv)
                     need_redraw = true;
                 }
                 else if (ke.vk_key == VIRT_DOWN && ke.modifier_key & CTRL_KEY_PRESSED)
-                    audio_set_volume(FFMAX(audio_get_volume() - 0.05f, 0));
+                {
+                    if (cst->media_is_muted)
+                        volume_before_muted = FFMAX(volume_before_muted - 0.05f, 0);
+                    else
+                        audio_set_volume(FFMAX(audio_get_volume() - 0.05f, 0));
+                }
                 else if (ke.vk_key == VIRT_UP && ke.modifier_key & CTRL_KEY_PRESSED)
-                    audio_set_volume(FFMIN(audio_get_volume() + 0.05f, 1.25f));
+                {
+                    if (cst->media_is_muted)
+                        volume_before_muted = FFMIN(volume_before_muted + 0.05f, 1.25f);
+                    else
+                        audio_set_volume(FFMIN(audio_get_volume() + 0.05f, 1.25f));
+                }
                 else if (ke.vk_key == VIRT_UP)
                 {
                     cst->selected_idx -= 1;
@@ -202,6 +213,20 @@ int main(int argc, char **argv)
 
                     cst->force_redraw = true;
                     cli_draw(cst);
+                }
+                else if (ke.acsii_key == 'm')
+                {
+                    if (cst->media_is_muted)
+                    {
+                        audio_set_volume(volume_before_muted);
+                        cst->media_is_muted = false;
+                    }
+                    else
+                    {
+                        volume_before_muted = audio_get_volume();
+                        audio_set_volume(0.0f);
+                        cst->media_is_muted = true;
+                    }
                 }
 
                 if (need_redraw)
