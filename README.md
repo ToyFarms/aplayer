@@ -8,6 +8,7 @@ It is developed for Windows, though most of the code are cross-platform. There a
 * [FFMPEG](https://github.com/FFmpeg/FFmpeg)
 * [PortAudio](https://github.com/PortAudio/portaudio)
 * [SDL2](https://github.com/libsdl-org/SDL)
+* [StringBuilder](https://github.com/cavaliercoder/c-stringbuilder)
 
 ### How to build:
 
