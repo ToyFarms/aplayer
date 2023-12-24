@@ -193,39 +193,35 @@ static LineState cli_get_line_state(CLIState *cst, int idx)
 
 static StringBuilder *pad_sb;
 
-ATTRIBUTE_USED
 static void cli_draw_padding(CLIState *cst,
-                             Vec2 pos,
+                             const Vec2 *pos,
                              int length,
-                             Color fg,
-                             Color bg)
+                             const Color *fg,
+                             const Color *bg)
 {
     if (!pad_sb)
         pad_sb = sb_create();
 
     char padding[length + 1];
     memset(padding, ' ', sizeof(padding));
-    padding[length + 1] = '\0';
+    padding[length] = '\0';
 
-    bool foreground_color = fg.r >= 0 && fg.g >= 0 && fg.b >= 0;
-    bool background_color = bg.r >= 0 && bg.g >= 0 && bg.b >= 0;
-
-    if (foreground_color && background_color)
-        sb_appendf(pad_sb, "\x1b[38;2;%d;%d;%d;48;2;%d;%d;%dm%s", fg.r, fg.g, fg.b, bg.r, bg.g, bg.b, padding);
-    else if (foreground_color)
-        sb_appendf(pad_sb, "\x1b[38;2;%d;%d;%dm%s", fg.r, fg.g, fg.b, padding);
-    else if (background_color)
-        sb_appendf(pad_sb, "\x1b[48;2;%d;%d;%dm%s", bg.r, bg.g, bg.b, padding);
+    if (bg && fg)
+        sb_appendf(pad_sb, "\x1b[38;2;%d;%d;%d;48;2;%d;%d;%dm%s", fg->r, fg->g, fg->b, bg->r, bg->g, bg->b, padding);
+    else if (fg)
+        sb_appendf(pad_sb, "\x1b[38;2;%d;%d;%dm%s", fg->r, fg->g, fg->b, padding);
+    else if (bg)
+        sb_appendf(pad_sb, "\x1b[48;2;%d;%d;%dm%s", bg->r, bg->g, bg->b, padding);
     else
         sb_appendf(pad_sb, "%s", padding);
 
-    if (foreground_color || background_color)
+    if (bg || fg)
         sb_append(pad_sb, "\x1b[0m");
 
     char *str = sb_concat(pad_sb);
 
-    if (pos.x >= 0 && pos.y >= 0)
-        cli_cursor_to(cst->out.handle, pos.x, pos.y);
+    if (pos)
+        cli_cursor_to(cst->out.handle, pos->x, pos->y);
 
     WriteConsole(cst->out.handle, str, strlen(str), NULL, NULL);
 
@@ -266,7 +262,7 @@ static void cli_draw_list(CLIState *cst)
         if (pad <= 0)
             continue;
 
-        cli_draw_padding(cst, (Vec2){-1, -1}, pad, (Color){-1, -1, -1}, (Color){-1, -1, -1});
+        cli_draw_padding(cst, NULL, pad, NULL, NULL);
     }
 }
 
@@ -299,7 +295,7 @@ static void cli_draw_rect(CLIState *cst, Rect rect, Color color)
         return;
 
     for (int current_y = rect.y; current_y < rect.y + rect.h; current_y++)
-        cli_draw_padding(cst, (Vec2){rect.x, current_y}, rect.w, color, color);
+        cli_draw_padding(cst, &(Vec2){rect.x, current_y}, rect.w, &color, &color);
 }
 
 static const wchar_t blocks[] = {L'█', L'▉', L'▊', L'▋', L'▌', L'▍', L'▎', L'▎', L' '};
@@ -321,7 +317,7 @@ static void cli_draw_hlinef(CLIState *cst,
     char *str;
 
     if (int_part > 0)
-        cli_draw_padding(cst, (Vec2){-1, -1}, int_part, (Color){-1, -1, -1}, fg);
+        cli_draw_padding(cst, NULL, int_part, NULL, &fg);
 
     sb_appendf(overlay_sb, "\x1b[48;2;%d;%d;%d;38;2;%d;%d;%dm", bg.r, bg.g, bg.b, fg.r, fg.g, fg.b);
     str = sb_concat(overlay_sb);
@@ -353,10 +349,10 @@ static void cli_draw_progress(CLIState *cst,
 
     cli_get_cursor_pos(cst);
     cli_draw_padding(cst,
-                     (Vec2){-1, -1},
+                     NULL,
                      (pos.x + length) - cst->cursor_x,
-                     (Color){-1, -1, -1},
-                     (Color){-1, -1, -1});
+                     NULL,
+                     NULL);
 
     WriteConsole(cst->out.handle, "\x1b[0m", 5, NULL, NULL);
 }
@@ -599,10 +595,10 @@ void cli_draw_overlay(CLIState *cst)
     cli_get_cursor_pos(cst);
 
     cli_draw_padding(cst,
-                     (Vec2){-1, -1},
+                     NULL,
                      cst->width - cst->cursor_x,
-                     (Color){-1, -1, -1},
-                     overlay_bg_color);
+                     NULL,
+                     &overlay_bg_color);
 }
 
 static HANDLE out_main;
