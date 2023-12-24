@@ -333,9 +333,9 @@ static void cli_draw_hlinef(CLIState *cst,
     WriteConsoleW(cst->out.handle, &final_block, 1, NULL, NULL);
 
     if (reset_bg_color)
-        WriteConsole(cst->out.handle, "\x1b[0m", 4, NULL, NULL);
+        WriteConsole(cst->out.handle, "\x1b[0m", 5, NULL, NULL);
     else
-        WriteConsole(cst->out.handle, "\x1b[39m", 5, NULL, NULL);
+        WriteConsole(cst->out.handle, "\x1b[39m", 6, NULL, NULL);
 }
 
 static void cli_draw_progress(CLIState *cst,
@@ -351,9 +351,13 @@ static void cli_draw_progress(CLIState *cst,
     cli_draw_hlinef(cst, pos, mapped_length, fg, bg, false);
 
     cli_get_cursor_pos(cst);
-    cli_draw_padding(cst, (Vec2){-1, -1}, (pos.x + length) - cst->cursor_x, (Color){-1, -1, -1}, (Color){-1, -1, -1});
+    cli_draw_padding(cst,
+                     (Vec2){-1, -1},
+                     (pos.x + length) - cst->cursor_x,
+                     (Color){-1, -1, -1},
+                     (Color){-1, -1, -1});
 
-    WriteConsole(cst->out.handle, "\x1b[0m", 4, NULL, NULL);
+    WriteConsole(cst->out.handle, "\x1b[0m", 5, NULL, NULL);
 }
 
 static void cli_draw_timestamp(CLIState *cst, Vec2 pos, Color fg, Color bg)
