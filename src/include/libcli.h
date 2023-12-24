@@ -15,14 +15,6 @@
 #include "libhelper.h"
 #include "libfile.h"
 
-#ifdef __clang__
-#define ATTRIBUTE_USED __attribute__((used))
-#elif defined(__GNUC__) || defined(__GNUG__)
-#define ATTRIBUTE_USED __attribute__((used))
-#elif defined(_MSC_VER)
-#define ATTRIBUTE_USED
-#endif // __GNUC__
-
 #define MOUSE_LEFT_CLICKED (1 << 0)
 #define MOUSE_MIDDLE_CLICKED (1 << 1)
 #define MOUSE_RIGHT_CLICKED (1 << 2)
