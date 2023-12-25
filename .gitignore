@@ -3,6 +3,7 @@ build/
 notes/
 vcpkg_installed/
 .vs/
+testing.c
 
 # Prerequisites
 *.d

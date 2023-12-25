@@ -53,7 +53,6 @@ int main(int argc, char **argv)
     prepare_app_arguments(&argc, &argv);
 
     // TODO: Fix line shifted up when resizing (shrink up), causing a "ghost" line that cannot be cleared even after switching to main buffer. (i don't know how to fix this one)
-    // TODO: Add more features to the cli
     // TODO: Make a gui
 
 #ifdef AP_WINDOWS
