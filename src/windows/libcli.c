@@ -25,7 +25,6 @@ static DWORD in_mode;
 void cli_buffer_switch(BUFFER_TYPE type)
 {
     out = GetStdHandle(STD_OUTPUT_HANDLE);
-    // SetConsoleOutputCP(CP_UTF8);
 
     switch (type)
     {
