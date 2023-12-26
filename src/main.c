@@ -61,12 +61,13 @@ void log_callback(void* ptr, int level, const char* fmt, va_list vl)
 
 int main(int argc, char **argv)
 {
-    atexit(cleanup);
     if (argc < 2)
     {
-        av_log(NULL, AV_LOG_FATAL, "Usage: %s <directory>\n", argv[0]);
+        fprintf(stderr, "Usage: %s <directory>\n", argv[0]);
         return 1;
     }
+
+    atexit(cleanup);
 
     av_log_set_callback(log_callback);
     av_log_set_level(AV_LOG_DEBUG);
