@@ -36,9 +36,28 @@ void sort_entries(CLIState *cst, SORT_METHOD sort, SORT_FLAG flag);
 void cleanup(void)
 {
     cli_buffer_switch(BUF_MAIN);
+    FILE *fd = fopen("log.txt", "a");
+
+    const char *separator = "========================== END OF LOG ==========================\n\n";
+    fwrite(separator, sizeof(char), strlen(separator), fd);
+
+    fclose(fd);
 }
 
-#define DEBUG 0
+void log_callback(void* ptr, int level, const char* fmt, va_list vl)
+{
+    if (level > av_log_get_level())
+        return;
+
+    FILE *fd = fopen("log.txt", "a");
+
+    char buf[8192];
+    vsprintf_s(buf, 8192, fmt, vl);
+
+    fwrite(buf, sizeof(char), strlen(buf), fd);
+
+    fclose(fd);
+}
 
 int main(int argc, char **argv)
 {
@@ -49,11 +68,8 @@ int main(int argc, char **argv)
         return 1;
     }
 
-#if DEBUG > 1
+    av_log_set_callback(log_callback);
     av_log_set_level(AV_LOG_DEBUG);
-#else
-    av_log_set_level(AV_LOG_QUIET);
-#endif // DEBUG == 1
 
     prepare_app_arguments(&argc, &argv);
 
@@ -80,9 +96,6 @@ int main(int argc, char **argv)
 
     if (!cst->out.handle)
         return 1;
-
-    cst->force_redraw = true;
-    cli_draw(cst);
 
     bool exit = false;
     float volume_before_muted = 0.0f;
@@ -412,7 +425,7 @@ void *event_thread(void *arg)
     float volume_incr = 0.05f;
     float volume_max = 2.0f;
 
-    while (true)
+    while (cst)
     {
         if (av_gettime() - last_keypress < keypress_cooldown)
         {
@@ -456,7 +469,7 @@ void *event_thread(void *arg)
 
 void *update_thread(void *arg)
 {
-    while (true)
+    while (cst)
     {
         pthread_mutex_lock(&cst->mutex);
 

@@ -674,6 +674,9 @@ void audio_init()
 
 void audio_free()
 {
+    audio_exit();
+    audio_wait_until_finished();
+    
     if (pst)
     {
         player_state_free(&pst);
