@@ -33,11 +33,16 @@ typedef enum SORT_FLAG
 } SORT_FLAG;
 
 void sort_entries(CLIState *cst, SORT_METHOD sort, SORT_FLAG flag);
+void cleanup(void)
+{
+    cli_buffer_switch(BUF_MAIN);
+}
 
 #define DEBUG 0
 
 int main(int argc, char **argv)
 {
+    atexit(cleanup);
     if (argc < 2)
     {
         av_log(NULL, AV_LOG_FATAL, "Usage: %s <directory>\n", argv[0]);
