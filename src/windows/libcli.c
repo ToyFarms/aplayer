@@ -630,26 +630,6 @@ static HANDLE out;
 static HANDLE in;
 static DWORD in_mode;
 
-// static void cli_init_input()
-// {
-//     in = CreateFile("CONIN$",
-//                     GENERIC_READ | GENERIC_WRITE,
-//                     FILE_SHARE_READ,
-//                     NULL,
-//                     OPEN_ALWAYS,
-//                     0,
-//                     NULL);
-
-//     GetConsoleMode(in, &in_main_mode);
-
-//     DWORD in_mode = in_main_mode;
-//     in_mode |= ENABLE_EXTENDED_FLAGS | ENABLE_WINDOW_INPUT | ENABLE_MOUSE_INPUT;
-//     in_mode &= ~ENABLE_QUICK_EDIT_MODE;
-//     SetConsoleMode(in, in_mode);
-
-//     SetStdHandle(STD_INPUT_HANDLE, in);
-// }
-
 void cli_buffer_switch(BUFFER_TYPE type)
 {
     out = GetStdHandle(STD_OUTPUT_HANDLE);
@@ -661,6 +641,7 @@ void cli_buffer_switch(BUFFER_TYPE type)
             SetConsoleMode(in, in_mode);
 
         printf("\x1b[?1049l");
+        printf("\x1b[?25h");
         break;
     case BUF_ALTERNATE:
         DWORD out_mode;
