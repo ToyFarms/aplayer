@@ -381,5 +381,7 @@ void cli_get_console_size(CLIState *cst);
 void cli_get_cursor_pos(CLIState *cst);
 Events cli_read_in();
 Handle cli_get_handle();
+void cli_write(Handle out, const char *str, int str_len);
+void cli_writew(Handle out, const wchar_t *str, int str_len);
 
 #endif // _LIBCLI_H
