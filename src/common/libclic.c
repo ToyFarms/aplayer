@@ -114,7 +114,7 @@ void cli_clear_screen(Handle out)
 static StringBuilder *list_sb;
 static const Color overlay_fg_color = {230, 200, 150};
 
-static wchar_t *cli_line_routine(CLIState *cst, int idx, LineState line_state, int *out_strlen)
+static wchar_t *cli_line_routine(CLIState *cst, int idx, LineState line_state, int *out_strwlen)
 {
     sb_appendf(list_sb, "\x1b[38;2;%d;%d;%d;48;2;41;41;41m%3d \x1b[39m", overlay_fg_color.r, overlay_fg_color.g, overlay_fg_color.b, idx);
     switch (line_state)
@@ -137,7 +137,7 @@ static wchar_t *cli_line_routine(CLIState *cst, int idx, LineState line_state, i
 
     char *str = sb_concat(list_sb);
 
-    wchar_t *strw = mbs2wchar(str, 2048, out_strlen);
+    wchar_t *strw = mbs2wchar(str, 2048, out_strwlen);
 
     free(str);
     sb_reset(list_sb);
