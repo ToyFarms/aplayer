@@ -376,6 +376,7 @@ void cli_draw(CLIState *cst);
 void cli_draw_overlay(CLIState *cst);
 
 // Implement for each OS
+
 void cli_buffer_switch(BUFFER_TYPE type);
 void cli_get_console_size(CLIState *cst);
 void cli_get_cursor_pos(CLIState *cst);
