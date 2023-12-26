@@ -626,83 +626,58 @@ void cli_draw_overlay(CLIState *cst)
                      &overlay_bg_color);
 }
 
-static HANDLE out_main;
-static HANDLE out_alt;
-static HANDLE out_cur;
+static HANDLE out;
 static HANDLE in;
-static DWORD in_main_mode;
+static DWORD in_mode;
 
-static void cli_init_input()
-{
-    in = CreateFile("CONIN$",
-                    GENERIC_READ | GENERIC_WRITE,
-                    FILE_SHARE_READ,
-                    NULL,
-                    OPEN_ALWAYS,
-                    0,
-                    NULL);
+// static void cli_init_input()
+// {
+//     in = CreateFile("CONIN$",
+//                     GENERIC_READ | GENERIC_WRITE,
+//                     FILE_SHARE_READ,
+//                     NULL,
+//                     OPEN_ALWAYS,
+//                     0,
+//                     NULL);
 
-    GetConsoleMode(in, &in_main_mode);
+//     GetConsoleMode(in, &in_main_mode);
 
-    DWORD in_mode = in_main_mode;
-    in_mode |= ENABLE_EXTENDED_FLAGS | ENABLE_WINDOW_INPUT | ENABLE_MOUSE_INPUT;
-    in_mode &= ~ENABLE_QUICK_EDIT_MODE;
-    SetConsoleMode(in, in_mode);
+//     DWORD in_mode = in_main_mode;
+//     in_mode |= ENABLE_EXTENDED_FLAGS | ENABLE_WINDOW_INPUT | ENABLE_MOUSE_INPUT;
+//     in_mode &= ~ENABLE_QUICK_EDIT_MODE;
+//     SetConsoleMode(in, in_mode);
 
-    SetStdHandle(STD_INPUT_HANDLE, in);
-}
+//     SetStdHandle(STD_INPUT_HANDLE, in);
+// }
 
 void cli_buffer_switch(BUFFER_TYPE type)
 {
+    out = GetStdHandle(STD_OUTPUT_HANDLE);
+
     switch (type)
     {
     case BUF_MAIN:
-        if (out_alt)
-        {
-            cli_clear_screen(out_alt);
-            Sleep(100);
-        }
-        if (!out_main)
-            out_main = CreateFile("CONOUT$",
-                                  GENERIC_READ | GENERIC_WRITE,
-                                  FILE_SHARE_WRITE,
-                                  NULL,
-                                  OPEN_ALWAYS,
-                                  0,
-                                  NULL);
+        if (in && in_mode)
+            SetConsoleMode(in, in_mode);
 
-        if (in && in_main_mode)
-            SetConsoleMode(in, in_main_mode);
-
-        SetConsoleActiveScreenBuffer(out_main);
-        out_cur = out_main;
+        printf("\x1b[?1049l");
         break;
     case BUF_ALTERNATE:
-        out_main = CreateFile("CONOUT$",
-                              GENERIC_READ | GENERIC_WRITE,
-                              FILE_SHARE_WRITE,
-                              NULL,
-                              OPEN_ALWAYS,
-                              0,
-                              NULL);
-        out_alt =
-            CreateConsoleScreenBuffer(GENERIC_READ | GENERIC_WRITE,
-                                      FILE_SHARE_WRITE,
-                                      NULL,
-                                      0,
-                                      NULL);
+        DWORD out_mode;
+        GetConsoleMode(out, &out_mode);
+        out_mode |= ENABLE_VIRTUAL_TERMINAL_PROCESSING;
+        out_mode &= ~ENABLE_WRAP_AT_EOL_OUTPUT;
+        SetConsoleMode(out, out_mode);
 
-        DWORD out_alt_mode;
-        GetConsoleMode(out_alt, &out_alt_mode);
-        out_alt_mode &= ~ENABLE_WRAP_AT_EOL_OUTPUT;
-        SetConsoleMode(out_alt, out_alt_mode);
+        in = GetStdHandle(STD_INPUT_HANDLE);
 
-        cli_init_input();
+        GetConsoleMode(in, &in_mode);
+        in_mode |= ENABLE_EXTENDED_FLAGS | ENABLE_WINDOW_INPUT | ENABLE_MOUSE_INPUT;
+        in_mode &= ~ENABLE_QUICK_EDIT_MODE;
+        SetConsoleMode(in, in_mode);
 
-        SetConsoleActiveScreenBuffer(out_alt);
-
-        SetConsoleCursorInfo(out_alt, &(CONSOLE_CURSOR_INFO){.bVisible = 0, .dwSize = 1});
-        out_cur = out_alt;
+        printf("\x1b[?1049h");
+        printf("\x1b[?25l");
         break;
     }
 }
@@ -790,25 +765,7 @@ Events cli_read_in()
     return (Events){.event = in_event, .event_size = read};
 }
 
-Handle cli_get_handle(BUFFER_TYPE type)
+Handle cli_get_handle()
 {
-    HANDLE ret;
-    switch (type)
-    {
-    case BUF_MAIN:
-        ret = out_main;
-        break;
-    case BUF_ALTERNATE:
-        ret = out_alt;
-        break;
-    default:
-        break;
-    }
-
-    if (!ret)
-    {
-        av_log(NULL, AV_LOG_FATAL, "Output handle is uninitialized.\n");
-        return (Handle){.handle = NULL};
-    }
-    return (Handle){.handle = ret};
+    return (Handle){.handle = GetStdHandle(STD_OUTPUT_HANDLE)};
 }

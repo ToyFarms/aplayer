@@ -115,7 +115,7 @@ typedef struct Events
     int event_size;
 } Events;
 
-#if defined(AP_WINDOWS)
+#ifdef AP_WINDOWS
 
 #include <windows.h>
 
@@ -328,6 +328,10 @@ typedef struct Handle
     HANDLE handle;
 } Handle;
 
+#elif defined(AP_MACOS)
+#elif defined(AP_LINUX)
+#endif // AP_WINDOWS
+
 typedef struct CLIState
 {
     pthread_mutex_t mutex;
@@ -365,9 +369,6 @@ typedef struct CLIState
     bool next_button_hovered;
 } CLIState;
 
-#elif defined(AP_MACOS)
-#elif defined(AP_LINUX)
-#endif // AP_WINDOWS
 
 CLIState *cli_state_init();
 void cli_state_free(CLIState **cst);
@@ -376,7 +377,7 @@ void cli_buffer_switch(BUFFER_TYPE type);
 Events cli_read_in();
 void cli_draw(CLIState *cst);
 void cli_draw_overlay(CLIState *cst);
-Handle cli_get_handle(BUFFER_TYPE type);
+Handle cli_get_handle();
 void cli_get_console_size(CLIState *cst);
 void cli_get_cursor_pos(CLIState *cst);
 
