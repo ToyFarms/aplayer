@@ -11,6 +11,7 @@ static int win32_argc = 0;
  * @param argc_ptr Arguments number (including executable)
  * @param argv_ptr Arguments list.
  */
+// From https://github.com/FFmpeg/FFmpeg/blob/4fee63b241e0dd254436bf38df8b0635b2b666d8/fftools/cmdutils.c#L178
 void prepare_app_arguments(int *argc_ptr, char ***argv_ptr)
 {
     char *argstr_flat;
@@ -84,23 +85,21 @@ char *wchar2mbs(const wchar_t *strw)
     int bufsize = WideCharToMultiByte(CP_UTF8, 0, &strw[0], -1, NULL, 0, NULL, NULL);
     if (bufsize == 0)
     {
-        wprintf(L"\x1b[38;2;255;0;0mError converting wide char \"%ls\": ", strw);
-        av_log(NULL, AV_LOG_FATAL, "%s.\n", get_last_error_string());
+        av_log(NULL, AV_LOG_FATAL, "Error converting wchar. %s.\n", get_last_error_string());
         return NULL;
     }
 
     char *char_utf8 = (char *)malloc(bufsize * sizeof(char));
     if (!char_utf8)
     {
-        av_log(NULL, AV_LOG_FATAL, "Could not allocate memory");
+        av_log(NULL, AV_LOG_FATAL, "wchar2mbs: Could not allocate memory.\n");
         return NULL;
     }
 
     bufsize = WideCharToMultiByte(CP_UTF8, 0, &strw[0], -1, &char_utf8[0], bufsize, NULL, NULL);
     if (bufsize == 0)
     {
-        wprintf(L"\x1b[38;2;255;0;0mError converting wide char \"%ls\": ", strw);
-        av_log(NULL, AV_LOG_FATAL, "%s.\n", get_last_error_string());
+        av_log(NULL, AV_LOG_FATAL, "Error converting wchar. %s.\n", get_last_error_string());
         free(char_utf8);
         return NULL;
     }
@@ -115,7 +114,10 @@ wchar_t *mbs2wchar(char *str, size_t wsize, int *strwlen_out)
 
     wchar_t *strw = (wchar_t *)malloc(wsize * sizeof(wchar_t));
     if (!strw)
+    {
+        av_log(NULL, AV_LOG_FATAL, "mbs2wchar: Could not allocate memory.\n");
         return NULL;
+    }
 
     int len = MultiByteToWideChar(CP_UTF8, 0, str, -1, strw, wsize);
     if (strwlen_out)
