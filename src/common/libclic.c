@@ -102,7 +102,7 @@ void cli_state_free(CLIState **cst)
 static void cli_cursor_to(Handle out, int x, int y)
 {
     char buf[128];
-    snprintf(buf, 128, "\x1b[%d;%dH", y, x);
+    snprintf(buf, 128, "\x1b[%d;%dH", y + 1, x + 1);
     cli_write(out, buf, strlen(buf));
 }
 
@@ -276,15 +276,16 @@ static void cli_draw_hlinef(CLIState *cst,
 
     cli_cursor_to(cst->out, pos.x, pos.y);
 
-    char *str;
     if (int_part > 0)
         cli_draw_padding(cst, NULL, int_part, NULL, &fg);
     
     cli_cursor_to(cst->out, pos.x + int_part, pos.y);
 
     sb_appendf(overlay_sb, "\x1b[48;2;%d;%d;%d;38;2;%d;%d;%dm", bg.r, bg.g, bg.b, fg.r, fg.g, fg.b);
-    str = sb_concat(overlay_sb);
+
+    char *str = sb_concat(overlay_sb);
     cli_write(cst->out, str, strlen(str));
+
     free(str);
     sb_reset(overlay_sb);
 
