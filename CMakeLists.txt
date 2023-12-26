@@ -25,6 +25,7 @@ add_executable(
   src/${OS-DIR}/libfile.c
   src/${OS-DIR}/libhelper.c
   src/common/libhelperc.c
+  src/common/libclic.c
 )
 
 target_include_directories(aplayer PUBLIC src/include)
