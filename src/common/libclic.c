@@ -168,18 +168,14 @@ static void cli_draw_padding(CLIState *cst,
     if (!pad_sb)
         pad_sb = sb_create();
 
-    char padding[length + 1];
-    memset(padding, ' ', sizeof(padding));
-    padding[length] = '\0';
-
     if (bg && fg)
-        sb_appendf(pad_sb, "\x1b[38;2;%d;%d;%d;48;2;%d;%d;%dm%s", fg->r, fg->g, fg->b, bg->r, bg->g, bg->b, padding);
+        sb_appendf(pad_sb, "\x1b[38;2;%d;%d;%d;48;2;%d;%d;%dm", fg->r, fg->g, fg->b, bg->r, bg->g, bg->b);
     else if (fg)
-        sb_appendf(pad_sb, "\x1b[38;2;%d;%d;%dm%s", fg->r, fg->g, fg->b, padding);
+        sb_appendf(pad_sb, "\x1b[38;2;%d;%d;%dm", fg->r, fg->g, fg->b);
     else if (bg)
-        sb_appendf(pad_sb, "\x1b[48;2;%d;%d;%dm%s", bg->r, bg->g, bg->b, padding);
-    else
-        sb_appendf(pad_sb, "%s", padding);
+        sb_appendf(pad_sb, "\x1b[48;2;%d;%d;%dm", bg->r, bg->g, bg->b);
+
+    sb_appendf(pad_sb, "\x1b[%dX", length);
 
     if (bg || fg)
         sb_append(pad_sb, "\x1b[0m");
@@ -281,9 +277,10 @@ static void cli_draw_hlinef(CLIState *cst,
     cli_cursor_to(cst->out.handle, pos.x, pos.y);
 
     char *str;
-
     if (int_part > 0)
         cli_draw_padding(cst, NULL, int_part, NULL, &fg);
+    
+    cli_cursor_to(cst->out.handle, pos.x + int_part, pos.y);
 
     sb_appendf(overlay_sb, "\x1b[48;2;%d;%d;%d;38;2;%d;%d;%dm", bg.r, bg.g, bg.b, fg.r, fg.g, fg.b);
     str = sb_concat(overlay_sb);
