@@ -25,6 +25,7 @@ static DWORD in_mode;
 void cli_buffer_switch(BUFFER_TYPE type)
 {
     out = GetStdHandle(STD_OUTPUT_HANDLE);
+    // SetConsoleOutputCP(CP_UTF8);
 
     switch (type)
     {
@@ -141,4 +142,14 @@ Events cli_read_in()
 Handle cli_get_handle()
 {
     return (Handle){.handle = GetStdHandle(STD_OUTPUT_HANDLE)};
+}
+
+void cli_write(Handle out, const char *str, int str_len)
+{
+    WriteConsole(out.handle, str, str_len, NULL, NULL);
+}
+
+void cli_writew(Handle out, const wchar_t *str, int str_len)
+{
+    WriteConsoleW(out.handle, str, str_len, NULL, NULL);
 }

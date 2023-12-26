@@ -99,16 +99,16 @@ void cli_state_free(CLIState **cst)
     *cst = NULL;
 }
 
-static void cli_cursor_to(int x, int y)
+static void cli_cursor_to(Handle out, int x, int y)
 {
     char buf[128];
     snprintf(buf, 128, "\x1b[%d;%dH", y, x);
-    printf("%s", buf);
+    cli_write(out, buf, strlen(buf));
 }
 
-void cli_clear_screen(HANDLE out)
+void cli_clear_screen(Handle out)
 {
-    printf("\x1b[2J");
+    cli_write(out, "\x1b[2J", 5);
 }
 
 static StringBuilder *list_sb;
@@ -183,9 +183,9 @@ static void cli_draw_padding(CLIState *cst,
     char *str = sb_concat(pad_sb);
 
     if (pos)
-        cli_cursor_to(pos->x, pos->y);
+        cli_cursor_to(cst->out, pos->x, pos->y);
 
-    WriteConsole(cst->out.handle, str, strlen(str), NULL, NULL);
+    cli_write(cst->out, str, strlen(str));
 
     free(str);
     sb_reset(pad_sb);
@@ -198,7 +198,7 @@ static void cli_draw_list(CLIState *cst)
     int strw_len;
 
     if (cst->force_redraw)
-        cli_clear_screen(cst->out.handle);
+        cli_clear_screen(cst->out);
 
     for (int viewport_offset = 0; //   - 3 : bottom overlay
          viewport_offset < cst->height - 3 && cst->entry_offset + viewport_offset < cst->entry_size;
@@ -212,10 +212,10 @@ static void cli_draw_list(CLIState *cst)
 
         lines_state_cache[abs_entry_idx] = line_state;
 
-        cli_cursor_to(0, viewport_offset);
+        cli_cursor_to(cst->out, 0, viewport_offset);
 
         wchar_t *strw = cli_line_routine(cst, abs_entry_idx, line_state, &strw_len);
-        WriteConsoleW(cst->out.handle, strw, strw_len, NULL, NULL);
+        cli_writew(cst->out, strw, strw_len);
         free(strw);
 
         cli_get_cursor_pos(cst);
@@ -274,28 +274,28 @@ static void cli_draw_hlinef(CLIState *cst,
     int int_part = (int)length;
     float float_part = length - (float)int_part;
 
-    cli_cursor_to(pos.x, pos.y);
+    cli_cursor_to(cst->out, pos.x, pos.y);
 
     char *str;
     if (int_part > 0)
         cli_draw_padding(cst, NULL, int_part, NULL, &fg);
     
-    cli_cursor_to(pos.x + int_part, pos.y);
+    cli_cursor_to(cst->out, pos.x + int_part, pos.y);
 
     sb_appendf(overlay_sb, "\x1b[48;2;%d;%d;%d;38;2;%d;%d;%dm", bg.r, bg.g, bg.b, fg.r, fg.g, fg.b);
     str = sb_concat(overlay_sb);
-    WriteConsole(cst->out.handle, str, strlen(str), NULL, NULL);
+    cli_write(cst->out, str, strlen(str));
     free(str);
     sb_reset(overlay_sb);
 
     int block_index = block_len - (int)(roundf(float_part / block_increment) * block_increment * block_len);
     wchar_t final_block = blocks[block_index];
-    WriteConsoleW(cst->out.handle, &final_block, 1, NULL, NULL);
+    cli_writew(cst->out, &final_block, 1);
 
     if (reset_bg_color)
-        WriteConsole(cst->out.handle, "\x1b[0m", 5, NULL, NULL);
+        cli_write(cst->out, "\x1b[0m", 5);
     else
-        WriteConsole(cst->out.handle, "\x1b[39m", 6, NULL, NULL);
+        cli_write(cst->out, "\x1b[39m", 6);
 }
 
 static void cli_draw_progress(CLIState *cst,
@@ -317,12 +317,12 @@ static void cli_draw_progress(CLIState *cst,
                      NULL,
                      NULL);
 
-    WriteConsole(cst->out.handle, "\x1b[0m", 5, NULL, NULL);
+    cli_write(cst->out, "\x1b[0m", 5);
 }
 
 static void cli_draw_timestamp(CLIState *cst, Vec2 pos, Color fg, Color bg)
 {
-    cli_cursor_to(pos.x, pos.y);
+    cli_cursor_to(cst->out, pos.x, pos.y);
 
     Time ts = time_from_us((double)cst->media_timestamp);
     Time d = time_from_us((double)cst->media_duration);
@@ -334,7 +334,7 @@ static void cli_draw_timestamp(CLIState *cst, Vec2 pos, Color fg, Color bg)
 
     char *str = sb_concat(overlay_sb);
 
-    WriteConsole(cst->out.handle, str, strlen(str), NULL, NULL);
+    cli_write(cst->out, str, strlen(str));
 
     free(str);
     sb_reset(overlay_sb);
@@ -357,7 +357,7 @@ static void cli_draw_timestamp(CLIState *cst, Vec2 pos, Color fg, Color bg)
 
     str = sb_concat(overlay_sb);
 
-    WriteConsole(cst->out.handle, str, strlen(str), NULL, NULL);
+    cli_write(cst->out, str, strlen(str));
 
     free(str);
     sb_reset(overlay_sb);
@@ -390,8 +390,8 @@ static void cli_draw_volume(CLIState *cst, Vec2 pos, Color fg, Color bg)
     int strw_len;
     wchar_t *strw = mbs2wchar(str, 128, &strw_len);
 
-    cli_cursor_to(pos.x, pos.y);
-    WriteConsoleW(cst->out.handle, strw, strw_len, NULL, NULL);
+    cli_cursor_to(cst->out, pos.x, pos.y);
+    cli_writew(cst->out, strw, strw_len);
 
     free(strw);
     free(str);
@@ -430,7 +430,7 @@ static void cli_draw_media_control(CLIState *cst, Vec2 center, Color fg, Color b
 
     sb_reset(overlay_sb);
 
-    cli_cursor_to(center.x - 5, center.y);
+    cli_cursor_to(cst->out, center.x - 5, center.y);
 
     sb_appendf(overlay_sb,
                "%s %s %s %s %s %s %s %s %s",
@@ -451,7 +451,7 @@ static void cli_draw_media_control(CLIState *cst, Vec2 center, Color fg, Color b
     int strw_len;
     wchar_t *strw = mbs2wchar(str, 1024, &strw_len);
 
-    WriteConsoleW(cst->out.handle, strw, strw_len, NULL, NULL);
+    cli_writew(cst->out, strw, strw_len);
 
     free(normal_color);
     free(strw);
@@ -468,7 +468,7 @@ static void cli_draw_now_playing(CLIState *cst, Vec2 pos, Color fg, Color bg)
     static int direction = 1;
     static int text_len = 0;
 
-    cli_cursor_to(pos.x, pos.y);
+    cli_cursor_to(cst->out, pos.x, pos.y);
 
     sb_appendf(overlay_sb,
                "\x1b[38;2;%d;%d;%d;48;2;%d;%d;%dm",
@@ -476,10 +476,10 @@ static void cli_draw_now_playing(CLIState *cst, Vec2 pos, Color fg, Color bg)
                bg.r, bg.g, bg.b);
 
     char *str = sb_concat(overlay_sb);
-    WriteConsole(cst->out.handle, str, strlen(str), NULL, NULL);
+    cli_write(cst->out, str, strlen(str));
 
     const char *playing = "Playing: ";
-    WriteConsole(cst->out.handle, playing, strlen(playing), NULL, NULL);
+    cli_write(cst->out, playing, strlen(playing));
 
     int max_len = ((cst->width / 2) - 5) - (pos.x + strlen(playing));
 
@@ -512,14 +512,14 @@ static void cli_draw_now_playing(CLIState *cst, Vec2 pos, Color fg, Color bg)
     cli_get_cursor_pos(cst);
     int prev_x = cst->cursor_x;
 
-    WriteConsoleW(cst->out.handle, strw + offset, strw_len - offset, NULL, NULL);
+    cli_writew(cst->out, strw + offset, strw_len - offset);
 
     cli_get_cursor_pos(cst);
     text_len = cst->cursor_x - prev_x;
 
     text_overflow = text_len >= max_len - 1;
 
-    WriteConsole(cst->out.handle, "\x1b[0m", 5, NULL, NULL);
+    cli_write(cst->out, "\x1b[0m", 5);
 
     free(str);
     free(strw);
