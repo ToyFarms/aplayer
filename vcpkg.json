@@ -4,6 +4,6 @@
     "dependencies": [
         "portaudio",
         "ffmpeg",
-        "sdl2"
+        "raylib"
     ]
 }
