@@ -52,7 +52,6 @@ int main(int argc, char **argv)
 
     prepare_app_arguments(&argc, &argv);
 
-    // TODO: Fix line shifted up when resizing (shrink up), causing a "ghost" line that cannot be cleared even after switching to main buffer. (i don't know how to fix this one)
     // TODO: Make a gui
 
 #ifdef AP_WINDOWS
@@ -71,12 +70,8 @@ int main(int argc, char **argv)
     pthread_create(&update_thread_id, NULL, update_thread, NULL);
 
     cli_buffer_switch(BUF_ALTERNATE);
-#if DEBUG == 1
-    cli_buffer_switch(BUF_MAIN);
-#endif // DEBUG == 1
 
-    Handle out_main = cli_get_handle(BUF_MAIN);
-    cst->out = cli_get_handle(BUF_ALTERNATE);
+    cst->out = cli_get_handle();
 
     if (!cst->out.handle)
         return 1;
@@ -313,9 +308,6 @@ int main(int argc, char **argv)
                 break;
             case BUFFER_CHANGED_EVENT_TYPE:
                 cli_get_console_size(cst);
-                SetConsoleWindowInfo(out_main.handle,
-                                     true,
-                                     &(SMALL_RECT){0, 0, cst->width - 1, cst->height - 1});
                 cst->force_redraw = true;
                 cli_draw(cst);
 
