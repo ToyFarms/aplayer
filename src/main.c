@@ -7,32 +7,13 @@
 #include "libhelper.h"
 #include "libfile.h"
 #include "libcli.h"
+#include "libplaylist.h"
 
-static CLIState *cst;
-
-void compute_offset(CLIState *cst);
-void cycle_next();
-void cycle_prev();
-void finished_callback(void);
-void play(char *filename);
 #ifdef AP_WINDOWS
 void *event_thread(void *arg);
 #endif // AP_WINDOWS
 void *update_thread(void *arg);
 
-typedef enum SORT_METHOD
-{
-    SORT_CTIME,
-    SORT_ALPHABETICALLY,
-} SORT_METHOD;
-
-typedef enum SORT_FLAG
-{
-    SORT_FLAG_ASC,
-    SORT_FLAG_DESC,
-} SORT_FLAG;
-
-void sort_entries(CLIState *cst, SORT_METHOD sort, SORT_FLAG flag);
 void cleanup(void)
 {
     cli_buffer_switch(BUF_MAIN);
@@ -44,7 +25,7 @@ void cleanup(void)
     fclose(fd);
 }
 
-void log_callback(void* ptr, int level, const char* fmt, va_list vl)
+void log_callback(void *ptr, int level, const char *fmt, va_list vl)
 {
     if (level > av_log_get_level())
         return;
@@ -64,7 +45,7 @@ int main(int argc, char **argv)
     if (argc < 2)
     {
         fprintf(stderr, "Usage: %s <directory>\n", argv[0]);
-        return 1;
+        return -1;
     }
 
     atexit(cleanup);
@@ -74,344 +55,29 @@ int main(int argc, char **argv)
 
     prepare_app_arguments(&argc, &argv);
 
-    // TODO: Make a gui
-
 #ifdef AP_WINDOWS
     pthread_t event_thread_id;
     pthread_create(&event_thread_id, NULL, event_thread, NULL);
 #endif // AP_WINDOWS
 
-    audio_init();
+    PlayerState *pst = audio_init();
+    if (!pst)
+        return -1;
 
-    cst = cli_state_init();
-    cst->entries = list_directory(argv[1], &cst->entry_size);
-    cli_get_console_size(cst);
-    cst->media_volume = audio_get_volume();
+    Playlist *pl = playlist_init(argv[1], pst);
+    if (!pl)
+        return -1;
 
-    pthread_t update_thread_id;
-    pthread_create(&update_thread_id, NULL, update_thread, NULL);
+    if (cli_init(pl) < 0)
+        return -1;
 
-    cli_buffer_switch(BUF_ALTERNATE);
+    cli_event_loop();
 
-    cst->out = cli_get_handle();
-
-    if (!cst->out.handle)
-        return 1;
-
-    bool exit = false;
-    float volume_before_muted = 0.0f;
-
-    while (!exit)
-    {
-        Events rec = cli_read_in();
-        if (!rec.event)
-        {
-            exit = true;
-            break;
-        }
-
-        for (int i = 0; i < rec.event_size; i++)
-        {
-            Event e = rec.event[i];
-            switch (e.type)
-            {
-            case KEY_EVENT_TYPE:
-                KeyEvent ke = e.key_event;
-
-                if (!ke.key_down)
-                    break;
-
-                bool need_redraw = false;
-                char key = ke.acsii_key;
-
-                if (key == 'q')
-                    exit = true;
-
-                else if (key == 'j')
-                {
-                    cst->selected_idx += 1;
-                    need_redraw = true;
-                }
-                else if (key == 'k')
-                {
-                    cst->selected_idx -= 1;
-                    need_redraw = true;
-                }
-                else if (ke.vk_key == VIRT_DOWN && ke.modifier_key & CTRL_KEY_PRESSED)
-                {
-                    if (cst->media_is_muted)
-                        volume_before_muted = FFMAX(volume_before_muted - 0.05f, 0);
-                    else
-                        audio_set_volume(FFMAX(audio_get_volume() - 0.05f, 0));
-                }
-                else if (ke.vk_key == VIRT_UP && ke.modifier_key & CTRL_KEY_PRESSED)
-                {
-                    if (cst->media_is_muted)
-                        volume_before_muted = FFMIN(volume_before_muted + 0.05f, 1.25f);
-                    else
-                        audio_set_volume(FFMIN(audio_get_volume() + 0.05f, 1.25f));
-                }
-                else if (ke.vk_key == VIRT_UP)
-                {
-                    cst->selected_idx -= 1;
-                    need_redraw = true;
-                }
-                else if (ke.vk_key == VIRT_DOWN)
-                {
-                    cst->selected_idx += 1;
-                    need_redraw = true;
-                }
-                else if (ke.vk_key == VIRT_LEFT)
-                    audio_seek(-2500);
-                else if (ke.vk_key == VIRT_RIGHT)
-                    audio_seek(2500);
-                else if (ke.vk_key == VIRT_SPACE)
-                    audio_toggle_play();
-                else if (ke.acsii_key == 'N')
-                {
-                    cycle_next();
-                    play(cst->entries[cst->playing_idx].path);
-                }
-                else if (ke.acsii_key == 'P')
-                {
-                    cycle_prev();
-                    play(cst->entries[cst->playing_idx].path);
-                }
-                else if (ke.acsii_key == 'S')
-                {
-                    File prev;
-                    if (cst->playing_idx >= 0)
-                        prev = cst->entries[cst->playing_idx];
-                    else if (cst->selected_idx >= 0)
-                        prev = cst->entries[cst->selected_idx];
-
-                    sort_entries(cst, SORT_CTIME, SORT_FLAG_ASC);
-
-                    if (cst->playing_idx >= 0 || cst->selected_idx >= 0)
-                        for (int i = 0; i < cst->entry_size; i++)
-                        {
-                            if (prev.path == cst->entries[i].path)
-                            {
-                                cst->playing_idx = cst->playing_idx >= 0 ? i : cst->playing_idx;
-                                cst->selected_idx = cst->selected_idx >= 0 ? i : cst->selected_idx;
-                                compute_offset(cst);
-                                break;
-                            }
-                        }
-
-                    cst->force_redraw = true;
-                    cli_draw(cst);
-                }
-                else if (ke.acsii_key == 's')
-                {
-                    File prev;
-                    if (cst->playing_idx >= 0)
-                        prev = cst->entries[cst->playing_idx];
-                    else if (cst->selected_idx >= 0)
-                        prev = cst->entries[cst->selected_idx];
-
-                    shuffle_array(cst->entries, cst->entry_size, sizeof(cst->entries[0]));
-
-                    if (cst->playing_idx >= 0 || cst->selected_idx >= 0)
-                        for (int i = 0; i < cst->entry_size; i++)
-                        {
-                            if (prev.path == cst->entries[i].path)
-                            {
-                                cst->playing_idx = cst->playing_idx >= 0 ? i : cst->playing_idx;
-                                cst->selected_idx = cst->selected_idx >= 0 ? i : cst->selected_idx;
-                                compute_offset(cst);
-                                break;
-                            }
-                        }
-
-                    cst->force_redraw = true;
-                    cli_draw(cst);
-                }
-                else if (ke.acsii_key == 'm')
-                {
-                    if (cst->media_is_muted)
-                    {
-                        audio_set_volume(volume_before_muted);
-                        cst->media_is_muted = false;
-                    }
-                    else
-                    {
-                        volume_before_muted = audio_get_volume();
-                        audio_set_volume(0.0f);
-                        cst->media_is_muted = true;
-                    }
-                }
-
-                if (need_redraw)
-                    compute_offset(cst);
-
-                if (ke.vk_key == VIRT_RETURN)
-                {
-                    if (cst->selected_idx >= 0)
-                    {
-                        cst->playing_idx = cst->selected_idx;
-                        play(cst->entries[cst->playing_idx].path);
-                        need_redraw = true;
-                    }
-                }
-                else if (ke.vk_key == VIRT_ESCAPE)
-                {
-                    cst->selected_idx = -1;
-                    need_redraw = true;
-                }
-
-                if (need_redraw)
-                    cli_draw(cst);
-
-                break;
-            case MOUSE_EVENT_TYPE:
-                MouseEvent me = e.mouse_event;
-
-                cst->mouse_x = me.x;
-                cst->mouse_y = me.y;
-
-                // overlay area
-                if (me.y > cst->height - 3)
-                {
-                    if (me.state & MOUSE_LEFT_CLICKED)
-                    {
-                        if (cst->prev_button_hovered)
-                        {
-                            cycle_prev();
-                            play(cst->entries[cst->playing_idx].path);
-                        }
-                        else if (cst->playback_button_hovered)
-                            audio_toggle_play();
-                        else if (cst->next_button_hovered)
-                        {
-                            cycle_next();
-                            play(cst->entries[cst->playing_idx].path);
-                        }
-                    }
-                    break;
-                }
-
-                if (me.scrolled)
-                {
-                    me.scroll_delta > 0 ? cst->entry_offset-- : cst->entry_offset++;
-
-                    cst->force_redraw = true;
-                    if (cst->entry_offset < 0 || cst->entry_offset > cst->entry_size - cst->height)
-                        cst->force_redraw = false;
-
-                    cst->entry_offset = FFMIN(FFMAX(cst->entry_offset, 0), cst->entry_size - cst->height);
-
-                    cli_draw(cst);
-                }
-                else if (me.moved)
-                {
-                    cst->hovered_idx = cst->entry_offset + me.y;
-                    cst->force_redraw = false;
-                    cli_draw(cst);
-                }
-
-                if (me.state & MOUSE_LEFT_CLICKED)
-                    cst->selected_idx = cst->hovered_idx;
-
-                if (me.state & MOUSE_LEFT_CLICKED && me.double_clicked)
-                {
-                    cst->playing_idx = cst->selected_idx;
-                    cst->force_redraw = false;
-                    cli_draw(cst);
-                    play(cst->entries[cst->playing_idx].path);
-                }
-
-                cst->force_redraw = false;
-                cli_draw(cst);
-
-                break;
-            case BUFFER_CHANGED_EVENT_TYPE:
-                cli_get_console_size(cst);
-                cst->force_redraw = true;
-                cli_draw(cst);
-
-                break;
-            default:
-                break;
-            }
-        }
-    }
-
-    cli_buffer_switch(BUF_MAIN);
-    cli_state_free(&cst);
+    playlist_free();
+    cli_free();
     audio_free();
+
     return 0;
-}
-
-void compute_offset(CLIState *cst)
-{
-    cst->force_redraw = false;
-
-    if (cst->selected_idx < 0)
-    {
-        cst->selected_idx = cst->entry_size - 1;
-        cst->entry_offset = cst->entry_size - cst->height;
-        cst->force_redraw = true;
-    }
-    else if (cst->selected_idx > cst->entry_size - 1)
-    {
-        cst->selected_idx = 0;
-        cst->entry_offset = 0;
-        cst->force_redraw = true;
-    }
-
-    int scroll_margin = cst->height > 12 ? 5 : 1;
-
-    if (cst->selected_idx - cst->entry_offset > cst->height - scroll_margin)
-    {
-        cst->entry_offset = FFMIN(cst->entry_offset + ((cst->selected_idx - cst->entry_offset) - (cst->height - scroll_margin)), cst->entry_size - cst->height);
-        cst->force_redraw = true;
-    }
-    else if (cst->selected_idx - cst->entry_offset < scroll_margin)
-    {
-        cst->entry_offset = FFMAX(cst->entry_offset - (scroll_margin - (cst->selected_idx - cst->entry_offset)), 0);
-        cst->force_redraw = true;
-    }
-}
-
-void cycle_next()
-{
-    cst->playing_idx = wrap_around(cst->playing_idx + 1, 0, cst->entry_size);
-    cst->selected_idx = cst->playing_idx;
-    compute_offset(cst);
-
-    cli_draw(cst);
-}
-
-void cycle_prev()
-{
-    cst->playing_idx = wrap_around(cst->playing_idx - 1, 0, cst->entry_size);
-    cst->selected_idx = cst->playing_idx;
-    compute_offset(cst);
-
-    cli_draw(cst);
-}
-
-void finished_callback(void)
-{
-    cycle_next();
-    play(cst->entries[cst->playing_idx].path);
-}
-
-void play(char *filename)
-{
-    audio_play();
-
-    if (!audio_is_finished() && audio_is_initialized())
-    {
-        audio_exit();
-        audio_wait_until_finished();
-    }
-
-    audio_start_async(filename, finished_callback);
-    audio_wait_until_initialized();
-
-    cst->media_duration = audio_get_duration();
 }
 
 #ifdef AP_WINDOWS
@@ -426,7 +92,7 @@ void *event_thread(void *arg)
     float volume_incr = 0.05f;
     float volume_max = 2.0f;
 
-    while (cst)
+    while (true)
     {
         if (av_gettime() - last_keypress < keypress_cooldown)
         {
@@ -442,15 +108,13 @@ void *event_thread(void *arg)
         }
         else if (GetAsyncKeyState(VIRT_MEDIA_NEXT_TRACK) & 0x8001)
         {
-            cycle_next();
-            play(cst->entries[cst->playing_idx].path);
+            cli_playlist_next();
             keypress = true;
             keypress_cooldown = ms2us(500);
         }
         else if (GetAsyncKeyState(VIRT_MEDIA_PREV_TRACK) & 0x8001)
         {
-            cycle_prev();
-            play(cst->entries[cst->playing_idx].path);
+            cli_playlist_prev();
             keypress = true;
             keypress_cooldown = ms2us(500);
         }
@@ -467,76 +131,3 @@ void *event_thread(void *arg)
     return 0;
 }
 #endif // AP_WINDOWS
-
-void *update_thread(void *arg)
-{
-    while (cst)
-    {
-        pthread_mutex_lock(&cst->mutex);
-
-        cst->media_timestamp = audio_get_timestamp();
-        cst->media_volume = audio_get_volume();
-        cst->media_paused = audio_is_paused();
-
-        cli_draw_overlay(cst);
-
-        pthread_mutex_unlock(&cst->mutex);
-
-        av_usleep(ms2us(50));
-    }
-}
-
-int sort_method_alphabetically(const void *a, const void *b)
-{
-    File *af = (File *)a;
-    File *bf = (File *)b;
-
-    wchar_t *strw_af = mbs2wchar(af->filename, 260, NULL);
-    wchar_t *strw_bf = mbs2wchar(bf->filename, 260, NULL);
-
-    int ret = wcscoll(strw_af, strw_bf);
-
-    free(strw_af);
-    free(strw_bf);
-
-    return ret;
-}
-
-int sort_method_ctime_desc(const void *a, const void *b)
-{
-    File *af = (File *)a;
-    File *bf = (File *)b;
-
-    return af->stat.st_ctime - bf->stat.st_ctime;
-}
-
-int sort_method_ctime_asc(const void *a, const void *b)
-{
-    File *af = (File *)a;
-    File *bf = (File *)b;
-
-    return bf->stat.st_ctime - af->stat.st_ctime;
-}
-
-void sort_entries(CLIState *cst, SORT_METHOD sort, SORT_FLAG flag)
-{
-    int sort_type = (sort << 16) | flag;
-    switch (sort_type)
-    {
-    case (SORT_CTIME << 16) | SORT_FLAG_ASC:
-        qsort(cst->entries, cst->entry_size, sizeof(cst->entries[0]), sort_method_ctime_asc);
-        break;
-    case (SORT_CTIME << 16) | SORT_FLAG_DESC:
-        qsort(cst->entries, cst->entry_size, sizeof(cst->entries[0]), sort_method_ctime_desc);
-        break;
-    case (SORT_ALPHABETICALLY << 16) | SORT_FLAG_ASC:
-        qsort(cst->entries, cst->entry_size, sizeof(cst->entries[0]), sort_method_alphabetically);
-        break;
-    case (SORT_ALPHABETICALLY << 16) | SORT_FLAG_DESC:
-        qsort(cst->entries, cst->entry_size, sizeof(cst->entries[0]), sort_method_alphabetically);
-        reverse_array(cst->entries, cst->entry_size, sizeof(cst->entries[0]));
-        break;
-    default:
-        break;
-    }
-}

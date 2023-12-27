@@ -85,10 +85,17 @@ void decoder_free(Decoder **dec)
     if (!(*dec))
         return;
 
-    av_log(NULL, AV_LOG_DEBUG, "Free decoder packet.\n");
-    av_packet_free(&(*dec)->pkt);
-    av_log(NULL, AV_LOG_DEBUG, "Free decoder codec context.\n");
-    avcodec_free_context(&(*dec)->avctx);
+    if ((*dec)->pkt)
+    {
+        av_log(NULL, AV_LOG_DEBUG, "Free decoder packet.\n");
+        av_packet_free(&(*dec)->pkt);
+    }
+
+    if ((*dec)->avctx)
+    {
+        av_log(NULL, AV_LOG_DEBUG, "Free decoder codec context.\n");
+        avcodec_free_context(&(*dec)->avctx);
+    }
 
     free(*dec);
     *dec = NULL;
