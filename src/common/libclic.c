@@ -1,37 +1,42 @@
 #include "libcli.h"
 
-CLIState *cli_state_init()
+#define CLI_CHECK_INITIALIZED(fn_name, ret)                                                                  \
+    do                                                                                                       \
+    {                                                                                                        \
+        if (!cst)                                                                                            \
+        {                                                                                                    \
+            av_log(NULL, AV_LOG_WARNING, "%s %s:%d CLI is not initialized.\n", fn_name, __FILE__, __LINE__); \
+            ret;                                                                                             \
+        };                                                                                                   \
+    } while (0)
+
+CLIState *cst;
+
+static void cli_state_init()
 {
     av_log(NULL, AV_LOG_DEBUG, "Initializing CLIState.\n");
 
-    CLIState *cst = (CLIState *)malloc(sizeof(CLIState));
+    cst = (CLIState *)malloc(sizeof(CLIState));
     if (!cst)
     {
         av_log(NULL, AV_LOG_DEBUG, "Could not allocate CLIState.\n");
-        return NULL;
+        return;
     }
 
-    memset(cst, 0, sizeof(CLIState));
+    memset(cst, 0, sizeof(cst));
 
     pthread_mutex_init(&cst->mutex, NULL);
 
-    cst->entries = NULL;
-    cst->entry_size = 0;
     cst->entry_offset = 0;
 
     cst->hovered_idx = -1;
-    cst->playing_idx = -1;
     cst->selected_idx = -1;
 
-    cst->media_duration = 0;
-    cst->media_timestamp = 0;
-    cst->media_volume = 0.0f;
-    cst->media_paused = false;
-    cst->media_is_muted = false;
+    cst->pl = NULL;
 
     cst->force_redraw = false;
 
-    cst->out.handle = NULL;
+    cst->out = cli_get_handle();
     cst->width = 0;
     cst->width = 0;
     cst->cursor_x = 0;
@@ -69,11 +74,9 @@ CLIState *cli_state_init()
     cst->prev_button_hovered = false;
     cst->playback_button_hovered = false;
     cst->next_button_hovered = false;
-
-    return cst;
 }
 
-void cli_state_free(CLIState **cst)
+static void cli_state_free(CLIState **cst)
 {
     av_log(NULL, AV_LOG_DEBUG, "Free CLIState.\n");
 
@@ -83,23 +86,39 @@ void cli_state_free(CLIState **cst)
     if (!(*cst))
         return;
 
-    if ((*cst)->entries)
+    if ((*cst)->mutex)
     {
-        av_log(NULL, AV_LOG_DEBUG, "Free CLIState entries.\n");
-        for (int i = 0; i < (*cst)->entry_size; i++)
-        {
-            free((*cst)->entries[i].path);
-            free((*cst)->entries[i].filename);
-        }
-
-        free((*cst)->entries);
+        av_log(NULL, AV_LOG_DEBUG, "Destroy CLIState mutex.\n");
+        pthread_mutex_destroy(&(*cst)->mutex);
     }
 
     free(*cst);
     *cst = NULL;
 }
 
-static void cli_cursor_to(Handle out, int x, int y)
+void cli_free()
+{
+    cli_state_free(&cst);
+    cli_buffer_switch(BUF_MAIN);
+}
+
+int cli_init(Playlist *pl)
+{
+    if (!cst)
+        cli_state_init();
+
+    if (!cst)
+        return -1;
+
+    cli_get_console_size(cst);
+
+    cst->pl = pl;
+    cli_buffer_switch(BUF_ALTERNATE);
+
+    return 1;
+}
+
+void cli_cursor_to(Handle out, int x, int y)
 {
     char buf[128];
     snprintf(buf, 128, "\x1b[%d;%dH", y + 1, x + 1);
@@ -111,6 +130,39 @@ void cli_clear_screen(Handle out)
     cli_write(out, "\x1b[2J", 5);
 }
 
+static void cli_compute_offset()
+{
+    CLI_CHECK_INITIALIZED("cli_compute_offset", return);
+
+    cst->force_redraw = false;
+
+    if (cst->selected_idx < 0)
+    {
+        cst->selected_idx = cst->pl->entry_size - 1;
+        cst->entry_offset = cst->pl->entry_size - cst->height;
+        cst->force_redraw = true;
+    }
+    else if (cst->selected_idx > cst->pl->entry_size - 1)
+    {
+        cst->selected_idx = 0;
+        cst->entry_offset = 0;
+        cst->force_redraw = true;
+    }
+
+    int scroll_margin = cst->height > 12 ? 5 : 1;
+
+    if (cst->selected_idx - cst->entry_offset > cst->height - scroll_margin)
+    {
+        cst->entry_offset = FFMIN(cst->entry_offset + ((cst->selected_idx - cst->entry_offset) - (cst->height - scroll_margin)), cst->pl->entry_size - cst->height);
+        cst->force_redraw = true;
+    }
+    else if (cst->selected_idx - cst->entry_offset < scroll_margin)
+    {
+        cst->entry_offset = FFMAX(cst->entry_offset - (scroll_margin - (cst->selected_idx - cst->entry_offset)), 0);
+        cst->force_redraw = true;
+    }
+}
+
 static StringBuilder *list_sb;
 static const Color overlay_fg_color = {230, 200, 150};
 
@@ -120,16 +172,16 @@ static wchar_t *cli_line_routine(CLIState *cst, int idx, LineState line_state, i
     switch (line_state)
     {
     case LINE_PLAYING:
-        sb_appendf(list_sb, "\x1b[38;2;0;0;0;48;2;91;201;77m%s", cst->entries[idx].filename);
+        sb_appendf(list_sb, "\x1b[38;2;0;0;0;48;2;91;201;77m%s", cst->pl->entries[idx].filename);
         break;
     case LINE_SELECTED:
-        sb_appendf(list_sb, "\x1b[38;2;0;0;0;48;2;255;255;255m%s", cst->entries[idx].filename);
+        sb_appendf(list_sb, "\x1b[38;2;0;0;0;48;2;255;255;255m%s", cst->pl->entries[idx].filename);
         break;
     case LINE_HOVERED:
-        sb_appendf(list_sb, "\x1b[38;2;0;0;0;48;2;150;150;150m%s", cst->entries[idx].filename);
+        sb_appendf(list_sb, "\x1b[38;2;0;0;0;48;2;150;150;150m%s", cst->pl->entries[idx].filename);
         break;
     case LINE_NORMAL:
-        sb_appendf(list_sb, "%s", cst->entries[idx].filename);
+        sb_appendf(list_sb, "%s", cst->pl->entries[idx].filename);
         break;
     default:
         break;
@@ -147,7 +199,7 @@ static wchar_t *cli_line_routine(CLIState *cst, int idx, LineState line_state, i
 
 static LineState cli_get_line_state(CLIState *cst, int idx)
 {
-    if (idx == cst->playing_idx)
+    if (idx == cst->pl->playing_idx)
         return LINE_PLAYING;
     else if (idx == cst->selected_idx)
         return LINE_SELECTED;
@@ -201,7 +253,7 @@ static void cli_draw_list(CLIState *cst)
         cli_clear_screen(cst->out);
 
     for (int viewport_offset = 0; //   - 3 : bottom overlay
-         viewport_offset < cst->height - 3 && cst->entry_offset + viewport_offset < cst->entry_size;
+         viewport_offset < cst->height - 3 && cst->entry_offset + viewport_offset < cst->pl->entry_size;
          viewport_offset++)
     {
         int abs_entry_idx = cst->entry_offset + viewport_offset;
@@ -226,27 +278,6 @@ static void cli_draw_list(CLIState *cst)
 
         cli_draw_padding(cst, NULL, pad, NULL, NULL);
     }
-}
-
-void cli_draw(CLIState *cst)
-{
-    pthread_mutex_lock(&cst->mutex);
-
-    if (!list_sb)
-        list_sb = sb_create();
-
-    cli_get_console_size(cst);
-
-    if (!lines_state_cache)
-        lines_state_cache = (LineState *)malloc(cst->entry_size * sizeof(LineState));
-    else if (sizeof(lines_state_cache) / sizeof(LineState) != cst->entry_size)
-        realloc(lines_state_cache, cst->entry_size * sizeof(LineState));
-
-    cli_draw_list(cst);
-    if (cst->force_redraw)
-        cli_draw_overlay(cst);
-
-    pthread_mutex_unlock(&cst->mutex);
 }
 
 static StringBuilder *overlay_sb;
@@ -278,7 +309,7 @@ static void cli_draw_hlinef(CLIState *cst,
 
     if (int_part > 0)
         cli_draw_padding(cst, NULL, int_part, NULL, &fg);
-    
+
     cli_cursor_to(cst->out, pos.x + int_part, pos.y);
 
     sb_appendf(overlay_sb, "\x1b[48;2;%d;%d;%d;38;2;%d;%d;%dm", bg.r, bg.g, bg.b, fg.r, fg.g, fg.b);
@@ -325,8 +356,8 @@ static void cli_draw_timestamp(CLIState *cst, Vec2 pos, Color fg, Color bg)
 {
     cli_cursor_to(cst->out, pos.x, pos.y);
 
-    Time ts = time_from_us((double)cst->media_timestamp);
-    Time d = time_from_us((double)cst->media_duration);
+    Time ts = time_from_us((double)cst->pl->pst->timestamp);
+    Time d = time_from_us((double)cst->pl->pst->duration);
 
     sb_appendf(overlay_sb,
                "\x1b[38;2;%d;%d;%d;48;2;%d;%d;%dm",
@@ -368,13 +399,13 @@ static void cli_draw_volume(CLIState *cst, Vec2 pos, Color fg, Color bg)
 {
     char *volume_icon;
 
-    if (cst->media_is_muted)
+    if (cst->pl->pst->muted)
         volume_icon = cst->icon.volume_mute;
-    else if (cst->media_volume - 1e-3 < 0.0f)
+    else if (cst->pl->pst->volume - 1e-3 < 0.0f)
         volume_icon = cst->icon.volume_off;
-    else if (cst->media_volume < 0.5f)
+    else if (cst->pl->pst->volume < 0.5f)
         volume_icon = cst->icon.volume_low;
-    else if (cst->media_volume < 0.75f)
+    else if (cst->pl->pst->volume < 0.75f)
         volume_icon = cst->icon.volume_medium;
     else
         volume_icon = cst->icon.volume_high;
@@ -384,7 +415,7 @@ static void cli_draw_volume(CLIState *cst, Vec2 pos, Color fg, Color bg)
                bg.r, bg.g, bg.b,
                volume_icon,
                fg.r, fg.g, fg.b,
-               cst->media_volume * 100.0f);
+               cst->pl->pst->volume * 100.0f);
 
     char *str = sb_concat(overlay_sb);
 
@@ -419,7 +450,7 @@ static void cli_draw_media_control(CLIState *cst, Vec2 center, Color fg, Color b
     cst->playback_button_hovered = playback_collision;
     cst->next_button_hovered = next_collision;
 
-    char *playback_icon = cst->media_paused ? cst->icon_nerdfont.media_play : cst->icon_nerdfont.media_pause;
+    char *playback_icon = cst->pl->pst->paused ? cst->icon_nerdfont.media_play : cst->icon_nerdfont.media_pause;
     const char *hovered_color = "\x1b[38;2;0;0;0;48;2;255;255;255m";
 
     sb_appendf(overlay_sb,
@@ -485,7 +516,7 @@ static void cli_draw_now_playing(CLIState *cst, Vec2 pos, Color fg, Color bg)
     int max_len = ((cst->width / 2) - 5) - (pos.x + strlen(playing));
 
     int strw_len;
-    wchar_t *strw = mbs2wchar(cst->entries[cst->playing_idx].filename, 1024, &strw_len);
+    wchar_t *strw = mbs2wchar(cst->pl->entries[cst->pl->playing_idx].filename, 1024, &strw_len);
 
     if (text_overflow)
     {
@@ -527,8 +558,10 @@ static void cli_draw_now_playing(CLIState *cst, Vec2 pos, Color fg, Color bg)
     sb_reset(overlay_sb);
 }
 
-void cli_draw_overlay(CLIState *cst)
+void cli_draw_overlay()
 {
+    CLI_CHECK_INITIALIZED("cli_draw_overlay", return);
+
     if (!overlay_sb)
         overlay_sb = sb_create();
 
@@ -565,8 +598,8 @@ void cli_draw_overlay(CLIState *cst)
     cli_draw_progress(cst,
                       (Vec2){cst->cursor_x + timestamp_right_pad, cst->height - progress_bottom_pad},
                       cst->width - cst->cursor_x - (volume_right_pad + timestamp_right_pad + volume_left_pad),
-                      (float)cst->media_timestamp,
-                      (float)cst->media_duration,
+                      (float)cst->pl->pst->timestamp,
+                      (float)cst->pl->pst->duration,
                       (Color){255, 0, 0},
                       (Color){150, 150, 150});
 
@@ -588,4 +621,351 @@ void cli_draw_overlay(CLIState *cst)
                      cst->width - cst->cursor_x,
                      NULL,
                      &overlay_bg_color);
+}
+
+static void cli_draw()
+{
+    CLI_CHECK_INITIALIZED("cli_draw", return);
+
+    pthread_mutex_lock(&cst->mutex);
+
+    if (!list_sb)
+        list_sb = sb_create();
+
+    cli_get_console_size(cst);
+
+    if (!lines_state_cache)
+        lines_state_cache = (LineState *)malloc(cst->pl->entry_size * sizeof(LineState));
+    else if (sizeof(lines_state_cache) / sizeof(LineState) != cst->pl->entry_size)
+        realloc(lines_state_cache, cst->pl->entry_size * sizeof(LineState));
+
+    cli_draw_list(cst);
+    if (cst->force_redraw)
+        cli_draw_overlay();
+
+    pthread_mutex_unlock(&cst->mutex);
+}
+
+static void cli_shuffle_entry()
+{
+    CLI_CHECK_INITIALIZED("cli_shuffle_entry", return);
+
+    File prev;
+
+    if (cst->pl->playing_idx >= 0)
+        prev = cst->pl->entries[cst->pl->playing_idx];
+    else if (cst->selected_idx >= 0)
+        prev = cst->pl->entries[cst->selected_idx];
+
+    shuffle_array(cst->pl->entries, cst->pl->entry_size, sizeof(cst->pl->entries[0]));
+
+    int new_index;
+    bool find = array_find(cst->pl->entries,
+                           cst->pl->entry_size,
+                           sizeof(cst->pl->entries[0]),
+                           &prev,
+                           file_compare_function,
+                           &new_index);
+
+    if (!find)
+        return;
+
+    cst->pl->playing_idx = cst->pl->playing_idx >= 0 ? new_index : cst->pl->playing_idx;
+    cst->selected_idx = cst->selected_idx >= 0 ? new_index : cst->selected_idx;
+    cli_compute_offset();
+
+    cst->force_redraw = true;
+    cli_draw();
+}
+
+static int sort_method_alphabetically(const void *a, const void *b)
+{
+    File *af = (File *)a;
+    File *bf = (File *)b;
+
+    wchar_t *strw_af = mbs2wchar(af->filename, 260, NULL);
+    wchar_t *strw_bf = mbs2wchar(bf->filename, 260, NULL);
+
+    int ret = wcscoll(strw_af, strw_bf);
+
+    free(strw_af);
+    free(strw_bf);
+
+    return ret;
+}
+
+static int sort_method_ctime_desc(const void *a, const void *b)
+{
+    File *af = (File *)a;
+    File *bf = (File *)b;
+
+    return af->stat.st_ctime - bf->stat.st_ctime;
+}
+
+static int sort_method_ctime_asc(const void *a, const void *b)
+{
+    File *af = (File *)a;
+    File *bf = (File *)b;
+
+    return bf->stat.st_ctime - af->stat.st_ctime;
+}
+
+static void cli_sort_entry(SortMethod sort, SortFlag flag)
+{
+    CLI_CHECK_INITIALIZED("cli_sort_entry", return);
+
+    File prev;
+
+    if (cst->pl->playing_idx >= 0)
+        prev = cst->pl->entries[cst->pl->playing_idx];
+    else if (cst->selected_idx >= 0)
+        prev = cst->pl->entries[cst->selected_idx];
+
+    int sort_type = (sort << 16) | flag;
+    switch (sort_type)
+    {
+    case (SORT_CTIME << 16) | SORT_FLAG_ASC:
+        qsort(cst->pl->entries, cst->pl->entry_size, sizeof(cst->pl->entries[0]), sort_method_ctime_asc);
+        break;
+    case (SORT_CTIME << 16) | SORT_FLAG_DESC:
+        qsort(cst->pl->entries, cst->pl->entry_size, sizeof(cst->pl->entries[0]), sort_method_ctime_desc);
+        break;
+    case (SORT_ALPHABETICALLY << 16) | SORT_FLAG_ASC:
+        qsort(cst->pl->entries, cst->pl->entry_size, sizeof(cst->pl->entries[0]), sort_method_alphabetically);
+        break;
+    case (SORT_ALPHABETICALLY << 16) | SORT_FLAG_DESC:
+        qsort(cst->pl->entries, cst->pl->entry_size, sizeof(cst->pl->entries[0]), sort_method_alphabetically);
+        reverse_array(cst->pl->entries, cst->pl->entry_size, sizeof(cst->pl->entries[0]));
+        break;
+    default:
+        break;
+    }
+
+    int new_index;
+    bool find = array_find(cst->pl->entries,
+                           cst->pl->entry_size,
+                           sizeof(cst->pl->entries[0]),
+                           &prev,
+                           file_compare_function,
+                           &new_index);
+
+    if (!find)
+        return;
+
+    cst->pl->playing_idx = cst->pl->playing_idx >= 0 ? new_index : cst->pl->playing_idx;
+    cst->selected_idx = cst->selected_idx >= 0 ? new_index : cst->selected_idx;
+    cli_compute_offset();
+
+    cst->force_redraw = true;
+    cli_draw();
+}
+
+static bool should_close = false;
+
+static void cli_handle_event_key(KeyEvent ev)
+{
+    if (!ev.key_down)
+        return;
+
+    bool need_redraw = false;
+    char key = ev.acsii_key;
+
+    if (key == 'q')
+    {
+        should_close = true;
+        return;
+    }
+
+    else if (key == 'j')
+    {
+        cst->selected_idx++;
+        need_redraw = true;
+    }
+    else if (key == 'k')
+    {
+        cst->selected_idx--;
+        need_redraw = true;
+    }
+    else if (ev.vk_key == VIRT_DOWN && ev.modifier_key & CTRL_KEY_PRESSED)
+        audio_set_volume(FFMAX(audio_get_volume() - 0.05f, 0));
+    else if (ev.vk_key == VIRT_UP && ev.modifier_key & CTRL_KEY_PRESSED)
+    {
+        audio_set_volume(FFMIN(audio_get_volume() + 0.05f, 1.25f));
+    }
+    else if (ev.vk_key == VIRT_UP)
+    {
+        cst->selected_idx--;
+        need_redraw = true;
+    }
+    else if (ev.vk_key == VIRT_DOWN)
+    {
+        cst->selected_idx++;
+        need_redraw = true;
+    }
+    else if (ev.vk_key == VIRT_LEFT)
+        audio_seek(-2500);
+    else if (ev.vk_key == VIRT_RIGHT)
+        audio_seek(2500);
+    else if (ev.vk_key == VIRT_SPACE)
+        audio_toggle_play();
+    else if (ev.acsii_key == 'N')
+        cli_playlist_next();
+    else if (ev.acsii_key == 'P')
+        cli_playlist_prev();
+    else if (ev.acsii_key == 'S')
+        cli_sort_entry(SORT_CTIME, SORT_FLAG_ASC);
+    else if (ev.acsii_key == 's')
+        cli_shuffle_entry();
+    else if (ev.acsii_key == 'm')
+    {
+        if (audio_is_muted())
+            audio_unmute();
+        else
+            audio_mute();
+    }
+
+    if (ev.vk_key == VIRT_RETURN)
+        playlist_play_idx(cst->selected_idx);
+    else if (ev.vk_key == VIRT_ESCAPE)
+    {
+        cst->selected_idx = -1;
+        need_redraw = true;
+    }
+
+    if (need_redraw)
+    {
+        cli_compute_offset();
+        cli_draw();
+    }
+}
+
+static void cli_handle_event_mouse(MouseEvent ev)
+{
+    cst->mouse_x = ev.x;
+    cst->mouse_y = ev.y;
+
+    // overlay area
+    if (ev.y > cst->height - 3)
+    {
+        if (ev.state & MOUSE_LEFT_CLICKED)
+        {
+            if (cst->prev_button_hovered)
+                cli_playlist_prev();
+            else if (cst->playback_button_hovered)
+                audio_toggle_play();
+            else if (cst->next_button_hovered)
+                cli_playlist_next();
+        }
+        return;
+    }
+
+    if (ev.scrolled)
+    {
+        ev.scroll_delta > 0 ? cst->entry_offset-- : cst->entry_offset++;
+
+        cst->force_redraw = true;
+        if (cst->entry_offset < 0 || cst->entry_offset > cst->pl->entry_size - cst->height)
+            cst->force_redraw = false;
+
+        cst->entry_offset = FFMIN(FFMAX(cst->entry_offset, 0), cst->pl->entry_size - cst->height);
+
+        cli_draw();
+    }
+    else if (ev.moved)
+    {
+        cst->hovered_idx = cst->entry_offset + ev.y;
+        cst->force_redraw = false;
+        cli_draw();
+    }
+
+    if (ev.state & MOUSE_LEFT_CLICKED)
+        cst->selected_idx = cst->hovered_idx;
+
+    if (ev.state & MOUSE_LEFT_CLICKED && ev.double_clicked)
+    {
+        cst->force_redraw = false;
+        cli_draw();
+        playlist_play_idx(cst->selected_idx);
+    }
+
+    cst->force_redraw = false;
+    cli_draw();
+}
+
+static int cli_handle_event_buffer_changed(BufferChangedEvent ev)
+{
+    cli_get_console_size(cst);
+
+    cst->force_redraw = true;
+    cli_draw();
+}
+
+static void cli_handle_event(Event ev)
+{
+    switch (ev.type)
+    {
+    case KEY_EVENT_TYPE:
+        cli_handle_event_key(ev.key_event);
+        break;
+    case MOUSE_EVENT_TYPE:
+        cli_handle_event_mouse(ev.mouse_event);
+        break;
+    case BUFFER_CHANGED_EVENT_TYPE:
+        cli_handle_event_buffer_changed(ev.buf_event);
+        break;
+    default:
+        break;
+    }
+}
+
+static void *update_thread(void *arg)
+{
+    while (cst)
+    {
+        pthread_mutex_lock(&cst->mutex);
+        cli_draw_overlay();
+        pthread_mutex_unlock(&cst->mutex);
+
+        av_usleep(ms2us(50));
+    }
+}
+
+void cli_event_loop()
+{
+    CLI_CHECK_INITIALIZED("cli_event_loop", return);
+
+    pthread_t update_thread_id;
+    pthread_create(&update_thread_id, NULL, update_thread, NULL);
+
+    while (!should_close)
+    {
+        Events events = cli_read_in();
+        if (!events.event)
+        {
+            should_close = true;
+            break;
+        }
+        for (int i = 0; i < events.event_size; i++)
+        {
+            cli_handle_event(events.event[i]);
+        }
+    }
+}
+
+void cli_playlist_next()
+{
+    CLI_CHECK_INITIALIZED("cli_playlist_next", return);
+
+    playlist_next();
+    cst->selected_idx = cst->pl->playing_idx;
+    cli_compute_offset();
+}
+
+void cli_playlist_prev()
+{
+    CLI_CHECK_INITIALIZED("cli_playlist_prev", return);
+
+    playlist_prev();
+    cst->selected_idx = cst->pl->playing_idx;
+    cli_compute_offset();
 }

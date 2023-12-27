@@ -21,11 +21,13 @@ add_executable(
   src/libstream.c
   src/libtime.c
   src/sb.c
+  src/libplaylist.c
   src/${OS-DIR}/libcli.c
   src/${OS-DIR}/libfile.c
   src/${OS-DIR}/libhelper.c
   src/common/libhelperc.c
   src/common/libclic.c
+  src/common/libfilec.c
 )
 
 target_include_directories(aplayer PUBLIC src/include)

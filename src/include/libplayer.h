@@ -26,8 +26,8 @@ typedef struct PlayerState
     int64_t timestamp;
     int64_t duration;
 
+    bool muted;
     float volume;
-    float volume_incr;
     float LUFS_target;
     int LUFS_sampling_cap;
 } PlayerState;

@@ -45,3 +45,38 @@ void shuffle_array(void *array, size_t array_len, size_t element_size)
         swap(a, b, element_size);
     }
 }
+
+bool file_compare_function(const void *a, const void *b)
+{
+    File *fa = (File *)a;
+    File *fb = (File *)b;
+
+    if (fa == NULL && fb == NULL)
+        return true;
+
+    if (fa == NULL || fb == NULL)
+        return false;
+
+    return fa->path == fb->path;
+}
+
+bool array_find(const void *array,
+                int array_size,
+                int element_size,
+                const void *target,
+                bool(compare_function)(const void *a,
+                                       const void *b),
+                int *out_index)
+{
+    for (int i = 0; i < array_size; i++)
+    {
+        if (compare_function((const char *)array + (i * element_size), target))
+        {
+            if (out_index)
+                *out_index = i;
+            return true;
+        }
+    }
+
+    return false;
+}
