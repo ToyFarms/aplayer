@@ -11,9 +11,20 @@ StreamState *stream_state_init(char *filename)
         av_log(NULL, AV_LOG_FATAL, "Could not allocate StreamState.\n");
         goto fail;
     }
-    memset(sst, 0, sizeof(StreamState));
+
+    memset(sst, 0, sizeof(sst));
 
     sst->filename = filename;
+
+    sst->ic = NULL;
+    sst->iformat = NULL;
+    sst->swr_ctx = NULL;
+    sst->frame = NULL;
+    sst->swr_frame = NULL;
+
+    sst->audio_stream = NULL;
+    sst->audiodec = NULL;
+    sst->audio_stream_index = -1;
 
     if (stream_open(sst) < 0)
         goto fail;
