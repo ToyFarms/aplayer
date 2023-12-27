@@ -237,6 +237,7 @@ int stream_init_stream(StreamState *sst, enum AVMediaType media_type)
     {
     case AVMEDIA_TYPE_AUDIO:
         stream_index = _stream_get_index(sst->ic, media_type);
+        sst->audio_stream_index = stream_index;
         stream = &sst->audio_stream;
         dec = &sst->audiodec;
         break;
