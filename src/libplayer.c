@@ -11,7 +11,7 @@ PlayerState *player_state_init()
         return NULL;
     }
 
-    memset(pst, 0, sizeof(PlayerState));
+    memset(pst, 0, sizeof(pst));
 
     pst->paused = false;
     pst->req_exit = false;
@@ -28,6 +28,7 @@ PlayerState *player_state_init()
     pst->timestamp = 0;
     pst->duration = 0;
 
+    pst->muted = false;
     pst->volume = 1.0f;
     pst->LUFS_target = -14.0f;
     pst->LUFS_sampling_cap = 50000;

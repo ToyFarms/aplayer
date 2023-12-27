@@ -26,6 +26,8 @@ typedef struct File
     FileStat stat;
 } File;
 
+void file_free(File file);
+
 #ifdef AP_WINDOWS
 
 #include <windows.h>

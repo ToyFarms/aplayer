@@ -11,6 +11,7 @@
 #include <math.h>
 #include <stdbool.h>
 #include <pthread.h>
+#include <immintrin.h>
 
 #include "libhelper.h"
 #include "libstream.h"
@@ -18,6 +19,9 @@
 
 void audio_set_volume(float volume);
 float audio_get_volume();
+void audio_mute();
+void audio_unmute();
+bool audio_is_muted();
 void audio_seek(float ms);
 void audio_seek_to(float ms);
 int64_t audio_get_timestamp();
@@ -33,7 +37,7 @@ bool audio_is_initialized();
 bool audio_is_paused();
 void audio_start(char *filename, void (*finished_callback)(void));
 pthread_t audio_start_async(char *filename, void (*finished_callback)(void));
-void audio_init();
+PlayerState *audio_init();
 void audio_free();
 
 #endif // _LIBAUDIO_H

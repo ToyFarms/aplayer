@@ -1,6 +1,14 @@
 #include "libaudio.h"
 
-#include <immintrin.h>
+#define AUDIO_CHECK_INITIALIZED(fn_name, ret)                                                                  \
+    do                                                                                                         \
+    {                                                                                                          \
+        if (!pst)                                                                                              \
+        {                                                                                                      \
+            av_log(NULL, AV_LOG_WARNING, "%s %s:%d Audio is not initialized.\n", fn_name, __FILE__, __LINE__); \
+            ret;                                                                                               \
+        };                                                                                                     \
+    } while (0)
 
 static PlayerState *pst;
 
@@ -25,33 +33,54 @@ static void _audio_set_volume(AVFrame *frame, float factor)
     }
 }
 
+static float volume_before_muted = 100.0f;
+
 void audio_set_volume(float volume)
 {
-    if (!pst)
-    {
-        av_log(NULL, AV_LOG_WARNING, "audio_set_volume: Audio is not initialized.\n");
-        return;
-    }
-    pst->volume = volume;
+    AUDIO_CHECK_INITIALIZED("audio_set_volume", return);
+
+    if (pst->muted)
+        volume_before_muted = volume;
+    else
+        pst->volume = volume;
 }
 
 float audio_get_volume()
 {
-    if (!pst)
-    {
-        av_log(NULL, AV_LOG_WARNING, "audio_get_volume: Audio is not initialized.\n");
-        return 0.0f;
-    }
-    return pst->volume;
+    AUDIO_CHECK_INITIALIZED("audio_get_volume", return 0.0f);
+
+    if (!pst->muted)
+        return pst->volume;
+}
+
+void audio_mute()
+{
+    AUDIO_CHECK_INITIALIZED("audio_mute", return);
+
+    volume_before_muted = pst->volume;
+    pst->volume = 0.0f;
+    pst->muted = true;
+}
+
+void audio_unmute()
+{
+    AUDIO_CHECK_INITIALIZED("audio_unmute", return);
+
+    pst->volume = volume_before_muted;
+    pst->muted = false;
+}
+
+bool audio_is_muted()
+{
+    AUDIO_CHECK_INITIALIZED("audio_is_muted", return false);
+
+    return pst->muted;
 }
 
 void audio_seek(float ms)
 {
-    if (!pst)
-    {
-        av_log(NULL, AV_LOG_WARNING, "audio_seek: Audio is not initialized.\n");
-        return;
-    }
+    AUDIO_CHECK_INITIALIZED("audio_seek", return);
+
     pst->req_seek = true;
     pst->seek_absolute = false;
     pst->seek_incr = ms * 1000;
@@ -59,11 +88,8 @@ void audio_seek(float ms)
 
 void audio_seek_to(float ms)
 {
-    if (!pst)
-    {
-        av_log(NULL, AV_LOG_WARNING, "audio_seek_to: Audio is not initialized.\n");
-        return;
-    }
+    AUDIO_CHECK_INITIALIZED("audio_seek_to", return);
+
     pst->req_seek = true;
     pst->seek_absolute = true;
     pst->seek_incr = ms * 1000;
@@ -71,69 +97,51 @@ void audio_seek_to(float ms)
 
 int64_t audio_get_timestamp()
 {
-    if (!pst)
-    {
-        av_log(NULL, AV_LOG_WARNING, "audio_get_timestamp: Audio is not initialized.\n");
-        return 0;
-    }
+    AUDIO_CHECK_INITIALIZED("audio_get_timestamp", return 0);
+
     return pst->timestamp;
 }
 
 int64_t audio_get_duration()
 {
-    if (!pst)
-    {
-        av_log(NULL, AV_LOG_WARNING, "audio_get_duration: Audio is not initialized.\n");
-        return 0;
-    }
+    AUDIO_CHECK_INITIALIZED("audio_get_duration", return 0);
+
     return pst->duration;
 }
 
 void audio_play()
 {
+    AUDIO_CHECK_INITIALIZED("audio_play", return);
+
     av_log(NULL, AV_LOG_DEBUG, "Paused audio: 0.\n");
-    if (!pst)
-    {
-        av_log(NULL, AV_LOG_WARNING, "Audio is not initialized.\n");
-        return;
-    }
     pst->paused = false;
 }
 
 void audio_pause()
 {
+    AUDIO_CHECK_INITIALIZED("audio_pause", return);
+
     av_log(NULL, AV_LOG_DEBUG, "Paused audio: 1.\n");
-    if (!pst)
-    {
-        av_log(NULL, AV_LOG_WARNING, "Audio is not initialized.\n");
-        return;
-    }
     pst->paused = true;
 }
 
 void audio_toggle_play()
 {
+    AUDIO_CHECK_INITIALIZED("audio_toggle_play", return);
+
     av_log(NULL,
            AV_LOG_DEBUG,
            "Paused audio: %d -> %d.\n",
            pst->paused,
            !pst->paused);
-    if (!pst)
-    {
-        av_log(NULL, AV_LOG_WARNING, "Audio is not initialized.\n");
-        return;
-    }
     pst->paused = !pst->paused;
 }
 
 void audio_exit()
 {
+    AUDIO_CHECK_INITIALIZED("audio_exit", return);
+
     av_log(NULL, AV_LOG_DEBUG, "Requesting exit to audio.\n");
-    if (!pst)
-    {
-        av_log(NULL, AV_LOG_WARNING, "Audio is not initialized.\n");
-        return;
-    }
     pst->req_exit = true;
 }
 
@@ -152,12 +160,9 @@ void audio_wait_until_initialized()
 
 void audio_wait_until_finished()
 {
+    AUDIO_CHECK_INITIALIZED("audio_wait_until_finished", return);
+
     av_log(NULL, AV_LOG_DEBUG, "Waiting until audio finished.\n");
-    if (!pst)
-    {
-        av_log(NULL, AV_LOG_WARNING, "Audio is not initialized.\n");
-        return;
-    }
 
     int64_t start = av_gettime();
 
@@ -172,31 +177,22 @@ void audio_wait_until_finished()
 
 bool audio_is_finished()
 {
-    if (!pst)
-    {
-        av_log(NULL, AV_LOG_WARNING, "audio_is_finished: Audio is not initialized.\n");
-        return true;
-    }
+    AUDIO_CHECK_INITIALIZED("audio_is_finished", return true);
+
     return pst->finished;
 }
 
 bool audio_is_initialized()
 {
-    if (!pst)
-    {
-        av_log(NULL, AV_LOG_WARNING, "audio_is_initialized: Audio is not initialized.\n");
-        return true;
-    }
+    AUDIO_CHECK_INITIALIZED("audio_is_initialized", return true);
+
     return pst->initialized;
 }
 
 bool audio_is_paused()
 {
-    if (!pst)
-    {
-        av_log(NULL, AV_LOG_WARNING, "audio_is_paused: Audio is not initialized.\n");
-        return true;
-    }
+    AUDIO_CHECK_INITIALIZED("audio_is_paused", return true);
+
     return pst->paused;
 }
 
@@ -271,10 +267,10 @@ static double audio_get_lufs(char *filename, int sampling_cap)
             goto cleanup;
         }
 
-        while (pst && pst->paused)
+        while (pst->paused)
             av_usleep(ms2us(100));
 
-        if (pst && pst->req_exit)
+        if (pst->req_exit)
         {
             pst->req_exit = false;
             goto cleanup;
@@ -306,9 +302,6 @@ static double audio_get_lufs(char *filename, int sampling_cap)
                     av_log(NULL, AV_LOG_FATAL, "Error during decoding. %s.\n", av_err2str(err));
                     goto cleanup;
                 }
-
-                if (pst)
-                    pst->timestamp = sst->frame->best_effort_timestamp;
 
                 int dst_nb_samples = av_rescale_rnd(swr_get_delay(sst->swr_ctx,
                                                                   sst->audiodec->avctx->sample_rate) +
@@ -360,6 +353,7 @@ static double audio_get_lufs(char *filename, int sampling_cap)
     }
 
 cleanup:
+    AVLOG("%f, %d\n", lufs_sum, lufs_sampled);
     stream_state_free(&sst);
     return lufs_sum / (double)lufs_sampled;
 }
@@ -403,26 +397,18 @@ static void _audio_seek(StreamState *sst, PlayerState *pst)
 
 void audio_start(char *filename, void (*finished_callback)(void))
 {
+    AUDIO_CHECK_INITIALIZED("audio_start", return);
+
     av_log(NULL,
            AV_LOG_INFO,
            "Starting audio stream from file %s.\n",
            filename);
 
-    if (!pst)
-    {
-        av_log(NULL, AV_LOG_FATAL, "Audio is not initialized, call audio_init().\n");
-        pthread_exit(NULL);
-        return;
-    }
+    pst->finished = false;
+    pst->req_exit = false;
 
-    if (pst)
-    {
-        pst->finished = false;
-        pst->req_exit = false;
-    }
-
-    float lufs = (float)audio_get_lufs(filename, pst ? pst->LUFS_sampling_cap : 50000);
-    float gain = (pst ? pst->LUFS_target : -14.0f) - lufs;
+    float lufs = (float)audio_get_lufs(filename, pst->LUFS_sampling_cap);
+    float gain = pst->LUFS_target - lufs;
     float gain_factor = dB_to_factor(gain);
     av_log(NULL,
            AV_LOG_INFO,
@@ -492,11 +478,8 @@ void audio_start(char *filename, void (*finished_callback)(void))
         goto cleanup;
     }
 
-    if (pst)
-    {
-        pst->initialized = true;
-        pst->duration = sst->ic->duration;
-    }
+    pst->initialized = true;
+    pst->duration = sst->ic->duration;
 
     int err;
     int err_nf; // error non-fatal
@@ -512,10 +495,10 @@ void audio_start(char *filename, void (*finished_callback)(void))
             goto cleanup;
         }
 
-        while (pst && pst->paused)
+        while (pst->paused)
             av_usleep(ms2us(100));
 
-        if (pst && pst->req_exit)
+        if (pst->req_exit)
             goto cleanup;
 
         if (sst->audiodec->pkt->stream_index == sst->audio_stream_index)
@@ -533,7 +516,7 @@ void audio_start(char *filename, void (*finished_callback)(void))
 
             while (true)
             {
-                if (pst && (pst->req_seek && pst->timestamp > 0))
+                if (pst->req_seek && pst->timestamp > 0)
                     _audio_seek(sst, pst);
 
                 err = avcodec_receive_frame(sst->audiodec->avctx, sst->frame);
@@ -550,7 +533,7 @@ void audio_start(char *filename, void (*finished_callback)(void))
 
                 pst->timestamp = (sst->audiodec->pkt->pts * sst->audio_stream->time_base.num * AV_TIME_BASE) / sst->audio_stream->time_base.den;
 
-                _audio_set_volume(sst->frame, gain_factor * (pst ? pst->volume : 1.0f));
+                _audio_set_volume(sst->frame, gain_factor * pst->volume);
 
                 int dst_nb_samples = av_rescale_rnd(swr_get_delay(sst->swr_ctx,
                                                                   sst->audiodec->avctx->sample_rate) +
@@ -601,20 +584,6 @@ void audio_start(char *filename, void (*finished_callback)(void))
                     goto cleanup;
                 }
 
-#if 0
-                if (pst && (av_gettime() - pst->last_print_info > pst->print_cooldown))
-                {
-                    printf("timestamp: %lldms (%.2fs) / %.2fs - %.3f %, volume=%f        \r",
-                           pst->timestamp,
-                           (double)pst->timestamp / 1000.0,
-                           (double)us2ms(sst->ic->duration) / 1000.0,
-                           ((double)pst->timestamp / (double)us2ms(sst->ic->duration)) * 100.0,
-                           pst->volume);
-
-                    pst->last_print_info = av_gettime();
-                }
-#endif
-
                 av_frame_unref(sst->swr_frame);
                 av_frame_unref(sst->frame);
                 av_packet_unref(sst->audiodec->pkt);
@@ -632,17 +601,13 @@ cleanup:
     av_log(NULL, AV_LOG_DEBUG, "Cleanup: Terminate PortAudio.\n");
     Pa_Terminate();
 
-    if (pst)
-    {
-        pst->finished = true;
-        pst->initialized = false;
-    }
+    pst->finished = true;
+    pst->initialized = false;
 
     if (finished_callback && !pst->req_exit)
         finished_callback();
 
-    if (pst)
-        pst->req_exit = false;
+    pst->req_exit = false;
 
     pthread_exit(NULL);
 }
@@ -667,19 +632,21 @@ pthread_t audio_start_async(char *filename, void (*finished_callback)(void))
     return audio_thread_id;
 }
 
-void audio_init()
+PlayerState *audio_init()
 {
-    pst = player_state_init();
+    if (!pst)
+        pst = player_state_init();
+
+    return pst;
 }
 
 void audio_free()
 {
-    audio_exit();
-    audio_wait_until_finished();
-    
-    if (pst)
+    if (audio_is_initialized())
     {
-        player_state_free(&pst);
-        pst = NULL;
+        audio_exit();
+        audio_wait_until_finished();
     }
+
+    player_state_free(&pst);
 }
