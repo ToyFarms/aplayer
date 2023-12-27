@@ -6,13 +6,16 @@
 #include <libavutil/mem.h>
 #include <libavutil/log.h>
 #include <libavutil/time.h>
+#include <stdbool.h>
 
 #include "libos.h"
+#include "libfile.h"
 
 #define ARRLEN(x) ((sizeof(x) / sizeof(0 [x])) / ((size_t)(!(sizeof(x) % sizeof(0 [x])))))
-#define PR printf("%s:%d\n", __FILE__, __LINE__);
-#define PRM(x) printf("%s:%d - %s\n", __FILE__, __LINE__, x);
-#define PRPTR(x) printf("%s:%d - %s: %p\n", __FILE__, __LINE__, #x, (void *)x);
+#define PR av_log(NULL, AV_LOG_INFO, "[PR] %s:%d\n", __FILE__, __LINE__);
+#define PRM(x) av_log(NULL, AV_LOG_INFO, "[PRM] %s:%d - %s\n", __FILE__, __LINE__, x);
+#define PRPTR(x) av_log(NULL, AV_LOG_INFO, "[PRPTR] %s:%d - %s: %p\n", __FILE__, __LINE__, #x, (void *)x);
+#define AVLOG(fmt, ...) av_log(NULL, AV_LOG_INFO, "[AVLOG] %s:%d - "fmt, __FILE__, __LINE__, __VA_ARGS__)
 
 static inline float lerpf(float v0, float v1, float t)
 {
@@ -53,6 +56,15 @@ void av_log_turn_off();
 void av_log_turn_on();
 void reverse_array(void *array, size_t array_len, size_t element_size);
 void shuffle_array(void *array, size_t array_len, size_t element_size);
+
+bool file_compare_function(const void *a, const void *b);
+bool array_find(const void *array,
+                int array_size,
+                int element_size,
+                const void *target,
+                bool(compare_function)(const void *a,
+                                       const void *b),
+                int *out_index);
 
 #ifdef AP_WINDOWS
 

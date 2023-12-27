@@ -15,6 +15,7 @@
 #include "libhelper.h"
 #include "libfile.h"
 #include "libtime.h"
+#include "libplaylist.h"
 
 #define MOUSE_LEFT_CLICKED (1 << 0)
 #define MOUSE_MIDDLE_CLICKED (1 << 1)
@@ -89,11 +90,11 @@ typedef enum LineState
     LINE_NORMAL,
 } LineState;
 
-typedef enum BUFFER_TYPE
+typedef enum BufferType
 {
     BUF_MAIN,
     BUF_ALTERNATE,
-} BUFFER_TYPE;
+} BufferType;
 
 typedef struct UnicodeSymbol
 {
@@ -114,6 +115,18 @@ typedef struct Events
     Event *event;
     int event_size;
 } Events;
+
+typedef enum SortMethod
+{
+    SORT_CTIME,
+    SORT_ALPHABETICALLY,
+} SortMethod;
+
+typedef enum SortFlag
+{
+    SORT_FLAG_ASC,
+    SORT_FLAG_DESC,
+} SortFlag;
 
 #ifdef AP_WINDOWS
 
@@ -323,10 +336,11 @@ typedef struct Events
 
 #endif // NOVIRTUALKEYCODES
 
-typedef struct Handle
+    typedef struct Handle
 {
     HANDLE handle;
-} Handle;
+}
+Handle;
 
 #elif defined(AP_MACOS)
 #elif defined(AP_LINUX)
@@ -336,19 +350,12 @@ typedef struct CLIState
 {
     pthread_mutex_t mutex;
 
-    File *entries;
-    int entry_size;
     int entry_offset;
 
     int hovered_idx;
-    int playing_idx;
     int selected_idx;
 
-    int64_t media_duration;
-    int64_t media_timestamp;
-    float media_volume;
-    bool media_is_muted;
-    bool media_paused;
+    Playlist *pl;
 
     bool force_redraw;
 
@@ -369,15 +376,15 @@ typedef struct CLIState
     bool next_button_hovered;
 } CLIState;
 
-CLIState *cli_state_init();
-void cli_state_free(CLIState **cst);
-
-void cli_draw(CLIState *cst);
-void cli_draw_overlay(CLIState *cst);
+int cli_init(Playlist *pl);
+void cli_free();
+void cli_event_loop();
+void cli_playlist_next();
+void cli_playlist_prev();
 
 // Implement for each OS
 
-void cli_buffer_switch(BUFFER_TYPE type);
+void cli_buffer_switch(BufferType type);
 void cli_get_console_size(CLIState *cst);
 void cli_get_cursor_pos(CLIState *cst);
 Events cli_read_in();

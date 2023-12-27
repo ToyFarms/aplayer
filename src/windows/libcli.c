@@ -22,7 +22,7 @@ static HANDLE out;
 static HANDLE in;
 static DWORD in_mode;
 
-void cli_buffer_switch(BUFFER_TYPE type)
+void cli_buffer_switch(BufferType type)
 {
     out = GetStdHandle(STD_OUTPUT_HANDLE);
 
@@ -32,8 +32,8 @@ void cli_buffer_switch(BUFFER_TYPE type)
         if (in && in_mode)
             SetConsoleMode(in, in_mode);
 
-        printf("\x1b[?1049l");
         printf("\x1b[?25h");
+        printf("\x1b[?1049l");
         break;
     case BUF_ALTERNATE:
         DWORD out_mode;
@@ -49,8 +49,8 @@ void cli_buffer_switch(BUFFER_TYPE type)
         in_mode &= ~ENABLE_QUICK_EDIT_MODE;
         SetConsoleMode(in, in_mode);
 
-        printf("\x1b[?1049h");
         printf("\x1b[?25l");
+        printf("\x1b[?1049h");
         break;
     }
 }
