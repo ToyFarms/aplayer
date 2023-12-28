@@ -493,7 +493,6 @@ static void cli_draw_media_control(CLIState *cst, Vec2 center, Color fg, Color b
 
 static void cli_draw_now_playing(CLIState *cst, Vec2 pos, Color fg, Color bg)
 {
-    static bool text_overflow = false;
     static int64_t last_shifted = 0;
     static int shift_interval = 200;
     static int offset = 0;
@@ -518,7 +517,7 @@ static void cli_draw_now_playing(CLIState *cst, Vec2 pos, Color fg, Color bg)
     int strw_len;
     wchar_t *strw = mbs2wchar(cst->pl->entries[cst->pl->playing_idx].filename, 1024, &strw_len);
 
-    if (text_overflow)
+    if ((text_len + offset) > max_len)
     {
         if (offset > 0 && text_len <= max_len)
         {
@@ -548,8 +547,6 @@ static void cli_draw_now_playing(CLIState *cst, Vec2 pos, Color fg, Color bg)
 
     cli_get_cursor_pos(cst);
     text_len = cst->cursor_x - prev_x;
-
-    text_overflow = text_len >= max_len - 1;
 
     cli_write(cst->out, "\x1b[0m", 5);
 
