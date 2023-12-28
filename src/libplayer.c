@@ -22,9 +22,6 @@ PlayerState *player_state_init()
     pst->seek_incr = 0;
     pst->seek_absolute = false;
 
-    pst->last_print_info = 0;
-    pst->print_cooldown = ms2us(100);
-
     pst->timestamp = 0;
     pst->duration = 0;
 

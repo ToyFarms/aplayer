@@ -20,9 +20,6 @@ typedef struct PlayerState
     int64_t seek_incr;
     bool seek_absolute;
 
-    int64_t last_print_info;
-    int64_t print_cooldown;
-
     int64_t timestamp;
     int64_t duration;
 
