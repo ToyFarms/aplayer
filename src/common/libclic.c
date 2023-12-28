@@ -512,6 +512,9 @@ static void cli_draw_now_playing(CLIState *cst, Vec2 pos, Color fg, Color bg)
     const char *playing = "Playing: ";
     cli_write(cst->out, playing, strlen(playing));
 
+    if (cst->pl->playing_idx < 0)
+        goto exit;
+
     int max_len = ((cst->width / 2) - 5) - (pos.x + strlen(playing));
 
     int strw_len;
@@ -550,8 +553,9 @@ static void cli_draw_now_playing(CLIState *cst, Vec2 pos, Color fg, Color bg)
 
     cli_write(cst->out, "\x1b[0m", 5);
 
-    free(str);
     free(strw);
+exit:
+    free(str);
     sb_reset(overlay_sb);
 }
 
