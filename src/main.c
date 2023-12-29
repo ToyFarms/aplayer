@@ -17,7 +17,7 @@ void *update_thread(void *arg);
 void cleanup(void)
 {
     cli_buffer_switch(BUF_MAIN);
-    FILE *fd = fopen("log.txt", "a");
+    FILE *fd = fopen("log.log", "a");
 
     const char *separator = "========================== END OF LOG ==========================\n\n";
     fwrite(separator, sizeof(char), strlen(separator), fd);
@@ -30,7 +30,7 @@ void log_callback(void *ptr, int level, const char *fmt, va_list vl)
     if (level > av_log_get_level())
         return;
 
-    FILE *fd = fopen("log.txt", "a");
+    FILE *fd = fopen("log.log", "a");
 
     char buf[8192];
     vsprintf_s(buf, 8192, fmt, vl);
@@ -42,11 +42,14 @@ void log_callback(void *ptr, int level, const char *fmt, va_list vl)
 
 int main(int argc, char **argv)
 {
+    char *directory;
+
     if (argc < 2)
     {
-        fprintf(stderr, "Usage: %s <directory>\n", argv[0]);
         return -1;
     }
+
+    directory = argv[1];
 
     atexit(cleanup);
 
@@ -64,7 +67,7 @@ int main(int argc, char **argv)
     if (!pst)
         return -1;
 
-    Playlist *pl = playlist_init(argv[1], pst);
+    Playlist *pl = playlist_init(directory, pst);
     if (!pl)
         return -1;
 

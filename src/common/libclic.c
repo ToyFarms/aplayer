@@ -217,20 +217,25 @@ static void cli_draw_padding(CLIState *cst,
                              const Color *fg,
                              const Color *bg)
 {
-    if (!pad_sb)
-        pad_sb = sb_create();
-
     if (bg && fg)
-        sb_appendf(pad_sb, "\x1b[38;2;%d;%d;%d;48;2;%d;%d;%dm", fg->r, fg->g, fg->b, bg->r, bg->g, bg->b);
+        sb_appendf(pad_sb,
+                   "\x1b[38;2;%d;%d;%d;48;2;%d;%d;%dm\x1b[%dX\x1b[0m",
+                   fg->r, fg->g, fg->b,
+                   bg->r, bg->g, bg->b,
+                   length);
     else if (fg)
-        sb_appendf(pad_sb, "\x1b[38;2;%d;%d;%dm", fg->r, fg->g, fg->b);
+        sb_appendf(pad_sb,
+                   "\x1b[38;2;%d;%d;%dm\x1b[%dX\x1b[0m",
+                   fg->r, fg->g, fg->b,
+                   length);
     else if (bg)
-        sb_appendf(pad_sb, "\x1b[48;2;%d;%d;%dm", bg->r, bg->g, bg->b);
-
-    sb_appendf(pad_sb, "\x1b[%dX", length);
-
-    if (bg || fg)
-        sb_append(pad_sb, "\x1b[0m");
+        sb_appendf(pad_sb,
+                   "\x1b[48;2;%d;%d;%dm\x1b[%dX\x1b[0m",
+                   bg->r, bg->g, bg->b,
+                   length);
+    else
+        sb_appendf(pad_sb,
+                   "\x1b[%dX", length);
 
     char *str = sb_concat(pad_sb);
 
@@ -238,6 +243,42 @@ static void cli_draw_padding(CLIState *cst,
         cli_cursor_to(cst->out, pos->x, pos->y);
 
     cli_write(cst->out, str, strlen(str));
+
+    free(str);
+    sb_reset(pad_sb);
+}
+
+static void cli_draw_vline(CLIState *cst,
+                           Vec2 pos,
+                           int length,
+                           int line_width,
+                           const Color *fg,
+                           const Color *bg)
+{
+    if (bg && fg)
+        sb_appendf(pad_sb,
+                   "\x1b[38;2;%d;%d;%d;48;2;%d;%d;%dm\x1b[%dX\x1b[0m",
+                   fg->r, fg->g, fg->b,
+                   bg->r, bg->g, bg->b,
+                   line_width);
+    else if (fg)
+        sb_appendf(pad_sb,
+                   "\x1b[38;2;%d;%d;%dm\x1b[%dX\x1b[0m",
+                   fg->r, fg->g, fg->b,
+                   line_width);
+    else if (bg)
+        sb_appendf(pad_sb,
+                   "\x1b[48;2;%d;%d;%dm\x1b[%dX\x1b[0m",
+                   bg->r, bg->g, bg->b,
+                   line_width);
+
+    char *str = sb_concat(pad_sb);
+
+    for (int y = pos.y; y < pos.y + length; y++)
+    {
+        cli_cursor_to(cst->out, pos.x, y);
+        cli_write(cst->out, str, strlen(str));
+    }
 
     free(str);
     sb_reset(pad_sb);
@@ -282,16 +323,15 @@ static void cli_draw_list(CLIState *cst)
 
 static StringBuilder *overlay_sb;
 
-static void cli_draw_rect(CLIState *cst, Rect rect, Color color)
+static inline void cli_draw_rect(CLIState *cst, Rect rect, Color color)
 {
     if (rect.x < 0 || rect.y < 0 || rect.w <= 0 || rect.h <= 0)
         return;
 
-    for (int current_y = rect.y; current_y < rect.y + rect.h; current_y++)
-        cli_draw_padding(cst, &(Vec2){rect.x, current_y}, rect.w, &color, &color);
+    cli_draw_vline(cst, (Vec2){rect.x, rect.y}, rect.h, rect.w, &color, &color);
 }
 
-static const wchar_t blocks[] = {L'█', L'▉', L'▊', L'▋', L'▌', L'▍', L'▎', L'▎', L' '};
+static const wchar_t blocks_horizontal[] = {L'█', L'▉', L'▊', L'▋', L'▌', L'▍', L'▎', L'▎', L' '};
 static const int block_len = 9;
 static const float block_increment = 1.0f / (float)block_len;
 
@@ -321,8 +361,45 @@ static void cli_draw_hlinef(CLIState *cst,
     sb_reset(overlay_sb);
 
     int block_index = block_len - (int)(roundf(float_part / block_increment) * block_increment * block_len);
-    wchar_t final_block = blocks[block_index];
+    wchar_t final_block = blocks_horizontal[block_index];
     cli_writew(cst->out, &final_block, 1);
+
+    if (reset_bg_color)
+        cli_write(cst->out, "\x1b[0m", 5);
+    else
+        cli_write(cst->out, "\x1b[39m", 6);
+}
+
+static const wchar_t blocks_vertical[] = {L'█', L'▇', L'▆', L'▅', L'▄', L'▄', L'▂', L'▂', L' '};
+
+static void cli_draw_vlinef(CLIState *cst,
+                            Vec2 pos,
+                            float length,
+                            int line_width,
+                            Color fg,
+                            Color bg,
+                            bool reset_bg_color)
+{
+    int int_part = (int)length;
+    float float_part = length - (float)int_part;
+
+    if (int_part > 0)
+        cli_draw_vline(cst, (Vec2){pos.x, pos.y - int_part}, int_part, line_width, NULL, &fg);
+
+    cli_cursor_to(cst->out, pos.x, pos.y - (int_part + 1));
+
+    sb_appendf(overlay_sb, "\x1b[48;2;%d;%d;%d;38;2;%d;%d;%dm", bg.r, bg.g, bg.b, fg.r, fg.g, fg.b);
+
+    char *str = sb_concat(overlay_sb);
+    cli_write(cst->out, str, strlen(str));
+
+    free(str);
+    sb_reset(overlay_sb);
+
+    int block_index = block_len - (int)(roundf(float_part / block_increment) * block_increment * block_len);
+    wchar_t final_block = blocks_vertical[block_index];
+    for (int i = 0; i < line_width; i++)
+        cli_writew(cst->out, &final_block, 1);
 
     if (reset_bg_color)
         cli_write(cst->out, "\x1b[0m", 5);
@@ -559,12 +636,45 @@ exit:
     sb_reset(overlay_sb);
 }
 
-void cli_draw_overlay()
+static void cli_draw_loudness(CLIState *cst, Vec2 pos, int length, Color bg)
+{
+    cli_draw_rect(cst, (Rect){pos.x, pos.y, 6, length}, bg);
+
+    static float prev_yl = 0.0f;
+    static float prev_yr = 0.0f;
+
+    if (cst->pl->playing_idx >= 0)
+    {
+        float yl = mapf(cst->pl->pst->LUFS_current_l, -70.0f, 0.0f, 0.0f, (float)length);
+        if (yl > 0.0f)
+        {
+            yl = audio_is_paused() ? lerpf(prev_yl, 0, 0.1f) : lerpf(prev_yl, yl, 0.2f);
+            int color = 255 - (int)mapf(yl, 0.0f, (float)length, 0.0f, 255.0f);
+            cli_draw_vlinef(cst, (Vec2){pos.x + 1, length - 1}, yl, 2, (Color){255 - color, color, 0}, bg, true);
+        }
+
+        float yr = mapf(cst->pl->pst->LUFS_current_r, -70.0f, 0.0f, 0.0f, (float)length);
+        if (yr > 0.0f)
+        {
+            yr = audio_is_paused() ? lerpf(prev_yr, 0, 0.1f) : lerpf(prev_yr, yr, 0.2f);
+            int color = 255 - (int)mapf(yr, 0.0f, (float)length, 0.0f, 255.0f);
+            cli_draw_vlinef(cst, (Vec2){pos.x + 3, length - 1}, yr, 2, (Color){255 - color, color, 0}, bg, true);
+        }
+
+        prev_yl = yl;
+        prev_yr = yr;
+    }
+}
+
+static void cli_draw_overlay()
 {
     CLI_CHECK_INITIALIZED("cli_draw_overlay", return);
 
     if (!overlay_sb)
         overlay_sb = sb_create();
+
+    if (!pad_sb)
+        pad_sb = sb_create();
 
     if (cst->width <= 0 || cst->height <= 0)
         return;
@@ -580,6 +690,8 @@ void cli_draw_overlay()
     static const int progress_bottom_pad = 2;
 
     static const Color overlay_bg_color = {10, 10, 10};
+
+    cli_draw_loudness(cst, (Vec2){cst->width - 6, 0}, cst->height - 2, overlay_bg_color);
 
     cli_draw_rect(cst, (Rect){0, cst->height - 3, cst->width, 3}, overlay_bg_color);
     cli_draw_timestamp(cst,
@@ -884,9 +996,12 @@ static void cli_handle_event_mouse(MouseEvent ev)
 
     if (ev.state & MOUSE_LEFT_CLICKED && ev.double_clicked)
     {
-        cst->force_redraw = false;
-        cli_draw();
-        playlist_play_idx(cst->selected_idx);
+        if (cst->selected_idx > 0)
+        {
+            cst->force_redraw = false;
+            cli_draw();
+            playlist_play_idx(cst->selected_idx);
+        }
     }
 
     cst->force_redraw = false;

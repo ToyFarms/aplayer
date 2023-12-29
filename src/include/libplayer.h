@@ -25,6 +25,8 @@ typedef struct PlayerState
 
     bool muted;
     float volume;
+    float LUFS_current_l;
+    float LUFS_current_r;
     float LUFS_target;
     int LUFS_sampling_cap;
 } PlayerState;
