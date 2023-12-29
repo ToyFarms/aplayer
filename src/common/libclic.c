@@ -1088,7 +1088,8 @@ void cli_playlist_play(int index)
 {
     CLI_CHECK_INITIALIZED("cli_playlist_play", return);
 
-    playlist_play_idx(index);
+
+    playlist_play_idx(index, cli_playlist_next);
     cst->selected_idx = cst->pl->playing_idx;
 
     cli_compute_offset();
