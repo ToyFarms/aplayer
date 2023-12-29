@@ -135,11 +135,12 @@ static void cli_compute_offset()
     CLI_CHECK_INITIALIZED("cli_compute_offset", return);
 
     cst->force_redraw = false;
+    int height_adjusted = cst->height - 3; // overlay area
 
     if (cst->selected_idx < 0)
     {
         cst->selected_idx = cst->pl->entry_size - 1;
-        cst->entry_offset = cst->pl->entry_size - cst->height;
+        cst->entry_offset = cst->pl->entry_size - height_adjusted;
         cst->force_redraw = true;
     }
     else if (cst->selected_idx > cst->pl->entry_size - 1)
@@ -149,11 +150,11 @@ static void cli_compute_offset()
         cst->force_redraw = true;
     }
 
-    int scroll_margin = cst->height > 12 ? 5 : 1;
+    int scroll_margin = height_adjusted > 12 ? 5 : 1;
 
-    if (cst->selected_idx - cst->entry_offset > cst->height - scroll_margin)
+    if (cst->selected_idx - cst->entry_offset > height_adjusted - scroll_margin)
     {
-        cst->entry_offset = FFMIN(cst->entry_offset + ((cst->selected_idx - cst->entry_offset) - (cst->height - scroll_margin)), cst->pl->entry_size - cst->height);
+        cst->entry_offset = FFMIN(cst->entry_offset + ((cst->selected_idx - cst->entry_offset) - (height_adjusted - scroll_margin)), cst->pl->entry_size - height_adjusted);
         cst->force_redraw = true;
     }
     else if (cst->selected_idx - cst->entry_offset < scroll_margin)
