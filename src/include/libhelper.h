@@ -42,14 +42,13 @@ static inline int wrap_around(int n, int min, int max)
     return (((n - min) % (max - min)) + (max - min)) % (max - min) + min;
 }
 
-static inline float mapf(float value, float min, float max, float new_min, float new_max)
+static inline float mapf(float value, float _min, float _max, float new_min, float new_max)
 {
-    if (min == max)
-        return 0.0f;
+    value = FFMIN(FFMAX(value, _min), _max);
 
-    value = FFMIN(FFMAX(value, min), max);
+    float v = (value - _min) / (_max - _min) * (new_max - new_min) + new_min;
 
-    return (value - min) * (new_max - new_min) / (max - min) + min;
+    return new_min < new_max ? FFMIN(FFMAX(v, new_min), new_max) : FFMIN(FFMAX(v, new_max), new_min);
 }
 
 void av_log_turn_off();

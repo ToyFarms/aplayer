@@ -239,6 +239,36 @@ static float calculate_lufs(AVFrame *frame)
     return -0.691f + 10.0f * log10f(power_sum);
 }
 
+static float calculate_lufs_ch(AVFrame *frame, int ch)
+{
+    float power_sum = 0.0f;
+    int sample;
+
+    __m128 sum_squared = _mm_setzero_ps();
+    float *channel = (float *)frame->data[ch];
+
+    for (sample = 0; sample < frame->nb_samples - 3; sample += 4)
+    {
+        __m128 sample_value = _mm_loadu_ps(&channel[sample]);
+        sample_value = _mm_mul_ps(sample_value, sample_value);
+        sum_squared = _mm_add_ps(sum_squared, sample_value);
+    }
+
+    float results[4];
+    _mm_storeu_ps(results, sum_squared);
+    float result = results[0] + results[1] + results[2] + results[3];
+
+    for (; sample < frame->nb_samples; sample++)
+        result += channel[sample] * channel[sample];
+
+    power_sum += result / (float)frame->nb_samples;
+
+    if (power_sum == 0.0f)
+        return 0.0f;
+
+    return -0.691f + 10.0f * log10f(power_sum);
+}
+
 static void audio_apply_gain(AVFrame *frame, float target_dB, float dB)
 {
     float gain = dB_to_factor(target_dB - dB);
@@ -534,6 +564,17 @@ void audio_start(char *filename, void (*finished_callback)(void))
                 pst->timestamp = (sst->audiodec->pkt->pts * sst->audio_stream->time_base.num * AV_TIME_BASE) / sst->audio_stream->time_base.den;
 
                 _audio_set_volume(sst->frame, gain_factor * pst->volume);
+
+                if (sst->frame->ch_layout.nb_channels >= 2)
+                {
+                    pst->LUFS_current_l = calculate_lufs_ch(sst->frame, 0);
+                    pst->LUFS_current_r = calculate_lufs_ch(sst->frame, 1);
+                }
+                else
+                {
+                    pst->LUFS_current_l = calculate_lufs(sst->frame);
+                    pst->LUFS_current_r = pst->LUFS_current_l;
+                }
 
                 int dst_nb_samples = av_rescale_rnd(swr_get_delay(sst->swr_ctx,
                                                                   sst->audiodec->avctx->sample_rate) +
