@@ -73,7 +73,7 @@ void playlist_prev()
     playlist_play(pl);
 }
 
-void playlist_play()
+void playlist_play(void (*finished_callback)(void))
 {
     PLAYLIST_CHECK_INITIALIZED("playlist_play", return);
 
@@ -85,14 +85,14 @@ void playlist_play()
         audio_wait_until_finished();
     }
 
-    audio_start_async(pl->entries[pl->playing_idx].path, playlist_next);
+    audio_start_async(pl->entries[pl->playing_idx].path, finished_callback ? finished_callback : playlist_next);
     audio_wait_until_initialized();
 }
 
-void playlist_play_idx(int index)
+void playlist_play_idx(int index, void (*finished_callback)(void))
 {
     PLAYLIST_CHECK_INITIALIZED("playlist_play_idx", return);
 
     pl->playing_idx = index;
-    playlist_play();
+    playlist_play(finished_callback);
 }
