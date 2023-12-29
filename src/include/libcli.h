@@ -381,6 +381,7 @@ void cli_free();
 void cli_event_loop();
 void cli_playlist_next();
 void cli_playlist_prev();
+void cli_playlist_play(int index);
 
 // Implement for each OS
 

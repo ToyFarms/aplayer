@@ -938,7 +938,7 @@ static void cli_handle_event_key(KeyEvent ev)
     }
 
     if (ev.vk_key == VIRT_RETURN)
-        playlist_play_idx(cst->selected_idx);
+        cli_playlist_play(cst->selected_idx);
     else if (ev.vk_key == VIRT_ESCAPE)
     {
         cst->selected_idx = -1;
@@ -995,14 +995,8 @@ static void cli_handle_event_mouse(MouseEvent ev)
         cst->selected_idx = cst->hovered_idx;
 
     if (ev.state & MOUSE_LEFT_CLICKED && ev.double_clicked)
-    {
         if (cst->selected_idx > 0)
-        {
-            cst->force_redraw = false;
-            cli_draw();
-            playlist_play_idx(cst->selected_idx);
-        }
-    }
+            cli_playlist_play(cst->selected_idx);
 
     cst->force_redraw = false;
     cli_draw();
@@ -1074,7 +1068,9 @@ void cli_playlist_next()
 
     playlist_next();
     cst->selected_idx = cst->pl->playing_idx;
+
     cli_compute_offset();
+    cli_draw();
 }
 
 void cli_playlist_prev()
@@ -1083,5 +1079,18 @@ void cli_playlist_prev()
 
     playlist_prev();
     cst->selected_idx = cst->pl->playing_idx;
+
     cli_compute_offset();
+    cli_draw();
+}
+
+void cli_playlist_play(int index)
+{
+    CLI_CHECK_INITIALIZED("cli_playlist_play", return);
+
+    playlist_play_idx(index);
+    cst->selected_idx = cst->pl->playing_idx;
+
+    cli_compute_offset();
+    cli_draw();
 }
