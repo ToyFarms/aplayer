@@ -49,7 +49,6 @@ int main(int argc, char **argv)
     // TODO: Fix audio normalization (sometimes it doesn't work)
     // TODO: Prompt the user for directory if not supplied from the argument
     // TODO: Make the program more stable
-    // TODO: Fix overlay area
     // TODO: Fix entries behind overlay area on the bottom
 
     directory = argv[1];

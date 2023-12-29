@@ -165,6 +165,7 @@ static void cli_compute_offset()
 
 static StringBuilder *list_sb;
 static const Color overlay_fg_color = {230, 200, 150};
+static const Color overlay_bg_color = {10, 10, 10};
 
 static wchar_t *cli_line_routine(CLIState *cst, int idx, LineState line_state, int *out_strwlen)
 {
@@ -290,9 +291,6 @@ static void cli_draw_list(CLIState *cst)
 {
     int strw_len;
 
-    if (cst->force_redraw)
-        cli_clear_screen(cst->out);
-
     for (int viewport_offset = 0; //   - 3 : bottom overlay
          viewport_offset < cst->height - 3 && cst->entry_offset + viewport_offset < cst->pl->entry_size;
          viewport_offset++)
@@ -313,9 +311,12 @@ static void cli_draw_list(CLIState *cst)
 
         cli_get_cursor_pos(cst);
 
-        int pad = cst->width - cst->cursor_x;
+        int pad = cst->width - cst->cursor_x - 6; // -6 : right overlay
         if (pad <= 0)
+        {
+            cli_draw_padding(cst, &(Vec2){cst->width - 6, viewport_offset}, 6, NULL, &overlay_bg_color);
             continue;
+        }
 
         cli_draw_padding(cst, NULL, pad, NULL, NULL);
     }
@@ -423,10 +424,10 @@ static void cli_draw_progress(CLIState *cst,
 
     if ((pos.x + length) - cst->cursor_x > 0)
         cli_draw_padding(cst,
-                        NULL,
-                        (pos.x + length) - cst->cursor_x,
-                        NULL,
-                        NULL);
+                         NULL,
+                         (pos.x + length) - cst->cursor_x,
+                         NULL,
+                         NULL);
 
     cli_write(cst->out, "\x1b[0m", 5);
 }
@@ -690,8 +691,6 @@ static void cli_draw_overlay()
     static const int volume_bottom_pad = 2;
 
     static const int progress_bottom_pad = 2;
-
-    static const Color overlay_bg_color = {10, 10, 10};
 
     cli_draw_loudness(cst, (Vec2){cst->width - 6, 0}, cst->height - 2, overlay_bg_color);
 
