@@ -4,6 +4,7 @@ notes/
 vcpkg_installed/
 .vs/
 testing.c
+*.log
 
 # Prerequisites
 *.d
