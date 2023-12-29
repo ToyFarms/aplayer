@@ -420,11 +420,13 @@ static void cli_draw_progress(CLIState *cst,
     cli_draw_hlinef(cst, pos, mapped_length, fg, bg, false);
 
     cli_get_cursor_pos(cst);
-    cli_draw_padding(cst,
-                     NULL,
-                     (pos.x + length) - cst->cursor_x,
-                     NULL,
-                     NULL);
+
+    if ((pos.x + length) - cst->cursor_x > 0)
+        cli_draw_padding(cst,
+                        NULL,
+                        (pos.x + length) - cst->cursor_x,
+                        NULL,
+                        NULL);
 
     cli_write(cst->out, "\x1b[0m", 5);
 }
@@ -1087,7 +1089,6 @@ void cli_playlist_prev()
 void cli_playlist_play(int index)
 {
     CLI_CHECK_INITIALIZED("cli_playlist_play", return);
-
 
     playlist_play_idx(index, cli_playlist_next);
     cst->selected_idx = cst->pl->playing_idx;
