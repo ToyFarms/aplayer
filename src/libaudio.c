@@ -681,6 +681,9 @@ PlayerState *audio_init()
     if (!pst)
         pst = player_state_init();
 
+    if (!pst)
+        return NULL;
+
     return pst;
 }
 
