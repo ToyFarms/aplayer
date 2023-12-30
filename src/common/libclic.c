@@ -972,12 +972,21 @@ static void cli_handle_event_key(KeyEvent ev)
             audio_mute();
     }
 
+    static int prev_selected_idx = -99;
+
+    if (prev_selected_idx != -99)
+    {
+        cst->selected_idx = prev_selected_idx;
+        prev_selected_idx = -99;
+    }
+
     if (ev.vk_key == VIRT_RETURN)
         cli_playlist_play(cst->selected_idx);
     else if (ev.vk_key == VIRT_ESCAPE)
     {
+        prev_selected_idx = cst->selected_idx;
         cst->selected_idx = -1;
-        need_redraw = true;
+        cli_draw();
     }
 
     if (need_redraw)
