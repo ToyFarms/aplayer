@@ -234,7 +234,7 @@ static float calculate_lufs(AVFrame *frame)
     }
 
     if (power_sum == 0.0f)
-        return 0.0f;
+        return -70.0f; // silence
 
     return -0.691f + 10.0f * log10f(power_sum);
 }
@@ -264,7 +264,7 @@ static float calculate_lufs_ch(AVFrame *frame, int ch)
     power_sum += result / (float)frame->nb_samples;
 
     if (power_sum == 0.0f)
-        return 0.0f;
+        return -70.0f; // silence
 
     return -0.691f + 10.0f * log10f(power_sum);
 }
