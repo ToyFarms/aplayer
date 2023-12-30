@@ -859,25 +859,35 @@ static void cli_sort_entry(SortMethod sort, SortFlag flag)
     else if (cst->selected_idx >= 0)
         prev = cst->pl->entries[cst->selected_idx];
 
+    int (*sort_method)(const void *a, const void *b) = NULL;
+    bool reverse = false;
+
     int sort_type = (sort << 16) | flag;
     switch (sort_type)
     {
     case (SORT_CTIME << 16) | SORT_FLAG_ASC:
-        qsort(cst->pl->entries, cst->pl->entry_size, sizeof(cst->pl->entries[0]), sort_method_ctime_asc);
+        sort_method = sort_method_ctime_asc;
         break;
     case (SORT_CTIME << 16) | SORT_FLAG_DESC:
-        qsort(cst->pl->entries, cst->pl->entry_size, sizeof(cst->pl->entries[0]), sort_method_ctime_desc);
+        sort_method = sort_method_ctime_desc;
         break;
     case (SORT_ALPHABETICALLY << 16) | SORT_FLAG_ASC:
-        qsort(cst->pl->entries, cst->pl->entry_size, sizeof(cst->pl->entries[0]), sort_method_alphabetically);
+        sort_method = sort_method_alphabetically;
         break;
     case (SORT_ALPHABETICALLY << 16) | SORT_FLAG_DESC:
-        qsort(cst->pl->entries, cst->pl->entry_size, sizeof(cst->pl->entries[0]), sort_method_alphabetically);
-        reverse_array(cst->pl->entries, cst->pl->entry_size, sizeof(cst->pl->entries[0]));
+        sort_method = sort_method_alphabetically;
+        reverse = true;
         break;
     default:
         break;
     }
+
+    if (!sort_method)
+        return;
+
+    qsort(cst->pl->entries, cst->pl->entry_size, sizeof(cst->pl->entries[0]), sort_method);
+    if (reverse) 
+        reverse_array(cst->pl->entries, cst->pl->entry_size, sizeof(cst->pl->entries[0]));
 
     int new_index;
     bool find = array_find(cst->pl->entries,
