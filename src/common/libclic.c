@@ -1039,7 +1039,7 @@ static void cli_handle_event_mouse(MouseEvent ev)
         cst->selected_idx = cst->hovered_idx;
 
     if (ev.state & MOUSE_LEFT_CLICKED && ev.double_clicked)
-        if (cst->selected_idx > 0)
+        if (cst->selected_idx >= 0)
         {
             cst->pl->playing_idx = cst->selected_idx;
             cli_draw();
