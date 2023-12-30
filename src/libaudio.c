@@ -281,6 +281,9 @@ static double audio_get_lufs(char *filename, int sampling_cap)
     av_log(NULL, AV_LOG_DEBUG, "Getting LUFS from %s, cap=%d.\n", filename, sampling_cap);
 
     StreamState *sst = stream_state_init(filename);
+    if (!sst)
+        return 0.0f;
+
     double lufs_sum = 0.0;
     int lufs_sampled = 0;
 
@@ -437,6 +440,10 @@ void audio_start(char *filename, void (*finished_callback)(void))
     pst->finished = false;
     pst->req_exit = false;
 
+    StreamState *sst = stream_state_init(filename);
+    if (!sst)
+        goto cleanup;
+
     float lufs = (float)audio_get_lufs(filename, pst->LUFS_sampling_cap);
     float gain = pst->LUFS_target - lufs;
     float gain_factor = dB_to_factor(gain);
@@ -447,10 +454,6 @@ void audio_start(char *filename, void (*finished_callback)(void))
            lufs,
            gain,
            gain_factor);
-
-    StreamState *sst = stream_state_init(filename);
-    if (!sst)
-        goto cleanup;
 
     av_log(NULL, AV_LOG_DEBUG, "Initializing PortAudio.\n");
     PaError pa_err;
