@@ -689,6 +689,8 @@ PlayerState *audio_init()
 
 void audio_free()
 {
+    audio_play();
+
     if (audio_is_initialized())
     {
         audio_exit();
