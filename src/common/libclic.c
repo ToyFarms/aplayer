@@ -654,9 +654,18 @@ static void cli_draw_loudness(CLIState *cst, Vec2 pos, int length, Color bg)
                          0.0f, (float)length / 2.0f, (float)length);
         if (yl > 0.0f)
         {
-            yl = audio_is_paused() ? lerpf(prev_yl, 0, 0.1f) : lerpf(prev_yl, yl, 0.2f);
+            yl = cst->pl->pst->paused || cst->pl->pst->volume - 1e-3 < 0.0f
+                     ? lerpf(prev_yl, 0, 0.2f)
+                     : lerpf(prev_yl, yl, 0.2f);
+
             int color = 255 - (int)mapf(yl, 0.0f, (float)length, 0.0f, 255.0f);
-            cli_draw_vlinef(cst, (Vec2){pos.x + 1, length - 1}, yl, 2, (Color){255 - color, color, 0}, bg, true);
+            cli_draw_vlinef(cst,
+                            (Vec2){pos.x + 1, length - 1},
+                            yl,
+                            2,
+                            (Color){255 - color, color, 0},
+                            bg,
+                            true);
         }
 
         float yr = map3f(cst->pl->pst->LUFS_current_r,
@@ -664,9 +673,18 @@ static void cli_draw_loudness(CLIState *cst, Vec2 pos, int length, Color bg)
                          0.0f, (float)length / 2.0f, (float)length);
         if (yr > 0.0f)
         {
-            yr = audio_is_paused() ? lerpf(prev_yr, 0, 0.1f) : lerpf(prev_yr, yr, 0.2f);
+            yr = cst->pl->pst->paused || cst->pl->pst->volume - 1e-3 < 0.0f
+                     ? lerpf(prev_yr, 0, 0.2f)
+                     : lerpf(prev_yr, yr, 0.2f);
+
             int color = 255 - (int)mapf(yr, 0.0f, (float)length, 0.0f, 255.0f);
-            cli_draw_vlinef(cst, (Vec2){pos.x + 3, length - 1}, yr, 2, (Color){255 - color, color, 0}, bg, true);
+            cli_draw_vlinef(cst,
+                            (Vec2){pos.x + 3, length - 1},
+                            yr,
+                            2,
+                            (Color){255 - color, color, 0},
+                            bg,
+                            true);
         }
 
         prev_yl = yl;
