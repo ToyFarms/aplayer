@@ -53,24 +53,24 @@ void playlist_free()
     pl = NULL;
 }
 
-void playlist_next()
+void playlist_next(void(*finished_callback)(void))
 {
     PLAYLIST_CHECK_INITIALIZED("playlist_next", return);
 
     av_log(NULL, AV_LOG_DEBUG, "Playlist next.\n");
 
     pl->playing_idx = wrap_around(pl->playing_idx + 1, 0, pl->entry_size);
-    playlist_play(pl);
+    playlist_play(finished_callback);
 }
 
-void playlist_prev()
+void playlist_prev(void(*finished_callback)(void))
 {
     PLAYLIST_CHECK_INITIALIZED("playlist_prev", return);
 
     av_log(NULL, AV_LOG_DEBUG, "Playlist prev.\n");
 
     pl->playing_idx = wrap_around(pl->playing_idx - 1, 0, pl->entry_size);
-    playlist_play(pl);
+    playlist_play(finished_callback);
 }
 
 void playlist_play(void (*finished_callback)(void))
@@ -85,7 +85,7 @@ void playlist_play(void (*finished_callback)(void))
         audio_wait_until_finished();
     }
 
-    audio_start_async(pl->entries[pl->playing_idx].path, finished_callback ? finished_callback : playlist_next);
+    audio_start_async(pl->entries[pl->playing_idx].path, finished_callback);
     audio_wait_until_initialized();
 }
 

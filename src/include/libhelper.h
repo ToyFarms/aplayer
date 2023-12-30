@@ -15,7 +15,7 @@
 #define PR av_log(NULL, AV_LOG_INFO, "[PR] %s:%d\n", __FILE__, __LINE__);
 #define PRM(x) av_log(NULL, AV_LOG_INFO, "[PRM] %s:%d - %s\n", __FILE__, __LINE__, x);
 #define PRPTR(x) av_log(NULL, AV_LOG_INFO, "[PRPTR] %s:%d - %s: %p\n", __FILE__, __LINE__, #x, (void *)x);
-#define AVLOG(fmt, ...) av_log(NULL, AV_LOG_INFO, "[AVLOG] %s:%d - "fmt, __FILE__, __LINE__, __VA_ARGS__)
+#define AVLOG(fmt, ...) av_log(NULL, AV_LOG_INFO, "[AVLOG] %s:%d - " fmt, __FILE__, __LINE__, __VA_ARGS__)
 
 static inline float lerpf(float v0, float v1, float t)
 {
@@ -49,6 +49,13 @@ static inline float mapf(float value, float _min, float _max, float new_min, flo
     float v = (value - _min) / (_max - _min) * (new_max - new_min) + new_min;
 
     return new_min < new_max ? FFMIN(FFMAX(v, new_min), new_max) : FFMIN(FFMAX(v, new_max), new_min);
+}
+
+static inline float map3f(int value, int min, int mid, int max, int new_min, int new_mid, int new_max)
+{
+    return value <= mid
+               ? mapf(value, min, mid, new_min, new_mid)
+               : mapf(value, mid, max, new_mid, new_max);
 }
 
 void av_log_turn_off();

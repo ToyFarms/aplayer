@@ -19,8 +19,8 @@ typedef struct Playlist
 
 Playlist *playlist_init(char *directory, PlayerState *pst);
 void playlist_free();
-void playlist_next();
-void playlist_prev();
+void playlist_next(void(*finished_callback)(void));
+void playlist_prev(void(*finished_callback)(void));
 void playlist_play(void(*finished_callback)(void));
 void playlist_play_idx(int index, void(*finished_callback)(void));
 
