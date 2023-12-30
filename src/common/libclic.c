@@ -806,13 +806,13 @@ static void cli_shuffle_entry()
                            &new_index);
 
     if (!find)
-        return;
+        goto draw;
 
     cst->pl->playing_idx = cst->pl->playing_idx >= 0 ? new_index : cst->pl->playing_idx;
     cst->selected_idx = cst->selected_idx >= 0 ? new_index : cst->selected_idx;
-    cli_compute_offset();
 
-    cst->force_redraw = true;
+    cli_compute_offset();
+draw:
     cli_draw();
 }
 
@@ -888,13 +888,13 @@ static void cli_sort_entry(SortMethod sort, SortFlag flag)
                            &new_index);
 
     if (!find)
-        return;
+        goto draw;
 
     cst->pl->playing_idx = cst->pl->playing_idx >= 0 ? new_index : cst->pl->playing_idx;
     cst->selected_idx = cst->selected_idx >= 0 ? new_index : cst->selected_idx;
-    cli_compute_offset();
 
-    cst->force_redraw = true;
+    cli_compute_offset();
+draw:
     cli_draw();
 }
 
