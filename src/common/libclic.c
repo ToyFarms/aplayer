@@ -718,6 +718,7 @@ static void cli_draw_overlay()
     cli_draw_loudness(cst, (Vec2){cst->width - 6, 0}, cst->height - 2, overlay_bg_color);
 
     cli_draw_rect(cst, (Rect){0, cst->height - 3, cst->width, 3}, overlay_bg_color);
+
     cli_draw_timestamp(cst,
                        (Vec2){timestamp_left_pad,
                               cst->height - timestamp_bottom_pad},
