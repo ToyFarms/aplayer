@@ -649,7 +649,9 @@ static void cli_draw_loudness(CLIState *cst, Vec2 pos, int length, Color bg)
 
     if (cst->pl->playing_idx >= 0)
     {
-        float yl = mapf(cst->pl->pst->LUFS_current_l, -70.0f, 0.0f, 0.0f, (float)length);
+        float yl = map3f(cst->pl->pst->LUFS_current_l,
+                         -70.0f, -14.0f, 0.0f,
+                         0.0f, (float)length / 2.0f, (float)length);
         if (yl > 0.0f)
         {
             yl = audio_is_paused() ? lerpf(prev_yl, 0, 0.1f) : lerpf(prev_yl, yl, 0.2f);
@@ -657,7 +659,9 @@ static void cli_draw_loudness(CLIState *cst, Vec2 pos, int length, Color bg)
             cli_draw_vlinef(cst, (Vec2){pos.x + 1, length - 1}, yl, 2, (Color){255 - color, color, 0}, bg, true);
         }
 
-        float yr = mapf(cst->pl->pst->LUFS_current_r, -70.0f, 0.0f, 0.0f, (float)length);
+        float yr = map3f(cst->pl->pst->LUFS_current_r,
+                         -70.0f, -14.0f, 0.0f,
+                         0.0f, (float)length / 2.0f, (float)length);
         if (yr > 0.0f)
         {
             yr = audio_is_paused() ? lerpf(prev_yr, 0, 0.1f) : lerpf(prev_yr, yr, 0.2f);
@@ -998,7 +1002,11 @@ static void cli_handle_event_mouse(MouseEvent ev)
 
     if (ev.state & MOUSE_LEFT_CLICKED && ev.double_clicked)
         if (cst->selected_idx > 0)
+        {
+            cst->pl->playing_idx = cst->selected_idx;
+            cli_draw();
             cli_playlist_play(cst->selected_idx);
+        }
 
     cst->force_redraw = false;
     cli_draw();
@@ -1068,7 +1076,7 @@ void cli_playlist_next()
 {
     CLI_CHECK_INITIALIZED("cli_playlist_next", return);
 
-    playlist_next();
+    playlist_next(cli_playlist_next);
     cst->selected_idx = cst->pl->playing_idx;
 
     cli_compute_offset();
@@ -1079,7 +1087,7 @@ void cli_playlist_prev()
 {
     CLI_CHECK_INITIALIZED("cli_playlist_prev", return);
 
-    playlist_prev();
+    playlist_prev(cli_playlist_next);
     cst->selected_idx = cst->pl->playing_idx;
 
     cli_compute_offset();
