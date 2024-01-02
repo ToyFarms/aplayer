@@ -5,6 +5,7 @@
 #include <stdbool.h>
 #include <stdlib.h>
 #include <libavutil/log.h>
+#include <libavformat/avformat.h>
 #include <string.h>
 
 #include "libhelper.h"
