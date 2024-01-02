@@ -9,6 +9,7 @@
 #include "libcli.h"
 #include "libplaylist.h"
 #include "libhook.h"
+#include "libgui.h"
 
 void cleanup(void)
 {
@@ -36,6 +37,11 @@ void log_callback(void *ptr, int level, const char *fmt, va_list vl)
     fclose(fd);
 }
 
+void *cli(void *arg)
+{
+    cli_event_loop();
+}
+
 int main(int argc, char **argv)
 {
     prepare_app_arguments(&argc, &argv);
@@ -49,14 +55,10 @@ int main(int argc, char **argv)
     // TODO: Prompt the user for directory if not supplied from the argument
     // TODO: Make the program more stable
 
-    directory = argv[1];
-
     atexit(cleanup);
 
     av_log_set_callback(log_callback);
     av_log_set_level(AV_LOG_DEBUG);
-
-    prepare_app_arguments(&argc, &argv);
 
     pthread_t event_thread_id;
     pthread_create(&event_thread_id, NULL, keyboard_hooks, NULL);
@@ -72,7 +74,13 @@ int main(int argc, char **argv)
     if (cli_init(pl) < 0)
         return -1;
 
-    cli_event_loop();
+    if (gui_init("Test", 700, 500) < 0)
+        return -1;
+
+    pthread_t cli_thread_id;
+    pthread_create(&cli_thread_id, NULL, cli, NULL);
+
+    gui_event_loop();
 
     playlist_free();
     cli_free();
