@@ -38,12 +38,12 @@ void log_callback(void *ptr, int level, const char *fmt, va_list vl)
 
 int main(int argc, char **argv)
 {
-    char *directory;
+    prepare_app_arguments(&argc, &argv);
 
-    if (argc < 2)
-    {
-        return -1;
-    }
+    char *directory = NULL;
+
+    if (argc >= 2)
+        directory = argv[1];
 
     // TODO: Fix audio normalization (sometimes it doesn't work)
     // TODO: Prompt the user for directory if not supplied from the argument
