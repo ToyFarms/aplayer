@@ -579,6 +579,8 @@ void audio_start(char *filename, void (*finished_callback)(void))
                     pst->LUFS_current_r = pst->LUFS_current_l;
                 }
 
+                pst->frame = sst->frame;
+
                 int dst_nb_samples = av_rescale_rnd(swr_get_delay(sst->swr_ctx,
                                                                   sst->audiodec->avctx->sample_rate) +
                                                         sst->frame->nb_samples,

@@ -29,6 +29,7 @@ typedef struct PlayerState
     float LUFS_current_r;
     float LUFS_target;
     int LUFS_sampling_cap;
+    AVFrame *frame;
 } PlayerState;
 
 PlayerState *player_state_init();

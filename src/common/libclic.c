@@ -886,7 +886,7 @@ static void cli_sort_entry(SortMethod sort, SortFlag flag)
         return;
 
     qsort(cst->pl->entries, cst->pl->entry_size, sizeof(cst->pl->entries[0]), sort_method);
-    if (reverse) 
+    if (reverse)
         reverse_array(cst->pl->entries, cst->pl->entry_size, sizeof(cst->pl->entries[0]));
 
     int new_index;
