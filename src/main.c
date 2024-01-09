@@ -74,13 +74,15 @@ int main(int argc, char **argv)
     if (cli_init(pl) < 0)
         return -1;
 
-    if (gui_init("Test", 700, 500) < 0)
-        return -1;
+    // if (gui_init("Test", 700, 500) < 0)
+    //     return -1;
 
-    pthread_t cli_thread_id;
-    pthread_create(&cli_thread_id, NULL, cli, NULL);
+    // pthread_t cli_thread_id;
+    // pthread_create(&cli_thread_id, NULL, cli, NULL);
 
-    gui_event_loop();
+    // gui_event_loop();
+
+    cli_event_loop();
 
     playlist_free();
     cli_free();
