@@ -219,6 +219,9 @@ static void cli_draw_padding(CLIState *cst,
                              const Color *fg,
                              const Color *bg)
 {
+    if (!pad_sb)
+        pad_sb = sb_create();
+
     if (bg && fg)
         sb_appendf(pad_sb,
                    "\x1b[38;2;%d;%d;%d;48;2;%d;%d;%dm\x1b[%dX\x1b[0m",
@@ -257,6 +260,9 @@ static void cli_draw_vline(CLIState *cst,
                            const Color *fg,
                            const Color *bg)
 {
+    if (!pad_sb)
+        pad_sb = sb_create();
+
     if (bg && fg)
         sb_appendf(pad_sb,
                    "\x1b[38;2;%d;%d;%d;48;2;%d;%d;%dm\x1b[%dX\x1b[0m",
@@ -698,9 +704,6 @@ static void cli_draw_overlay()
 
     if (!overlay_sb)
         overlay_sb = sb_create();
-
-    if (!pad_sb)
-        pad_sb = sb_create();
 
     if (cst->width <= 0 || cst->height <= 0)
         return;
