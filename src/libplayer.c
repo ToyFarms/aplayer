@@ -28,6 +28,7 @@ PlayerState *player_state_init()
     pst->muted = false;
     pst->volume = 1.0f;
     pst->LUFS_target = -14.0f;
+    pst->LUFS_avg = pst->LUFS_target;
     pst->LUFS_current_l = pst->LUFS_target;
     pst->LUFS_current_r = pst->LUFS_target;
     pst->LUFS_sampling_cap = 50000;

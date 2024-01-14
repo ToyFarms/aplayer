@@ -39,5 +39,6 @@ void audio_start(char *filename, void (*finished_callback)(void));
 pthread_t audio_start_async(char *filename, void (*finished_callback)(void));
 PlayerState *audio_init();
 void audio_free();
+StreamState *_audio_get_stream();
 
 #endif // _LIBAUDIO_H

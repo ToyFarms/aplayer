@@ -428,6 +428,8 @@ static void _audio_seek(StreamState *sst, PlayerState *pst)
     pst->seek_incr = 0;
 }
 
+static StreamState *_sst = NULL;
+
 void audio_start(char *filename, void (*finished_callback)(void))
 {
     AUDIO_CHECK_INITIALIZED("audio_start", return);
@@ -444,7 +446,10 @@ void audio_start(char *filename, void (*finished_callback)(void))
     if (!sst)
         goto cleanup;
 
+    _sst = sst;
+
     float lufs = (float)audio_get_lufs(filename, pst->LUFS_sampling_cap);
+    pst->LUFS_avg = lufs;
     float gain = pst->LUFS_target - lufs;
     float gain_factor = dB_to_factor(gain);
     av_log(NULL,
@@ -700,4 +705,9 @@ void audio_free()
     }
 
     player_state_free(&pst);
+}
+
+StreamState *_audio_get_stream()
+{
+    return _sst;
 }
