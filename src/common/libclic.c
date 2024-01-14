@@ -698,6 +698,40 @@ static void cli_draw_loudness(CLIState *cst, Vec2 pos, int length, Color bg)
     }
 }
 
+static void cli_draw_media_info(CLIState *cst, Vec2 pos, Color fg, Color bg)
+{
+    StreamState *sst = _audio_get_stream();
+    if (!sst)
+        return;
+
+    if (!sst->audiodec)
+        return;
+
+    AVCodecContext *avctx = sst->audiodec->avctx;
+    if (!avctx)
+        return;
+
+    cli_cursor_to(cst->out, pos.x, pos.y);
+
+    sb_appendf(overlay_sb, "\x1b[38;2;%d;%d;%d;48;2;%d;%d;%dm", fg.r, fg.g, fg.b, bg.r, bg.g, bg.b);
+    sb_appendf(overlay_sb,
+               "ch=%d, sr=%dk, ld=%.1f, g=%.1f, f=%.2f",
+               avctx->ch_layout.nb_channels,
+               avctx->sample_rate / 1000,
+               cst->pl->pst->LUFS_avg,
+               cst->pl->pst->LUFS_target - cst->pl->pst->LUFS_avg,
+               powf(10.0f, (cst->pl->pst->LUFS_target - cst->pl->pst->LUFS_avg) / 20.0f));
+
+    sb_append(overlay_sb, "\x1b[0m");
+
+    char *str = sb_concat(overlay_sb);
+
+    cli_write(cst->out, str, strlen(str));
+
+    free(str);
+    sb_reset(overlay_sb);
+}
+
 static void cli_draw_overlay()
 {
     CLI_CHECK_INITIALIZED("cli_draw_overlay", return);
@@ -762,6 +796,12 @@ static void cli_draw_overlay()
                      cst->width - cst->cursor_x,
                      NULL,
                      &overlay_bg_color);
+
+    cli_draw_media_info(cst,
+                        (Vec2){(cst->width / 2) + 7,
+                               cst->height - 1},
+                        overlay_fg_color,
+                        overlay_bg_color);
 }
 
 static void cli_draw()
