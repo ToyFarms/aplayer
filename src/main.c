@@ -54,7 +54,6 @@ int main(int argc, char **argv)
     // TODO: Fix audio normalization (sometimes it doesn't work)
     // TODO: Prompt the user for directory if not supplied from the argument
     // TODO: Make the program more stable
-    // TODO: Fix crash when have less entries than the height of the terminal
     // TODO: Fix display not updating when sorting under specific circumstances
 
     atexit(cleanup);
