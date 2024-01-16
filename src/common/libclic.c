@@ -681,23 +681,21 @@ static void cli_draw_loudness(CLIState *cst, Vec2 pos, int length, Color bg)
     if (cst->pl->playing_idx < 0)
         return;
 
-    prev = _cli_draw_loudness_bar(cst,
-                                  (Vec2){pos.x + 1, pos.y},
-                                  length,
-                                  2,
-                                  bg,
-                                  cst->pl->pst->LUFS_current_l,
-                                  prev_yl);
-    prev_yl = prev;
+    prev_yl = _cli_draw_loudness_bar(cst,
+                                     (Vec2){pos.x + 1, pos.y},
+                                     length,
+                                     2,
+                                     bg,
+                                     cst->pl->pst->LUFS_current_l,
+                                     prev_yl);
 
-    prev = _cli_draw_loudness_bar(cst,
-                                  (Vec2){(pos.x + 2) + 1, pos.y},
-                                  length,
-                                  2,
-                                  bg,
-                                  cst->pl->pst->LUFS_current_r,
-                                  prev_yr);
-    prev_yr = prev;
+    prev_yr = _cli_draw_loudness_bar(cst,
+                                     (Vec2){(pos.x + 2) + 1, pos.y},
+                                     length,
+                                     2,
+                                     bg,
+                                     cst->pl->pst->LUFS_current_r,
+                                     prev_yr);
 }
 
 static void cli_draw_media_info(CLIState *cst, Vec2 pos, Color fg, Color bg)
