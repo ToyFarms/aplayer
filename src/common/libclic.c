@@ -154,7 +154,7 @@ static void cli_compute_offset()
 
     if (cst->selected_idx - cst->entry_offset > height_adjusted - scroll_margin)
     {
-        cst->entry_offset = FFMIN(cst->entry_offset + ((cst->selected_idx - cst->entry_offset) - (height_adjusted - scroll_margin)), cst->pl->entry_size - height_adjusted);
+        cst->entry_offset = FFMAX(FFMIN(cst->entry_offset + ((cst->selected_idx - cst->entry_offset) - (height_adjusted - scroll_margin)), cst->pl->entry_size - height_adjusted), 0);
         cst->force_redraw = true;
     }
     else if (cst->selected_idx - cst->entry_offset < scroll_margin)
