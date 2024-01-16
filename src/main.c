@@ -53,7 +53,6 @@ int main(int argc, char **argv)
 
     // TODO: Fix audio normalization (sometimes it doesn't work)
     // TODO: Prompt the user for directory if not supplied from the argument
-    // TODO: Fix display not updating when sorting under specific circumstances
 
     atexit(cleanup);
 
