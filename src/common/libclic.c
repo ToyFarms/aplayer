@@ -817,7 +817,7 @@ static void cli_draw()
 
     if (!lines_state_cache)
         lines_state_cache = (LineState *)malloc(cst->pl->entry_size * sizeof(LineState));
-    else if (sizeof(lines_state_cache) / sizeof(LineState) != cst->pl->entry_size)
+    else if (sizeof(*lines_state_cache) / sizeof(LineState) != cst->pl->entry_size)
         realloc(lines_state_cache, cst->pl->entry_size * sizeof(LineState));
 
     cli_draw_list(cst);
