@@ -79,7 +79,7 @@ void playlist_play(void (*finished_callback)(void))
 
     audio_play();
 
-    if (!audio_is_finished() && audio_is_initialized())
+    if (_audio_get_stream())
     {
         audio_exit();
         audio_wait_until_finished();
