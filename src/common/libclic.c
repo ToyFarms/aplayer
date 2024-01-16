@@ -1015,6 +1015,16 @@ static void cli_handle_event_key(KeyEvent ev)
         else
             audio_mute();
     }
+    else if (ev.acsii_key == 'g')
+    {
+        cst->selected_idx = 0;
+        need_redraw = true;
+    }
+    else if (ev.acsii_key == 'G')
+    {
+        cst->selected_idx = cst->pl->entry_size - 1;
+        need_redraw = true;
+    }
 
     static int prev_selected_idx = -99;
 
