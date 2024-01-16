@@ -856,6 +856,7 @@ static void cli_shuffle_entry()
 
     cli_compute_offset();
 draw:
+    cst->force_redraw = true;
     cli_draw();
 }
 
@@ -948,6 +949,7 @@ static void cli_sort_entry(SortMethod sort, SortFlag flag)
 
     cli_compute_offset();
 draw:
+    cst->force_redraw = true;
     cli_draw();
 }
 
