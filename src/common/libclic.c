@@ -676,7 +676,6 @@ static void cli_draw_loudness(CLIState *cst, Vec2 pos, int length, Color bg)
 
     static float prev_yl = 0.0f;
     static float prev_yr = 0.0f;
-    float prev = 0.0f;
 
     if (cst->pl->playing_idx < 0)
         return;
