@@ -644,6 +644,7 @@ void audio_start(char *filename, void (*finished_callback)(void))
 
 cleanup:
     stream_state_free(&sst);
+    _sst = NULL;
 
     av_log(NULL, AV_LOG_DEBUG, "Cleanup: Stop PaStream.\n");
     Pa_StopStream(stream);
