@@ -646,56 +646,58 @@ exit:
     sb_reset(overlay_sb);
 }
 
+static float _cli_draw_loudness_bar(CLIState *cst, Vec2 pos, int length, int width, Color bg, float loudness, float prev)
+{
+    float y = map3f(loudness,
+                    -70.0f, -14.0f, 0.0f,
+                    0.0f, (float)length * 0.35f, (float)length);
+    if (y > 0.0f)
+    {
+        y = cst->pl->pst->paused || cst->pl->pst->volume - 1e-3 < 0.0f
+                ? lerpf(prev, 0, 0.2f)
+                : lerpf(prev, y, 0.2f);
+
+        int color = (int)mapf(y, 0.0f, (float)length, 0.0f, 255.0f);
+        cli_draw_vlinef(cst,
+                        (Vec2){pos.x, length},
+                        y,
+                        width,
+                        (Color){color, 255 - color, 0},
+                        bg,
+                        true);
+    }
+
+    return y;
+}
+
 static void cli_draw_loudness(CLIState *cst, Vec2 pos, int length, Color bg)
 {
     cli_draw_rect(cst, (Rect){pos.x, pos.y, 6, length}, bg);
 
     static float prev_yl = 0.0f;
     static float prev_yr = 0.0f;
+    float prev = 0.0f;
 
-    if (cst->pl->playing_idx >= 0)
-    {
-        float yl = map3f(cst->pl->pst->LUFS_current_l,
-                         -70.0f, -14.0f, 0.0f,
-                         0.0f, (float)length / 2.0f, (float)length);
-        if (yl > 0.0f)
-        {
-            yl = cst->pl->pst->paused || cst->pl->pst->volume - 1e-3 < 0.0f
-                     ? lerpf(prev_yl, 0, 0.2f)
-                     : lerpf(prev_yl, yl, 0.2f);
+    if (cst->pl->playing_idx < 0)
+        return;
 
-            int color = 255 - (int)mapf(yl, 0.0f, (float)length, 0.0f, 255.0f);
-            cli_draw_vlinef(cst,
-                            (Vec2){pos.x + 1, length - 1},
-                            yl,
-                            2,
-                            (Color){255 - color, color, 0},
-                            bg,
-                            true);
-        }
+    prev = _cli_draw_loudness_bar(cst,
+                                  (Vec2){pos.x + 1, pos.y},
+                                  length,
+                                  2,
+                                  bg,
+                                  cst->pl->pst->LUFS_current_l,
+                                  prev_yl);
+    prev_yl = prev;
 
-        float yr = map3f(cst->pl->pst->LUFS_current_r,
-                         -70.0f, -14.0f, 0.0f,
-                         0.0f, (float)length / 2.0f, (float)length);
-        if (yr > 0.0f)
-        {
-            yr = cst->pl->pst->paused || cst->pl->pst->volume - 1e-3 < 0.0f
-                     ? lerpf(prev_yr, 0, 0.2f)
-                     : lerpf(prev_yr, yr, 0.2f);
-
-            int color = 255 - (int)mapf(yr, 0.0f, (float)length, 0.0f, 255.0f);
-            cli_draw_vlinef(cst,
-                            (Vec2){pos.x + 3, length - 1},
-                            yr,
-                            2,
-                            (Color){255 - color, color, 0},
-                            bg,
-                            true);
-        }
-
-        prev_yl = yl;
-        prev_yr = yr;
-    }
+    prev = _cli_draw_loudness_bar(cst,
+                                  (Vec2){(pos.x + 2) + 1, pos.y},
+                                  length,
+                                  2,
+                                  bg,
+                                  cst->pl->pst->LUFS_current_r,
+                                  prev_yr);
+    prev_yr = prev;
 }
 
 static void cli_draw_media_info(CLIState *cst, Vec2 pos, Color fg, Color bg)
