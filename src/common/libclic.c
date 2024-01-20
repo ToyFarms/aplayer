@@ -864,8 +864,8 @@ static int sort_method_alphabetically(const void *a, const void *b)
     File *af = (File *)a;
     File *bf = (File *)b;
 
-    wchar_t *strw_af = mbs2wchar(af->filename, 260, NULL);
-    wchar_t *strw_bf = mbs2wchar(bf->filename, 260, NULL);
+    wchar_t *strw_af = mbs2wchar(af->filename, 1024, NULL);
+    wchar_t *strw_bf = mbs2wchar(bf->filename, 1024, NULL);
 
     int ret = wcscoll(strw_af, strw_bf);
 
