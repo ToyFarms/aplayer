@@ -458,7 +458,7 @@ static void cli_draw_timestamp(CLIState *cst, Vec2 pos, Color fg, Color bg)
     free(str);
     sb_reset(overlay_sb);
 
-    if (d.h >= 1.0)
+    if (ts.h >= 1.0)
         sb_appendf(overlay_sb, "%01lld:", (int64_t)ts.h);
 
     sb_appendf(overlay_sb,
