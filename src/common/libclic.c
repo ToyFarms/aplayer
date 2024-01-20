@@ -972,6 +972,32 @@ static void cli_sort_entry(SortMethod sort, SortFlag flag)
     cli_draw();
 }
 
+static void cli_selected_go_down(int *last)
+{
+    if (cst->selected_idx < 0 && cst->pl->playing_idx >= 0)
+        cst->selected_idx = cst->pl->playing_idx;
+    else if (cst->selected_idx < 0)
+    {
+        cst->selected_idx = *last;
+        *last = 0;
+    }
+
+    cst->selected_idx++;
+}
+
+static void cli_selected_go_up(int *last)
+{
+    if (cst->selected_idx < 0 && cst->pl->playing_idx >= 0)
+        cst->selected_idx = cst->pl->playing_idx;
+    else if (cst->selected_idx < 0)
+    {
+        cst->selected_idx = *last;
+        *last = 0;
+    }
+
+    cst->selected_idx--;
+}
+
 static bool should_close = false;
 
 static void cli_handle_event_key(KeyEvent ev)
@@ -981,21 +1007,21 @@ static void cli_handle_event_key(KeyEvent ev)
 
     bool need_redraw = false;
     char key = ev.acsii_key;
+    static int selected_before_escaped = 0;
 
     if (key == 'q')
     {
         should_close = true;
         return;
     }
-
     else if (key == 'j')
     {
-        cst->selected_idx++;
+        cli_selected_go_down(&selected_before_escaped);
         need_redraw = true;
     }
     else if (key == 'k')
     {
-        cst->selected_idx--;
+        cli_selected_go_up(&selected_before_escaped);
         need_redraw = true;
     }
     else if (ev.vk_key == VIRT_DOWN && ev.modifier_key & CTRL_KEY_PRESSED)
@@ -1006,12 +1032,12 @@ static void cli_handle_event_key(KeyEvent ev)
     }
     else if (ev.vk_key == VIRT_UP)
     {
-        cst->selected_idx--;
+        cli_selected_go_up(&selected_before_escaped);
         need_redraw = true;
     }
     else if (ev.vk_key == VIRT_DOWN)
     {
-        cst->selected_idx++;
+        cli_selected_go_down(&selected_before_escaped);
         need_redraw = true;
     }
     else if (ev.vk_key == VIRT_LEFT)
@@ -1046,19 +1072,11 @@ static void cli_handle_event_key(KeyEvent ev)
         need_redraw = true;
     }
 
-    static int prev_selected_idx = -99;
-
-    if (prev_selected_idx != -99)
-    {
-        cst->selected_idx = prev_selected_idx;
-        prev_selected_idx = -99;
-    }
-
     if (ev.vk_key == VIRT_RETURN)
         cli_playlist_play(cst->selected_idx);
     else if (ev.vk_key == VIRT_ESCAPE)
     {
-        prev_selected_idx = cst->selected_idx;
+        selected_before_escaped = cst->selected_idx;
         cst->selected_idx = -1;
         cli_draw();
     }
