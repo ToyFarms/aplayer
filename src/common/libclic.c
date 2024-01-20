@@ -830,31 +830,41 @@ static void cli_shuffle_entry()
 {
     CLI_CHECK_INITIALIZED("cli_shuffle_entry", return);
 
-    File prev;
+    File prev_selected;
+    File prev_playing;
+
+    if (cst->selected_idx >= 0)
+        prev_selected = cst->pl->entries[cst->selected_idx];
 
     if (cst->pl->playing_idx >= 0)
-        prev = cst->pl->entries[cst->pl->playing_idx];
-    else if (cst->selected_idx >= 0)
-        prev = cst->pl->entries[cst->selected_idx];
+        prev_playing = cst->pl->entries[cst->pl->playing_idx];
 
     shuffle_array(cst->pl->entries, cst->pl->entry_size, sizeof(cst->pl->entries[0]));
 
-    int new_index;
-    bool find = array_find(cst->pl->entries,
-                           cst->pl->entry_size,
-                           sizeof(cst->pl->entries[0]),
-                           &prev,
-                           file_compare_function,
-                           &new_index);
+    int new_idx = 0;
+    if (array_find(cst->pl->entries,
+                   cst->pl->entry_size,
+                   sizeof(cst->pl->entries[0]),
+                   &prev_selected,
+                   file_compare_function,
+                   &new_idx))
+    {
+        cst->selected_idx = new_idx;
+        cli_compute_offset();
+    }
+    else if (array_find(cst->pl->entries,
+                        cst->pl->entry_size,
+                        sizeof(cst->pl->entries[0]),
+                        &prev_playing,
+                        file_compare_function,
+                        &new_idx))
+    {
+        cst->pl->playing_idx = new_idx;
+        cst->selected_idx = new_idx;
+        cli_compute_offset();
+        cst->selected_idx = -1;
+    }
 
-    if (!find)
-        goto draw;
-
-    cst->pl->playing_idx = cst->pl->playing_idx >= 0 ? new_index : cst->pl->playing_idx;
-    cst->selected_idx = cst->selected_idx >= 0 ? new_index : cst->selected_idx;
-
-    cli_compute_offset();
-draw:
     cst->force_redraw = true;
     cli_draw();
 }
@@ -893,14 +903,16 @@ static int sort_method_ctime_asc(const void *a, const void *b)
 
 static void cli_sort_entry(SortMethod sort, SortFlag flag)
 {
-    CLI_CHECK_INITIALIZED("cli_sort_entry", return);
+    CLI_CHECK_INITIALIZED("cli_shuffle_entry", return);
 
-    File prev;
+    File prev_selected;
+    File prev_playing;
+
+    if (cst->selected_idx >= 0)
+        prev_selected = cst->pl->entries[cst->selected_idx];
 
     if (cst->pl->playing_idx >= 0)
-        prev = cst->pl->entries[cst->pl->playing_idx];
-    else if (cst->selected_idx >= 0)
-        prev = cst->pl->entries[cst->selected_idx];
+        prev_playing = cst->pl->entries[cst->pl->playing_idx];
 
     int (*sort_method)(const void *a, const void *b) = NULL;
     bool reverse = false;
@@ -932,22 +944,30 @@ static void cli_sort_entry(SortMethod sort, SortFlag flag)
     if (reverse)
         reverse_array(cst->pl->entries, cst->pl->entry_size, sizeof(cst->pl->entries[0]));
 
-    int new_index;
-    bool find = array_find(cst->pl->entries,
-                           cst->pl->entry_size,
-                           sizeof(cst->pl->entries[0]),
-                           &prev,
-                           file_compare_function,
-                           &new_index);
+    int new_idx = 0;
+    if (array_find(cst->pl->entries,
+                   cst->pl->entry_size,
+                   sizeof(cst->pl->entries[0]),
+                   &prev_selected,
+                   file_compare_function,
+                   &new_idx))
+    {
+        cst->selected_idx = new_idx;
+        cli_compute_offset();
+    }
+    else if (array_find(cst->pl->entries,
+                        cst->pl->entry_size,
+                        sizeof(cst->pl->entries[0]),
+                        &prev_playing,
+                        file_compare_function,
+                        &new_idx))
+    {
+        cst->pl->playing_idx = new_idx;
+        cst->selected_idx = new_idx;
+        cli_compute_offset();
+        cst->selected_idx = -1;
+    }
 
-    if (!find)
-        goto draw;
-
-    cst->pl->playing_idx = cst->pl->playing_idx >= 0 ? new_index : cst->pl->playing_idx;
-    cst->selected_idx = cst->selected_idx >= 0 ? new_index : cst->selected_idx;
-
-    cli_compute_offset();
-draw:
     cst->force_redraw = true;
     cli_draw();
 }
