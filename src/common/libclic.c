@@ -1050,7 +1050,7 @@ static void cli_handle_event_key(KeyEvent ev)
             cst->is_in_input_mode = false;
             goto clear_buffer;
         }
-        else if (ev.acsii_key == 'q')
+        else if (ev.ascii_key == 'q')
             should_close = true;
         else if (ev.vk_key == VIRT_RETURN)
         {
@@ -1066,9 +1066,9 @@ static void cli_handle_event_key(KeyEvent ev)
         {
             cst->input_buffer_size = FFMAX(cst->input_buffer_size - 1, 0);
         }
-        else if (is_numeric(&ev.acsii_key))
+        else if (is_numeric(&ev.ascii_key))
         {
-            cst->input_buffer[cst->input_buffer_size] = ev.acsii_key;
+            cst->input_buffer[cst->input_buffer_size] = ev.ascii_key;
             cst->input_buffer_size++;
         }
 
@@ -1080,7 +1080,7 @@ static void cli_handle_event_key(KeyEvent ev)
     }
 
     bool need_redraw = false;
-    char key = ev.acsii_key;
+    char key = ev.ascii_key;
     static int selected_before_escaped = 0;
 
     if (key == 'q')
@@ -1120,32 +1120,32 @@ static void cli_handle_event_key(KeyEvent ev)
         audio_seek(2500);
     else if (ev.vk_key == VIRT_SPACE)
         audio_toggle_play();
-    else if (ev.acsii_key == 'N')
+    else if (ev.ascii_key == 'N')
         cli_playlist_next();
-    else if (ev.acsii_key == 'P')
+    else if (ev.ascii_key == 'P')
         cli_playlist_prev();
-    else if (ev.acsii_key == 'S')
+    else if (ev.ascii_key == 'S')
         cli_sort_entry(SORT_CTIME, SORT_FLAG_ASC);
-    else if (ev.acsii_key == 's')
+    else if (ev.ascii_key == 's')
         cli_shuffle_entry();
-    else if (ev.acsii_key == 'm')
+    else if (ev.ascii_key == 'm')
     {
         if (audio_is_muted())
             audio_unmute();
         else
             audio_mute();
     }
-    else if (ev.acsii_key == 'g')
+    else if (ev.ascii_key == 'g')
     {
         cst->selected_idx = 0;
         need_redraw = true;
     }
-    else if (ev.acsii_key == 'G')
+    else if (ev.ascii_key == 'G')
     {
         cst->selected_idx = cst->pl->entry_size - 1;
         need_redraw = true;
     }
-    else if (ev.acsii_key == ':')
+    else if (ev.ascii_key == ':')
     {
         cst->is_in_input_mode = true;
     }
