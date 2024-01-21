@@ -9,7 +9,7 @@
 #include "libcli.h"
 #include "libplaylist.h"
 #include "libhook.h"
-#include "libgui.h"
+// #include "libgui.h"
 
 void cleanup(void)
 {

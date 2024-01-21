@@ -1047,6 +1047,7 @@ static void cli_handle_event_key(KeyEvent ev)
     {
         if (ev.vk_key == VIRT_ESCAPE)
         {
+            cli_write(cst->out, "\x1b[?25l", 7);
             cst->is_in_input_mode = false;
             goto clear_buffer;
         }
@@ -1054,6 +1055,7 @@ static void cli_handle_event_key(KeyEvent ev)
             should_close = true;
         else if (ev.vk_key == VIRT_RETURN)
         {
+            cli_write(cst->out, "\x1b[?25l", 7);
             cst->is_in_input_mode = false;
             int index = atoi(cst->input_buffer);
             cst->selected_idx = FFMAX(FFMIN(index, cst->pl->entry_size - 1), 0);
@@ -1148,6 +1150,7 @@ static void cli_handle_event_key(KeyEvent ev)
     else if (ev.ascii_key == ':')
     {
         cst->is_in_input_mode = true;
+        cli_write(cst->out, "\x1b[?25h", 7);
     }
 
     if (ev.vk_key == VIRT_RETURN)
