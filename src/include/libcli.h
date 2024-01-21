@@ -165,6 +165,7 @@ typedef struct CLIState
 
     UnicodeSymbol icon;
     UnicodeSymbol icon_nerdfont;
+    UnicodeSymbol *current_icon;
 
     bool prev_button_hovered;
     bool playback_button_hovered;
