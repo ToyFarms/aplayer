@@ -28,7 +28,7 @@
 typedef struct KeyEvent
 {
     bool key_down;
-    char acsii_key;
+    char ascii_key;
     wchar_t unicode_key;
     uint32_t vk_key;
     uint32_t modifier_key;

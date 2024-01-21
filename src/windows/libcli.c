@@ -88,7 +88,7 @@ Events cli_read_in()
             type = KEY_EVENT_TYPE;
 
             key_event.key_down = k.bKeyDown;
-            key_event.acsii_key = k.uChar.AsciiChar;
+            key_event.ascii_key = k.uChar.AsciiChar;
             key_event.unicode_key = k.uChar.UnicodeChar;
             key_event.vk_key = k.wVirtualKeyCode;
 
