@@ -80,3 +80,13 @@ bool array_find(const void *array,
 
     return false;
 }
+
+bool is_numeric(char *str)
+{
+    for (char *c = str; *c != '\0'; c++)
+    {
+        if (!isdigit(*c))
+            return false;
+    }
+    return true;
+}
