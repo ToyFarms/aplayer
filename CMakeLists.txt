@@ -22,7 +22,7 @@ add_executable(
   src/libtime.c
   src/sb.c
   src/libplaylist.c
-  src/libgui.c
+  # src/libgui.c
   src/${OS-DIR}/libcli.c
   src/${OS-DIR}/libfile.c
   src/${OS-DIR}/libhelper.c
@@ -42,5 +42,5 @@ target_link_libraries(aplayer PUBLIC
   avutil
   swresample
   portaudio
-  sdl2
+  # sdl2
 )
