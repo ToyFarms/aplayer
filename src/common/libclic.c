@@ -52,24 +52,30 @@ static void cli_state_init()
         .volume_medium = wchar2mbs(L"🔊"),
         .volume_high = wchar2mbs(L"🔊"),
 
-        .media_play = wchar2mbs(L"⏵"),
-        .media_pause = wchar2mbs(L"⏸"),
-        .media_next_track = wchar2mbs(L"⏭"),
-        .media_prev_track = wchar2mbs(L"⏮"),
+        .media_play = wchar2mbs(L"▶"),
+        .media_pause = wchar2mbs(L"="),
+        .media_next_track = wchar2mbs(L">"),
+        .media_prev_track = wchar2mbs(L"<"),
     };
 
     cst->icon_nerdfont = (UnicodeSymbol){
-        .volume_mute = wchar2mbs(L"󰝟"),
-        .volume_off = wchar2mbs(L"󰖁"),
-        .volume_low = wchar2mbs(L"󰕿"),
-        .volume_medium = wchar2mbs(L"󰖀"),
-        .volume_high = wchar2mbs(L"󰕾"),
+        // .volume_mute = wchar2mbs(L"󰝟"),
+        // .volume_off = wchar2mbs(L"󰖁"),
+        // .volume_low = wchar2mbs(L"󰕿"),
+        // .volume_medium = wchar2mbs(L"󰖀"),
+        // .volume_high = wchar2mbs(L"󰕾"),
+        .volume_mute = wchar2mbs(L"🔇"),
+        .volume_off = wchar2mbs(L"🔈"),
+        .volume_low = wchar2mbs(L"🔉"),
+        .volume_medium = wchar2mbs(L"🔊"),
+        .volume_high = wchar2mbs(L"🔊"),
 
         .media_play = wchar2mbs(L""),
         .media_pause = wchar2mbs(L""),
         .media_next_track = wchar2mbs(L"󰒭"),
         .media_prev_track = wchar2mbs(L"󰒮"),
     };
+    cst->current_icon = &cst->icon_nerdfont;
 
     cst->prev_button_hovered = false;
     cst->playback_button_hovered = false;
@@ -487,15 +493,15 @@ static void cli_draw_volume(CLIState *cst, Vec2 pos, Color fg, Color bg)
     char *volume_icon;
 
     if (cst->pl->pst->muted)
-        volume_icon = cst->icon.volume_mute;
+        volume_icon = cst->current_icon->volume_mute;
     else if (cst->pl->pst->volume - 1e-3 < 0.0f)
-        volume_icon = cst->icon.volume_off;
+        volume_icon = cst->current_icon->volume_off;
     else if (cst->pl->pst->volume < 0.5f)
-        volume_icon = cst->icon.volume_low;
+        volume_icon = cst->current_icon->volume_low;
     else if (cst->pl->pst->volume < 0.75f)
-        volume_icon = cst->icon.volume_medium;
+        volume_icon = cst->current_icon->volume_medium;
     else
-        volume_icon = cst->icon.volume_high;
+        volume_icon = cst->current_icon->volume_high;
 
     sb_appendf(overlay_sb,
                "\x1b[48;2;%d;%d;%dm%s\x1b[38;2;%d;%d;%dm%.0f\x1b[0m",
@@ -537,7 +543,7 @@ static void cli_draw_media_control(CLIState *cst, Vec2 center, Color fg, Color b
     cst->playback_button_hovered = playback_collision;
     cst->next_button_hovered = next_collision;
 
-    char *playback_icon = cst->pl->pst->paused ? cst->icon_nerdfont.media_play : cst->icon_nerdfont.media_pause;
+    char *playback_icon = cst->pl->pst->paused ? cst->current_icon->media_play : cst->current_icon->media_pause;
     const char *hovered_color = "\x1b[38;2;0;0;0;48;2;255;255;255m";
 
     sb_appendf(overlay_sb,
@@ -554,7 +560,7 @@ static void cli_draw_media_control(CLIState *cst, Vec2 center, Color fg, Color b
     sb_appendf(overlay_sb,
                "%s %s %s %s %s %s %s %s %s",
                prev_collision ? hovered_color : normal_color,
-               cst->icon_nerdfont.media_prev_track,
+               cst->current_icon->media_prev_track,
                prev_collision ? normal_color : "",
 
                playback_collision ? hovered_color : normal_color,
@@ -562,7 +568,7 @@ static void cli_draw_media_control(CLIState *cst, Vec2 center, Color fg, Color b
                playback_collision ? normal_color : "",
 
                next_collision ? hovered_color : normal_color,
-               cst->icon_nerdfont.media_next_track,
+               cst->current_icon->media_next_track,
                next_collision ? normal_color : "");
 
     char *str = sb_concat(overlay_sb);
