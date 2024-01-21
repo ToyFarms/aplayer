@@ -36,6 +36,12 @@ static void cli_state_init()
 
     cst->force_redraw = false;
 
+    cst->is_in_input_mode = false;
+    cst->input_buffer_capacity = 4096;
+    cst->input_buffer = (char *)malloc(cst->input_buffer_capacity * sizeof(char));
+    memset(cst->input_buffer, '\0', sizeof(cst->input_buffer));
+    cst->input_buffer_size = 0;
+
     cst->out = cli_get_handle();
     cst->width = 0;
     cst->width = 0;
@@ -737,6 +743,31 @@ static void cli_draw_media_info(CLIState *cst, Vec2 pos, Color fg, Color bg)
     sb_reset(overlay_sb);
 }
 
+static void cli_draw_input(CLIState *cst, Vec2 pos, Color fg, Color bg)
+{
+    if (!cst->is_in_input_mode)
+        return;
+
+    cli_cursor_to(cst->out, pos.x, pos.y);
+    char *input = (char *)malloc((cst->input_buffer_size + 1) * sizeof(char));
+    memcpy_s(input, cst->input_buffer_size, cst->input_buffer, cst->input_buffer_size * sizeof(char));
+    input[cst->input_buffer_size] = '\0';
+
+    sb_appendf(overlay_sb,
+               "\x1b[38;2;%d;%d;%d;48;2;%d;%d;%dm%s%s\x1b[0m",
+               fg.r, fg.g, fg.b,
+               bg.r, bg.g, bg.b,
+               cst->is_in_input_mode ? ":" : "",
+               input);
+
+    char *str = sb_concat(overlay_sb);
+    cli_write(cst->out, str, strlen(str));
+
+    free(str);
+    free(input);
+    sb_reset(overlay_sb);
+}
+
 static void cli_draw_overlay()
 {
     CLI_CHECK_INITIALIZED("cli_draw_overlay", return);
@@ -802,11 +833,12 @@ static void cli_draw_overlay()
                      NULL,
                      &overlay_bg_color);
 
-    cli_draw_media_info(cst,
-                        (Vec2){(cst->width / 2) + 7,
-                               cst->height - 1},
-                        overlay_fg_color,
-                        overlay_bg_color);
+    // cli_draw_media_info(cst,
+    //                     (Vec2){(cst->width / 2) + 7,
+    //                            cst->height - 1},
+    //                     overlay_fg_color,
+    //                     overlay_bg_color);
+    cli_draw_input(cst, (Vec2){(cst->width / 2) + 7, cst->height - 1}, overlay_fg_color, overlay_bg_color);
 }
 
 static void cli_draw()
@@ -1011,6 +1043,42 @@ static void cli_handle_event_key(KeyEvent ev)
     if (!ev.key_down)
         return;
 
+    if (cst->is_in_input_mode)
+    {
+        if (ev.vk_key == VIRT_ESCAPE)
+        {
+            cst->is_in_input_mode = false;
+            goto clear_buffer;
+        }
+        else if (ev.acsii_key == 'q')
+            should_close = true;
+        else if (ev.vk_key == VIRT_RETURN)
+        {
+            cst->is_in_input_mode = false;
+            int index = atoi(cst->input_buffer);
+            cst->selected_idx = FFMAX(FFMIN(index, cst->pl->entry_size - 1), 0);
+            AVLOG("%d %d\n", index, cst->selected_idx);
+            cli_compute_offset();
+            cli_draw();
+            goto clear_buffer;
+        }
+        else if (ev.vk_key == VIRT_BACK)
+        {
+            cst->input_buffer_size = FFMAX(cst->input_buffer_size - 1, 0);
+        }
+        else if (is_numeric(&ev.acsii_key))
+        {
+            cst->input_buffer[cst->input_buffer_size] = ev.acsii_key;
+            cst->input_buffer_size++;
+        }
+
+        return;
+    clear_buffer:
+        memset(cst->input_buffer, '\0', sizeof(cst->input_buffer));
+        cst->input_buffer_size = 0;
+        return;
+    }
+
     bool need_redraw = false;
     char key = ev.acsii_key;
     static int selected_before_escaped = 0;
@@ -1076,6 +1144,10 @@ static void cli_handle_event_key(KeyEvent ev)
     {
         cst->selected_idx = cst->pl->entry_size - 1;
         need_redraw = true;
+    }
+    else if (ev.acsii_key == ':')
+    {
+        cst->is_in_input_mode = true;
     }
 
     if (ev.vk_key == VIRT_RETURN)

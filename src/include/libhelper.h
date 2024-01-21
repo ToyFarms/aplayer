@@ -7,6 +7,7 @@
 #include <libavutil/log.h>
 #include <libavutil/time.h>
 #include <stdbool.h>
+#include <ctype.h>
 
 #include "libos.h"
 #include "libfile.h"
@@ -71,6 +72,7 @@ bool array_find(const void *array,
                 bool(compare_function)(const void *a,
                                        const void *b),
                 int *out_index);
+bool is_numeric(char *str);
 
 #ifdef AP_WINDOWS
 

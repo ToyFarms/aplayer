@@ -154,6 +154,11 @@ typedef struct CLIState
 
     bool force_redraw;
 
+    bool is_in_input_mode;
+    char *input_buffer;
+    int input_buffer_capacity;
+    int input_buffer_size;
+
     Handle out;
     int width;
     int height;
