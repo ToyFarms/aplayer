@@ -304,7 +304,8 @@ static void cli_draw_vline(CLIState *cst,
     sb_reset(pad_sb);
 }
 
-static LineState *lines_state_cache;
+static LineState *lines_state_cache = NULL;
+static int lines_state_cache_size = 0;
 
 static void cli_draw_list(CLIState *cst)
 {
@@ -853,9 +854,15 @@ static void cli_draw()
     cli_get_console_size(cst);
 
     if (!lines_state_cache)
+    {
         lines_state_cache = (LineState *)malloc(cst->pl->entry_size * sizeof(LineState));
-    else if (sizeof(*lines_state_cache) / sizeof(LineState) != cst->pl->entry_size)
-        realloc(lines_state_cache, cst->pl->entry_size * sizeof(LineState));
+        lines_state_cache_size = cst->pl->entry_size;
+    }
+    else if (lines_state_cache_size != cst->pl->entry_size)
+    {
+        lines_state_cache = (LineState *)realloc(lines_state_cache, cst->pl->entry_size * sizeof(LineState));
+        lines_state_cache_size = cst->pl->entry_size;
+    }
 
     cli_draw_list(cst);
     if (cst->force_redraw)
