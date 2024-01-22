@@ -57,7 +57,15 @@ bool file_compare_function(const void *a, const void *b)
     if (fa == NULL || fb == NULL)
         return false;
 
-    return fa->path == fb->path;
+    wchar_t *aw = mbs2wchar(fa->path, 1024, NULL);
+    wchar_t *bw = mbs2wchar(fb->path, 1024, NULL);
+
+    bool res = path_comparew(aw, bw);
+
+    free(aw);
+    free(bw);
+
+    return res;
 }
 
 bool array_find(const void *array,

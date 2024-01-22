@@ -86,5 +86,7 @@ bool is_numeric(char *str);
 void prepare_app_arguments(int *argc_ptr, char ***argv_ptr);
 char *wchar2mbs(const wchar_t *strw);
 wchar_t *mbs2wchar(char *str, size_t wsize, int *strwlen_out);
+bool path_compare(char *a, char *b);
+bool path_comparew(wchar_t *a, wchar_t *b);
 
 #endif // _LIBHELPER_H

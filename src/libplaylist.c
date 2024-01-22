@@ -32,25 +32,40 @@ Playlist *playlist_init(char *directory, PlayerState *pst)
     return pl;
 }
 
+static void playlist_free_entries(Playlist *_pl)
+{
+    if (_pl->entries)
+    {
+        av_log(NULL, AV_LOG_DEBUG, "Free Playlist entries.\n");
+        for (int i = 0; i < _pl->playing_idx; i++)
+        {
+            file_free(_pl->entries[i]);
+        }
+
+        free(_pl->entries);
+    }
+
+}
+
 void playlist_free()
 {
     PLAYLIST_CHECK_INITIALIZED("playlist_free", return);
 
     av_log(NULL, AV_LOG_DEBUG, "Free Playlist.\n");
 
-    if (pl->entries)
-    {
-        av_log(NULL, AV_LOG_DEBUG, "Free Playlist entries.\n");
-        for (int i = 0; i < pl->playing_idx; i++)
-        {
-            file_free(pl->entries[i]);
-        }
-
-        free(pl->entries);
-    }
+    playlist_free_entries(pl);
 
     free(pl);
     pl = NULL;
+}
+
+void playlist_update_entry(char *directory)
+{
+    PLAYLIST_CHECK_INITIALIZED("playlist_free", return);
+
+    playlist_free_entries(pl);
+
+    pl->entries = list_directory(directory, &pl->entry_size);
 }
 
 void playlist_next(void(*finished_callback)(void))
