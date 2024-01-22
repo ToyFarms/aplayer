@@ -1125,9 +1125,9 @@ static void cli_handle_event_key(KeyEvent ev)
         need_redraw = true;
     }
     else if (ev.vk_key == VIRT_LEFT)
-        audio_seek(-2500000);
+        audio_seek(-2.5 * (double)AV_TIME_BASE);
     else if (ev.vk_key == VIRT_RIGHT)
-        audio_seek(2500000);
+        audio_seek(2.5 * (double)AV_TIME_BASE);
     else if (ev.vk_key == VIRT_SPACE)
         audio_toggle_play();
     else if (ev.ascii_key == 'N')
