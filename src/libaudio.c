@@ -77,22 +77,22 @@ bool audio_is_muted()
     return pst->muted;
 }
 
-void audio_seek(float ms)
+void audio_seek(int64_t us)
 {
     AUDIO_CHECK_INITIALIZED("audio_seek", return);
 
     pst->req_seek = true;
     pst->seek_absolute = false;
-    pst->seek_incr = ms * 1000;
+    pst->seek_incr = us;
 }
 
-void audio_seek_to(float ms)
+void audio_seek_to(int64_t us)
 {
     AUDIO_CHECK_INITIALIZED("audio_seek_to", return);
 
     pst->req_seek = true;
     pst->seek_absolute = true;
-    pst->seek_incr = ms * 1000;
+    pst->seek_incr = us;
 }
 
 int64_t audio_get_timestamp()
