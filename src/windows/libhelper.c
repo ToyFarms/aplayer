@@ -125,3 +125,81 @@ wchar_t *mbs2wchar(char *str, size_t wsize, int *strwlen_out)
 
     return strw;
 }
+
+bool path_compare(char *a, char *b)
+{
+    HANDLE file1 = CreateFile(a,
+                              GENERIC_READ,
+                              FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+                              NULL,
+                              OPEN_EXISTING,
+                              FILE_ATTRIBUTE_NORMAL,
+                              NULL);
+    if (file1 == INVALID_HANDLE_VALUE)
+        goto error;
+
+    HANDLE file2 = CreateFile(b,
+                              GENERIC_READ,
+                              FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+                              NULL,
+                              OPEN_EXISTING,
+                              FILE_ATTRIBUTE_NORMAL,
+                              NULL);
+    if (file2 == INVALID_HANDLE_VALUE)
+        goto error;
+
+    BY_HANDLE_FILE_INFORMATION file_info1, file_info2;
+    if (!GetFileInformationByHandle(file1, &file_info1) || !GetFileInformationByHandle(file2, &file_info2))
+        goto error;
+
+    return (file_info1.nFileIndexHigh == file_info2.nFileIndexHigh) &&
+           (file_info1.nFileIndexLow == file_info2.nFileIndexLow) &&
+           (file_info1.dwVolumeSerialNumber == file_info2.dwVolumeSerialNumber);
+
+error:
+    if (file1)
+        CloseHandle(file1);
+    if (file2)
+        CloseHandle(file2);
+
+    return false;
+}
+
+bool path_comparew(wchar_t *a, wchar_t *b)
+{
+    HANDLE file1 = CreateFileW(a,
+                               GENERIC_READ,
+                               FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+                               NULL,
+                               OPEN_EXISTING,
+                               FILE_ATTRIBUTE_NORMAL,
+                               NULL);
+    if (file1 == INVALID_HANDLE_VALUE)
+        goto error;
+
+    HANDLE file2 = CreateFileW(b,
+                               GENERIC_READ,
+                               FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+                               NULL,
+                               OPEN_EXISTING,
+                               FILE_ATTRIBUTE_NORMAL,
+                               NULL);
+    if (file2 == INVALID_HANDLE_VALUE)
+        goto error;
+
+    BY_HANDLE_FILE_INFORMATION file_info1, file_info2;
+    if (!GetFileInformationByHandle(file1, &file_info1) || !GetFileInformationByHandle(file2, &file_info2))
+        goto error;
+
+    return (file_info1.nFileIndexHigh == file_info2.nFileIndexHigh) &&
+           (file_info1.nFileIndexLow == file_info2.nFileIndexLow) &&
+           (file_info1.dwVolumeSerialNumber == file_info2.dwVolumeSerialNumber);
+
+error:
+    if (file1)
+        CloseHandle(file1);
+    if (file2)
+        CloseHandle(file2);
+
+    return false;
+}
