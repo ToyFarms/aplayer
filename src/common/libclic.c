@@ -834,11 +834,12 @@ static void cli_draw_overlay()
                      NULL,
                      &overlay_bg_color);
 
-    // cli_draw_media_info(cst,
-    //                     (Vec2){(cst->width / 2) + 7,
-    //                            cst->height - 1},
-    //                     overlay_fg_color,
-    //                     overlay_bg_color);
+    if (!cst->is_in_input_mode)
+        cli_draw_media_info(cst,
+                            (Vec2){(cst->width / 2) + 7,
+                                   cst->height - 1},
+                            overlay_fg_color,
+                            overlay_bg_color);
     cli_draw_input(cst, (Vec2){(cst->width / 2) + 7, cst->height - 1}, overlay_fg_color, overlay_bg_color);
 }
 
