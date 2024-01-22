@@ -1024,7 +1024,7 @@ static void cli_selected_go_down(int *last)
         cst->selected_idx = cst->pl->playing_idx;
     else if (cst->selected_idx < 0)
     {
-        cst->selected_idx = *last;
+        cst->selected_idx = -1;
         *last = 0;
     }
 
