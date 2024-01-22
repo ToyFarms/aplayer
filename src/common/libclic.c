@@ -659,18 +659,27 @@ exit:
     sb_reset(overlay_sb);
 }
 
-static float _cli_draw_loudness_bar(CLIState *cst, Vec2 pos, int length, int width, Color bg, float loudness, float prev)
+static float _cli_draw_loudness_bar(CLIState *cst,
+                                    Vec2 pos,
+                                    int length,
+                                    int width,
+                                    Color bg,
+                                    float loudness,
+                                    float prev)
 {
     float y = map3f(loudness,
                     -70.0f, -14.0f, 0.0f,
-                    0.0f, (float)length * 0.35f, (float)length);
+                    0.0f, (float)length * 0.65f, (float)length);
     if (y > 0.0f)
     {
         y = cst->pl->pst->paused || cst->pl->pst->volume - 1e-3 < 0.0f
                 ? lerpf(prev, 0, 0.2f)
                 : lerpf(prev, y, 0.2f);
 
-        int color = (int)mapf(y, 0.0f, (float)length, 0.0f, 255.0f);
+        int color = (int)mapf(FFABS(y - prev),
+                              0.0f, 3.0f,
+                              0.0f, 255.0f);
+
         cli_draw_vlinef(cst,
                         (Vec2){pos.x, length},
                         y,
