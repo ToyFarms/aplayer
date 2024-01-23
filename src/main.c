@@ -74,6 +74,8 @@ int main(int argc, char **argv)
     if (cli_init(pl) < 0)
         return -1;
 
+    cli_sort_entry(SORT_CTIME, SORT_FLAG_ASC);
+
     // if (gui_init("Test", 700, 500) < 0)
     //     return -1;
 

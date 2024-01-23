@@ -881,7 +881,7 @@ static void cli_draw()
     pthread_mutex_unlock(&cst->mutex);
 }
 
-static void cli_shuffle_entry()
+void cli_shuffle_entry()
 {
     CLI_CHECK_INITIALIZED("cli_shuffle_entry", return);
 
@@ -910,11 +910,11 @@ static void cli_shuffle_entry()
         cst->selected_idx = -1;
     }
     else if (array_find(cst->pl->entries,
-                   cst->pl->entry_size,
-                   sizeof(cst->pl->entries[0]),
-                   &prev_selected,
-                   file_compare_function,
-                   &new_idx))
+                        cst->pl->entry_size,
+                        sizeof(cst->pl->entries[0]),
+                        &prev_selected,
+                        file_compare_function,
+                        &new_idx))
     {
         cst->selected_idx = new_idx;
         cli_compute_offset();
@@ -956,7 +956,7 @@ static int sort_method_ctime_asc(const void *a, const void *b)
     return bf->stat.st_ctime - af->stat.st_ctime;
 }
 
-static void cli_sort_entry(SortMethod sort, SortFlag flag)
+void cli_sort_entry(SortMethod sort, SortFlag flag)
 {
     CLI_CHECK_INITIALIZED("cli_shuffle_entry", return);
 
@@ -1001,11 +1001,11 @@ static void cli_sort_entry(SortMethod sort, SortFlag flag)
 
     int new_idx = 0;
     if (array_find(cst->pl->entries,
-                        cst->pl->entry_size,
-                        sizeof(cst->pl->entries[0]),
-                        &prev_playing,
-                        file_compare_function,
-                        &new_idx))
+                   cst->pl->entry_size,
+                   sizeof(cst->pl->entries[0]),
+                   &prev_playing,
+                   file_compare_function,
+                   &new_idx))
     {
         cst->pl->playing_idx = new_idx;
         cst->selected_idx = new_idx;
@@ -1013,11 +1013,11 @@ static void cli_sort_entry(SortMethod sort, SortFlag flag)
         cst->selected_idx = -1;
     }
     else if (array_find(cst->pl->entries,
-                   cst->pl->entry_size,
-                   sizeof(cst->pl->entries[0]),
-                   &prev_selected,
-                   file_compare_function,
-                   &new_idx))
+                        cst->pl->entry_size,
+                        sizeof(cst->pl->entries[0]),
+                        &prev_selected,
+                        file_compare_function,
+                        &new_idx))
     {
         cst->selected_idx = new_idx;
         cli_compute_offset();
