@@ -900,24 +900,24 @@ static void cli_shuffle_entry()
     if (array_find(cst->pl->entries,
                    cst->pl->entry_size,
                    sizeof(cst->pl->entries[0]),
+                   &prev_playing,
+                   file_compare_function,
+                   &new_idx))
+    {
+        cst->pl->playing_idx = new_idx;
+        cst->selected_idx = new_idx;
+        cli_compute_offset();
+        cst->selected_idx = -1;
+    }
+    else if (array_find(cst->pl->entries,
+                   cst->pl->entry_size,
+                   sizeof(cst->pl->entries[0]),
                    &prev_selected,
                    file_compare_function,
                    &new_idx))
     {
         cst->selected_idx = new_idx;
         cli_compute_offset();
-    }
-    else if (array_find(cst->pl->entries,
-                        cst->pl->entry_size,
-                        sizeof(cst->pl->entries[0]),
-                        &prev_playing,
-                        file_compare_function,
-                        &new_idx))
-    {
-        cst->pl->playing_idx = new_idx;
-        cst->selected_idx = new_idx;
-        cli_compute_offset();
-        cst->selected_idx = -1;
     }
 
     cst->force_redraw = true;
@@ -1001,16 +1001,6 @@ static void cli_sort_entry(SortMethod sort, SortFlag flag)
 
     int new_idx = 0;
     if (array_find(cst->pl->entries,
-                   cst->pl->entry_size,
-                   sizeof(cst->pl->entries[0]),
-                   &prev_selected,
-                   file_compare_function,
-                   &new_idx))
-    {
-        cst->selected_idx = new_idx;
-        cli_compute_offset();
-    }
-    else if (array_find(cst->pl->entries,
                         cst->pl->entry_size,
                         sizeof(cst->pl->entries[0]),
                         &prev_playing,
@@ -1021,6 +1011,16 @@ static void cli_sort_entry(SortMethod sort, SortFlag flag)
         cst->selected_idx = new_idx;
         cli_compute_offset();
         cst->selected_idx = -1;
+    }
+    else if (array_find(cst->pl->entries,
+                   cst->pl->entry_size,
+                   sizeof(cst->pl->entries[0]),
+                   &prev_selected,
+                   file_compare_function,
+                   &new_idx))
+    {
+        cst->selected_idx = new_idx;
+        cli_compute_offset();
     }
 
     cst->force_redraw = true;
