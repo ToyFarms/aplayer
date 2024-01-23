@@ -183,6 +183,8 @@ void cli_event_loop();
 void cli_playlist_next();
 void cli_playlist_prev();
 void cli_playlist_play(int index);
+void cli_sort_entry(SortMethod sort, SortFlag flag);
+void cli_shuffle_entry();
 
 // Implement for each OS
 
