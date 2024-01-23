@@ -736,7 +736,7 @@ static void cli_draw_media_info(CLIState *cst, Vec2 pos, Color fg, Color bg)
 
     sb_appendf(overlay_sb, "\x1b[38;2;%d;%d;%d;48;2;%d;%d;%dm", fg.r, fg.g, fg.b, bg.r, bg.g, bg.b);
     sb_appendf(overlay_sb,
-               "ch=%d, sr=%dk, ld=%.1f, g=%.1f, f=%.2f",
+               "ch=%d sr=%dk ld=%.1f g=%.1f f=%.2f",
                avctx->ch_layout.nb_channels,
                avctx->sample_rate / 1000,
                cst->pl->pst->LUFS_avg,
