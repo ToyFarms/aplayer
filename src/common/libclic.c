@@ -885,8 +885,8 @@ void cli_shuffle_entry()
 {
     CLI_CHECK_INITIALIZED("cli_shuffle_entry", return);
 
-    File prev_selected;
-    File prev_playing;
+    File prev_selected = {.path = NULL};
+    File prev_playing = {.path = NULL};
 
     if (cst->selected_idx >= 0)
         prev_selected = cst->pl->entries[cst->selected_idx];
@@ -897,24 +897,24 @@ void cli_shuffle_entry()
     shuffle_array(cst->pl->entries, cst->pl->entry_size, sizeof(cst->pl->entries[0]));
 
     int new_idx = 0;
-    if (array_find(cst->pl->entries,
-                   cst->pl->entry_size,
-                   sizeof(cst->pl->entries[0]),
-                   &prev_playing,
-                   file_compare_function,
-                   &new_idx))
+    if (prev_playing.path && array_find(cst->pl->entries,
+                                        cst->pl->entry_size,
+                                        sizeof(cst->pl->entries[0]),
+                                        &prev_playing,
+                                        file_compare_function,
+                                        &new_idx))
     {
         cst->pl->playing_idx = new_idx;
         cst->selected_idx = new_idx;
         cli_compute_offset();
         cst->selected_idx = -1;
     }
-    else if (array_find(cst->pl->entries,
-                        cst->pl->entry_size,
-                        sizeof(cst->pl->entries[0]),
-                        &prev_selected,
-                        file_compare_function,
-                        &new_idx))
+    else if (prev_selected.path && array_find(cst->pl->entries,
+                                              cst->pl->entry_size,
+                                              sizeof(cst->pl->entries[0]),
+                                              &prev_selected,
+                                              file_compare_function,
+                                              &new_idx))
     {
         cst->selected_idx = new_idx;
         cli_compute_offset();
@@ -960,8 +960,8 @@ void cli_sort_entry(SortMethod sort, SortFlag flag)
 {
     CLI_CHECK_INITIALIZED("cli_shuffle_entry", return);
 
-    File prev_selected;
-    File prev_playing;
+    File prev_selected = {.path = NULL};
+    File prev_playing = {.path = NULL};
 
     if (cst->selected_idx >= 0)
         prev_selected = cst->pl->entries[cst->selected_idx];
@@ -1000,24 +1000,24 @@ void cli_sort_entry(SortMethod sort, SortFlag flag)
         reverse_array(cst->pl->entries, cst->pl->entry_size, sizeof(cst->pl->entries[0]));
 
     int new_idx = 0;
-    if (array_find(cst->pl->entries,
-                   cst->pl->entry_size,
-                   sizeof(cst->pl->entries[0]),
-                   &prev_playing,
-                   file_compare_function,
-                   &new_idx))
+    if (prev_playing.path && array_find(cst->pl->entries,
+                                        cst->pl->entry_size,
+                                        sizeof(cst->pl->entries[0]),
+                                        &prev_playing,
+                                        file_compare_function,
+                                        &new_idx))
     {
         cst->pl->playing_idx = new_idx;
         cst->selected_idx = new_idx;
         cli_compute_offset();
         cst->selected_idx = -1;
     }
-    else if (array_find(cst->pl->entries,
-                        cst->pl->entry_size,
-                        sizeof(cst->pl->entries[0]),
-                        &prev_selected,
-                        file_compare_function,
-                        &new_idx))
+    else if (prev_selected.path && array_find(cst->pl->entries,
+                                              cst->pl->entry_size,
+                                              sizeof(cst->pl->entries[0]),
+                                              &prev_selected,
+                                              file_compare_function,
+                                              &new_idx))
     {
         cst->selected_idx = new_idx;
         cli_compute_offset();
