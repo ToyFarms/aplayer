@@ -37,5 +37,7 @@ void file_free(File file);
 #endif // AP_WINDOWS
 
 File *list_directory(char *directory, int *out_size);
+bool path_compare(char *a, char *b);
+bool path_comparew(wchar_t *a, wchar_t *b);
 
 #endif // _LIBFILE_H
