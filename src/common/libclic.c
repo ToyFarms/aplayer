@@ -391,21 +391,13 @@ static void cli_draw_hlinef(CLIState *cst,
     cli_cursor_to(cst->out, pos.x, pos.y);
 
     if (int_part > 0)
+    {
         cli_draw_padding(cst, NULL, int_part, NULL, &fg);
+        cli_cursor_to(cst->out, pos.x + int_part, pos.y);
+    }
 
-    cli_cursor_to(cst->out, pos.x + int_part, pos.y);
-
-    sb_appendf(overlay_sb, "\x1b[48;2;%d;%d;%d;38;2;%d;%d;%dm", bg.r, bg.g, bg.b, fg.r, fg.g, fg.b);
-
-    char *str = sb_concat(overlay_sb);
-    cli_write(cst->out, str, strlen(str));
-
-    free(str);
-    sb_reset(overlay_sb);
-
-    int block_index = block_len - (int)(roundf(float_part / block_increment) * block_increment * block_len);
-    wchar_t final_block = blocks_horizontal[block_index];
-    cli_writew(cst->out, &final_block, 1);
+    cli_get_cursor_pos(cst);
+    cli_draw_hblock(cst, (Vec2){cst->cursor_x, cst->cursor_y}, float_part, fg, bg);
 
     if (reset_bg_color)
         cli_write(cst->out, "\x1b[0m", 5);
