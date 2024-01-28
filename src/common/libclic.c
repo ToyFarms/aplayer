@@ -720,7 +720,7 @@ static void _cli_draw_loudness_bar(CLIState *cst,
     else
     {
         lerp_y = lerpf(*prev, y, 0.5f);
-        *cap -= 0.2f;
+        *cap -= (float)cst->height * 0.01f;
     }
 
     int color = (int)map3f(lerp_y,
@@ -793,6 +793,15 @@ static void cli_draw_loudness(CLIState *cst, Vec2 pos, int length, Color bg)
     static float cap_l = 0.0f;
     static float cap_r = 0.0f;
     static const Color cap_color = {250, 250, 250};
+    static int prev_height = 0;
+
+    if (prev_height != cst->height)
+    {
+        cap_l = mapf(cap_l, 0, prev_height, 0, cst->height);
+        cap_r = mapf(cap_r, 0, prev_height, 0, cst->height);
+
+        prev_height = cst->height;
+    }
 
     if (cst->pl->playing_idx < 0)
         return;
