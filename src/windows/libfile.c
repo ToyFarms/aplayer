@@ -67,3 +67,25 @@ File *list_directory(char *directory, int *out_size)
 
     return files;
 }
+
+bool path_compare(char *a, char *b)
+{
+    char expanded_a[2048];
+    GetFullPathName(a, 2048, expanded_a, NULL);
+
+    char expanded_b[2048];
+    GetFullPathName(b, 2048, expanded_b, NULL);
+
+    return strcmp(expanded_a, expanded_b) == 0;
+}
+
+bool path_comparew(wchar_t *a, wchar_t *b)
+{
+    wchar_t expanded_a[2048];
+    GetFullPathNameW(a, 2048, expanded_a, NULL);
+
+    wchar_t expanded_b[2048];
+    GetFullPathNameW(b, 2048, expanded_b, NULL);
+
+    return wcscmp(expanded_a, expanded_b) == 0;
+}
