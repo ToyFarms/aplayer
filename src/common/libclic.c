@@ -356,6 +356,28 @@ static const wchar_t blocks_horizontal[] = {L'█', L'▉', L'▊', L'▋', L'�
 static const int block_len = 9;
 static const float block_increment = 1.0f / (float)block_len;
 
+static void cli_draw_hblock(CLIState *cst, Vec2 pos, float x, Color fg, Color bg)
+{
+    x = FFMIN(FFMAX(x, 0.0f), 1.0f);
+
+    int block_index = block_len - (int)(roundf(x / block_increment) * block_increment * block_len);
+    wchar_t block = blocks_horizontal[block_index];
+
+    sb_appendf(overlay_sb,
+               "\x1b[38;2;%d;%d;%d;48;2;%d;%d;%dm",
+               fg.r, fg.g, fg.b,
+               bg.r, bg.g, bg.b);
+
+    char *str = sb_concat(overlay_sb);
+
+    cli_cursor_to(cst->out, pos.x, pos.y);
+    cli_write(cst->out, str, strlen(str));
+    cli_writew(cst->out, &block, 1);
+
+    free(str);
+    sb_reset(overlay_sb);
+}
+
 static void cli_draw_hlinef(CLIState *cst,
                             Vec2 pos,
                             float length,
@@ -392,6 +414,29 @@ static void cli_draw_hlinef(CLIState *cst,
 }
 
 static const wchar_t blocks_vertical[] = {L'█', L'▇', L'▆', L'▅', L'▄', L'▄', L'▂', L'▂', L' '};
+
+static void cli_draw_vblock(CLIState *cst, Vec2 pos, float x, int width, Color fg, Color bg)
+{
+    x = FFMIN(FFMAX(x, 0.0f), 1.0f);
+
+    int block_index = block_len - (int)(roundf(x / block_increment) * block_increment * block_len);
+    wchar_t block = blocks_vertical[block_index];
+
+    sb_appendf(overlay_sb,
+               "\x1b[38;2;%d;%d;%d;48;2;%d;%d;%dm",
+               fg.r, fg.g, fg.b,
+               bg.r, bg.g, bg.b);
+
+    char *str = sb_concat(overlay_sb);
+
+    cli_cursor_to(cst->out, pos.x, pos.y);
+    cli_write(cst->out, str, strlen(str));
+    for (int i = 0; i < width; i++)
+        cli_writew(cst->out, &block, 1);
+
+    free(str);
+    sb_reset(overlay_sb);
+}
 
 static void cli_draw_vlinef(CLIState *cst,
                             Vec2 pos,
@@ -659,64 +704,127 @@ exit:
     sb_reset(overlay_sb);
 }
 
-static float _cli_draw_loudness_bar(CLIState *cst,
-                                    Vec2 pos,
-                                    int length,
-                                    int width,
-                                    Color bg,
-                                    float loudness,
-                                    float prev)
+static void _cli_draw_loudness_bar(CLIState *cst,
+                                   Vec2 pos,
+                                   int length,
+                                   int width,
+                                   Color bg,
+                                   float loudness,
+                                   float *prev,
+                                   Color cap_color,
+                                   float *cap)
 {
     float y = map3f(loudness,
                     -70.0f, -14.0f, 0.0f,
                     0.0f, (float)length * 0.65f, (float)length);
-    if (y > 0.0f)
+
+    float lerp_y = 0.0f;
+
+    if (cst->pl->pst->paused || cst->pl->pst->volume - 1e-3f < 0.0f)
     {
-        y = cst->pl->pst->paused || cst->pl->pst->volume - 1e-3 < 0.0f
-                ? lerpf(prev, 0, 0.2f)
-                : lerpf(prev, y, 0.2f);
-
-        int color = (int)mapf(FFABS(y - prev),
-                              0.0f, 3.0f,
-                              0.0f, 255.0f);
-
-        cli_draw_vlinef(cst,
-                        (Vec2){pos.x, length},
-                        y,
-                        width,
-                        (Color){color, 255 - color, 0},
-                        bg,
-                        true);
+        lerp_y = lerpf(*prev, 0, 0.5f);
+        *cap = lerpf(*cap, 0, 0.5f);
+    }
+    else
+    {
+        lerp_y = lerpf(*prev, y, 0.5f);
+        *cap -= 0.2f;
     }
 
-    return y;
+    int color = (int)map3f(lerp_y,
+                           0.0f, (float)length * 0.70f, (float)length,
+                           0.0f, 100.0f, 255.0f);
+
+    cli_draw_vlinef(cst,
+                    (Vec2){pos.x, length},
+                    lerp_y,
+                    width,
+                    (Color){color, 255 - color, 0},
+                    lerp_y > *cap ? cap_color : bg,
+                    true);
+
+    if (lerp_y > *cap)
+    {
+        float displayed_block = 1.0f - (lerp_y - (int)lerp_y);
+        *cap = lerp_y;
+
+        if (lerp_y - (int)lerp_y < block_increment)
+        {
+            displayed_block = 0.0f;
+            if (!(lerp_y - (int)lerp_y - 1e-5f < 0.0f))
+                *cap -= 1.0f;
+        }
+
+        cli_draw_vblock(cst,
+                        (Vec2){pos.x, length - (*cap + 1.0f)},
+                        1.0f - displayed_block,
+                        width,
+                        cap_color,
+                        bg);
+    }
+    else
+    {
+        if (*cap - (int)*cap > block_increment)
+        {
+            cli_draw_vblock(cst,
+                            (Vec2){pos.x, length - *cap},
+                            *cap - (int)*cap,
+                            width,
+                            bg,
+                            cap_color);
+
+            cli_draw_vblock(cst,
+                            (Vec2){pos.x, length - *cap - 1},
+                            *cap - (int)*cap,
+                            width,
+                            cap_color,
+                            bg);
+        }
+        else
+        {
+            cli_draw_vblock(cst,
+                            (Vec2){pos.x, length - *cap},
+                            1.0f,
+                            width,
+                            cap_color,
+                            bg);
+        }
+    }
+
+    *prev = lerp_y;
 }
 
 static void cli_draw_loudness(CLIState *cst, Vec2 pos, int length, Color bg)
 {
-    cli_draw_rect(cst, (Rect){pos.x, pos.y, 6, length}, bg);
-
     static float prev_yl = 0.0f;
     static float prev_yr = 0.0f;
+    static float cap_l = 0.0f;
+    static float cap_r = 0.0f;
 
     if (cst->pl->playing_idx < 0)
         return;
 
-    prev_yl = _cli_draw_loudness_bar(cst,
-                                     (Vec2){pos.x + 1, pos.y},
-                                     length,
-                                     2,
-                                     bg,
-                                     cst->pl->pst->LUFS_current_l,
-                                     prev_yl);
+    cli_draw_rect(cst, (Rect){pos.x, pos.y, 6, length}, bg);
 
-    prev_yr = _cli_draw_loudness_bar(cst,
-                                     (Vec2){(pos.x + 2) + 1, pos.y},
-                                     length,
-                                     2,
-                                     bg,
-                                     cst->pl->pst->LUFS_current_r,
-                                     prev_yr);
+    _cli_draw_loudness_bar(cst,
+                           (Vec2){pos.x + 1, pos.y},
+                           length,
+                           2,
+                           bg,
+                           cst->pl->pst->LUFS_current_l,
+                           &prev_yl,
+                           (Color){255, 255, 255},
+                           &cap_l);
+
+    _cli_draw_loudness_bar(cst,
+                           (Vec2){(pos.x + 2) + 1, pos.y},
+                           length,
+                           2,
+                           bg,
+                           cst->pl->pst->LUFS_current_r,
+                           &prev_yr,
+                           (Color){255, 255, 255},
+                           &cap_r);
 }
 
 static void cli_draw_media_info(CLIState *cst, Vec2 pos, Color fg, Color bg)
