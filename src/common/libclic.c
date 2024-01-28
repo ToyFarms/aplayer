@@ -352,16 +352,14 @@ static inline void cli_draw_rect(CLIState *cst, Rect rect, Color color)
     cli_draw_vline(cst, (Vec2){rect.x, rect.y}, rect.h, rect.w, &color, &color);
 }
 
-static const wchar_t blocks_horizontal[] = {L'█', L'▉', L'▊', L'▋', L'▌', L'▍', L'▎', L'▎', L' '};
+static const wchar_t *blocks_horizontal = L" ▎▎▍▌▋▊▉█";
+static const wchar_t *blocks_vertical = L" ▂▂▄▄▅▆▇█";
 static const int block_len = 9;
 static const float block_increment = 1.0f / (float)block_len;
 
 static void cli_draw_hblock(CLIState *cst, Vec2 pos, float x, Color fg, Color bg)
 {
     x = FFMIN(FFMAX(x, 0.0f), 1.0f);
-
-    int block_index = block_len - (int)(roundf(x / block_increment) * block_increment * block_len);
-    wchar_t block = blocks_horizontal[block_index];
 
     sb_appendf(overlay_sb,
                "\x1b[38;2;%d;%d;%d;48;2;%d;%d;%dm",
@@ -372,6 +370,9 @@ static void cli_draw_hblock(CLIState *cst, Vec2 pos, float x, Color fg, Color bg
 
     cli_cursor_to(cst->out, pos.x, pos.y);
     cli_write(cst->out, str, strlen(str));
+
+    int block_index = (int)(x * (block_len - 1));
+    wchar_t block = blocks_horizontal[block_index];
     cli_writew(cst->out, &block, 1);
 
     free(str);
@@ -405,14 +406,9 @@ static void cli_draw_hlinef(CLIState *cst,
         cli_write(cst->out, "\x1b[39m", 6);
 }
 
-static const wchar_t blocks_vertical[] = {L'█', L'▇', L'▆', L'▅', L'▄', L'▄', L'▂', L'▂', L' '};
-
 static void cli_draw_vblock(CLIState *cst, Vec2 pos, float x, int width, Color fg, Color bg)
 {
     x = FFMIN(FFMAX(x, 0.0f), 1.0f);
-
-    int block_index = block_len - (int)(roundf(x / block_increment) * block_increment * block_len);
-    wchar_t block = blocks_vertical[block_index];
 
     sb_appendf(overlay_sb,
                "\x1b[38;2;%d;%d;%d;48;2;%d;%d;%dm",
@@ -423,6 +419,10 @@ static void cli_draw_vblock(CLIState *cst, Vec2 pos, float x, int width, Color f
 
     cli_cursor_to(cst->out, pos.x, pos.y);
     cli_write(cst->out, str, strlen(str));
+
+    int block_index = (int)(x * (block_len - 1));
+    wchar_t block = blocks_vertical[block_index];
+
     for (int i = 0; i < width; i++)
         cli_writew(cst->out, &block, 1);
 
@@ -454,7 +454,7 @@ static void cli_draw_vlinef(CLIState *cst,
     free(str);
     sb_reset(overlay_sb);
 
-    int block_index = block_len - (int)(roundf(float_part / block_increment) * block_increment * block_len);
+    int block_index = (int)(float_part * (block_len - 1));
     wchar_t final_block = blocks_vertical[block_index];
     for (int i = 0; i < line_width; i++)
         cli_writew(cst->out, &final_block, 1);
