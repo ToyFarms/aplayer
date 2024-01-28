@@ -800,6 +800,7 @@ static void cli_draw_loudness(CLIState *cst, Vec2 pos, int length, Color bg)
     static float prev_yr = 0.0f;
     static float cap_l = 0.0f;
     static float cap_r = 0.0f;
+    static const Color cap_color = {250, 250, 250};
 
     if (cst->pl->playing_idx < 0)
         return;
@@ -813,7 +814,7 @@ static void cli_draw_loudness(CLIState *cst, Vec2 pos, int length, Color bg)
                            bg,
                            cst->pl->pst->LUFS_current_l,
                            &prev_yl,
-                           (Color){255, 255, 255},
+                           cap_color,
                            &cap_l);
 
     _cli_draw_loudness_bar(cst,
@@ -823,7 +824,7 @@ static void cli_draw_loudness(CLIState *cst, Vec2 pos, int length, Color bg)
                            bg,
                            cst->pl->pst->LUFS_current_r,
                            &prev_yr,
-                           (Color){255, 255, 255},
+                           cap_color,
                            &cap_r);
 }
 
