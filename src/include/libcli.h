@@ -73,7 +73,7 @@ typedef struct Vec2
 
 typedef struct Color
 {
-    int r, g, b;
+    uint8_t r, g, b;
 } Color;
 
 typedef struct Rect
