@@ -7,6 +7,8 @@ APlayer is an audio player written in C using mainly FFMPEG for reading audio fi
 * [PortAudio](https://github.com/PortAudio/portaudio)
 * [SDL2](https://github.com/libsdl-org/SDL)
 * [StringBuilder](https://github.com/cavaliercoder/c-stringbuilder)
+* [Ini Parser](https://github.com/benhoyt/inih)
+* [JSON Parser](https://github.com/DaveGamble/cJSON)
 
 ### How to build:
 

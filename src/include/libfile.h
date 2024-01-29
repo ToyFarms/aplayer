@@ -4,6 +4,8 @@
 #include <stdio.h>
 #include <libavutil/log.h>
 #include <sys/stat.h>
+#include <fcntl.h>
+#include <errno.h>
 
 #include "libos.h"
 #include "libhelper.h"
@@ -27,6 +29,9 @@ typedef struct File
 } File;
 
 void file_free(File file);
+char *file_read(const char *path);
+bool file_exists(const char *path);
+bool file_empty(const char *path);
 
 #ifdef AP_WINDOWS
 
@@ -36,8 +41,12 @@ void file_free(File file);
 #elif defined(LINUX)
 #endif // AP_WINDOWS
 
-File *list_directory(char *directory, int *out_size);
-bool path_compare(char *a, char *b);
-bool path_comparew(wchar_t *a, wchar_t *b);
+File *list_directory(const char *directory, int *out_size);
+bool path_compare(const char *a, const char *b);
+bool path_comparew(const wchar_t *a, const wchar_t *b);
+FileStat file_get_statw(const wchar_t *filename, int *success);
+FileStat file_get_stat(const char *filename, int *success);
+char *path_normalize(const char *path);
+wchar_t *path_normalizew(const wchar_t *path);
 
 #endif // _LIBFILE_H

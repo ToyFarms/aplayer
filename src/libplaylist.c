@@ -12,7 +12,7 @@
 
 static Playlist *pl;
 
-Playlist *playlist_init(char *directory, PlayerState *pst)
+Playlist *playlist_init(char *directory, PlayerState *pst, bool init_entry)
 {
     av_log(NULL, AV_LOG_DEBUG, "Initializing Playlist.\n");
     pl = (Playlist *)malloc(sizeof(Playlist));
@@ -25,7 +25,13 @@ Playlist *playlist_init(char *directory, PlayerState *pst)
 
     memset(pl, 0, sizeof(pl));
 
-    pl->entries = list_directory(directory, &pl->entry_size);
+    if (init_entry)
+        pl->entries = list_directory(directory, &pl->entry_size);
+    else
+    {
+        pl->entries = NULL;
+        pl->entry_size = 0;
+    }
     pl->playing_idx = -1;
     pl->pst = pst;
 
@@ -43,8 +49,8 @@ static void playlist_free_entries(Playlist *_pl)
         }
 
         free(_pl->entries);
+        pl->entry_size = 0;
     }
-
 }
 
 void playlist_free()
@@ -59,13 +65,23 @@ void playlist_free()
     pl = NULL;
 }
 
-void playlist_update_entry(char *directory)
+void playlist_refresh_entry(char *directory)
 {
     PLAYLIST_CHECK_INITIALIZED("playlist_free", return);
 
     playlist_free_entries(pl);
 
     pl->entries = list_directory(directory, &pl->entry_size);
+}
+
+void playlist_update_entry(File *entries, int entry_size)
+{
+    PLAYLIST_CHECK_INITIALIZED("playlist_free", return);
+
+    playlist_free_entries(pl);
+
+    pl->entries = entries;
+    pl->entry_size = entry_size;
 }
 
 void playlist_next(void(*finished_callback)(void))
