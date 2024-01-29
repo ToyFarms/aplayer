@@ -107,7 +107,7 @@ char *wchar2mbs(const wchar_t *strw)
     return char_utf8;
 }
 
-wchar_t *mbs2wchar(char *str, size_t wsize, int *strwlen_out)
+wchar_t *mbs2wchar(const char *str, size_t wsize, int *strwlen_out)
 {
     if (!str)
         return NULL;

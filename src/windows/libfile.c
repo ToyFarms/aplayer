@@ -1,13 +1,21 @@
 #include "libfile.h"
 
-FileStat get_file_stat(wchar_t *filename)
+FileStat file_get_statw(const wchar_t *filename, int *success)
 {
     struct _stat stat;
     FileStat fstat = {0};
 
     if (_wstat(filename, &stat) != 0)
     {
-        av_log(NULL, AV_LOG_WARNING, "Could not get file stat.\n");
+        char *filename_tmp = wchar2mbs(filename);
+        if (filename_tmp)
+        {
+            av_log(NULL, AV_LOG_WARNING, "Could not get file stat: %s.\n", filename_tmp);
+            free(filename_tmp);
+        }
+
+        if (success)
+            *success = -1;
         return fstat;
     }
 
@@ -17,10 +25,48 @@ FileStat get_file_stat(wchar_t *filename)
     fstat.st_mtime = stat.st_mtime;
     fstat.st_ctime = stat.st_ctime;
 
+    if (success)
+        *success = 0;
+
     return fstat;
 }
 
-File *list_directory(char *directory, int *out_size)
+FileStat file_get_stat(const char *filename, int *success)
+{
+    struct _stat stat;
+    FileStat fstat = {0};
+    int ret_code = 0;
+
+    wchar_t *filenamew = mbs2wchar(filename, 2048, NULL);
+    if (!filenamew)
+        goto error;
+
+    if (_wstat(filenamew, &stat) != 0)
+    {
+        av_log(NULL, AV_LOG_WARNING, "Could not get file stat: %s.\n", filename);
+        goto error;
+    }
+
+    fstat.st_mode = stat.st_mode;
+    fstat.st_size = stat.st_size;
+    fstat.st_atime = stat.st_atime;
+    fstat.st_mtime = stat.st_mtime;
+    fstat.st_ctime = stat.st_ctime;
+
+    goto cleanup;
+
+error:
+    ret_code = -1;
+cleanup:
+    if (filenamew)
+        free(filenamew);
+    if (success)
+        *success = ret_code;
+
+    return fstat;
+}
+
+File *list_directory(const char *directory, int *out_size)
 {
     WIN32_FIND_DATAW ffd;
     HANDLE find;
@@ -46,16 +92,19 @@ File *list_directory(char *directory, int *out_size)
     {
         if (wcscmp(ffd.cFileName, L".") != 0 && wcscmp(ffd.cFileName, L"..") != 0)
         {
-            wchar_t filepath[1024];
-            wcscpy_s(filepath, 1024, wide_directory);
-            wcscat_s(filepath, 1024, L"\\");
-            wcscat_s(filepath, 1024, ffd.cFileName);
+            wchar_t filepath[2048];
+            wcscpy_s(filepath, 2048, wide_directory);
+            wcscat_s(filepath, 2048, L"\\");
+            wcscat_s(filepath, 2048, ffd.cFileName);
+            wchar_t *filepath_normalized = path_normalizew(filepath);
 
             files[count] = (File){
-                .path = wchar2mbs(filepath),
+                .path = wchar2mbs(filepath_normalized),
                 .filename = wchar2mbs(ffd.cFileName),
-                .stat = get_file_stat(filepath),
+                .stat = file_get_statw(filepath, NULL),
             };
+
+            free(filepath_normalized);
             count++;
         }
     } while (FindNextFileW(find, &ffd) != 0 && count < MAX_FILES);
@@ -68,7 +117,23 @@ File *list_directory(char *directory, int *out_size)
     return files;
 }
 
-bool path_compare(char *a, char *b)
+char *path_normalize(const char *path)
+{
+    char *normalized = (char *)malloc(2048 * sizeof(char));
+    GetFullPathName(path, 2048, normalized, NULL);
+
+    return normalized;
+}
+
+wchar_t *path_normalizew(const wchar_t *path)
+{
+    wchar_t *normalized = (wchar_t *)malloc(2048 * sizeof(wchar_t));
+    GetFullPathNameW(path, 2048, normalized, NULL);
+
+    return normalized;
+}
+
+bool path_compare(const char *a, const char *b)
 {
     char expanded_a[2048];
     GetFullPathName(a, 2048, expanded_a, NULL);
@@ -79,7 +144,7 @@ bool path_compare(char *a, char *b)
     return strcmp(expanded_a, expanded_b) == 0;
 }
 
-bool path_comparew(wchar_t *a, wchar_t *b)
+bool path_comparew(const wchar_t *a, const wchar_t *b)
 {
     wchar_t expanded_a[2048];
     GetFullPathNameW(a, 2048, expanded_a, NULL);

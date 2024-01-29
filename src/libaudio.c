@@ -386,7 +386,6 @@ static double audio_get_lufs(char *filename, int sampling_cap)
     }
 
 cleanup:
-    AVLOG("%f, %d\n", lufs_sum, lufs_sampled);
     stream_state_free(&sst);
     return lufs_sum / (double)lufs_sampled;
 }
@@ -646,12 +645,15 @@ cleanup:
     stream_state_free(&sst);
     _sst = NULL;
 
-    av_log(NULL, AV_LOG_DEBUG, "Cleanup: Stop PaStream.\n");
-    Pa_StopStream(stream);
-    av_log(NULL, AV_LOG_DEBUG, "Cleanup: Close PaStream.\n");
-    Pa_CloseStream(stream);
-    av_log(NULL, AV_LOG_DEBUG, "Cleanup: Terminate PortAudio.\n");
-    Pa_Terminate();
+    if (stream)
+    {
+        av_log(NULL, AV_LOG_DEBUG, "Cleanup: Stop PaStream.\n");
+        Pa_StopStream(stream);
+        av_log(NULL, AV_LOG_DEBUG, "Cleanup: Close PaStream.\n");
+        Pa_CloseStream(stream);
+        av_log(NULL, AV_LOG_DEBUG, "Cleanup: Terminate PortAudio.\n");
+        Pa_Terminate();
+    }
 
     pst->finished = true;
     pst->initialized = false;

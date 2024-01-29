@@ -114,6 +114,8 @@ void cli_free()
     cli_buffer_switch(BUF_MAIN);
 }
 
+static void cli_restore_session(const char *file);
+
 int cli_init(Playlist *pl)
 {
     if (!cst)
@@ -126,6 +128,12 @@ int cli_init(Playlist *pl)
 
     cst->pl = pl;
     cli_buffer_switch(BUF_ALTERNATE);
+
+    if (!pl->entries)
+    {
+        if (file_exists("session.auto.json") && !file_empty("session.auto.json"))
+            cli_restore_session("session.auto.json");
+    }
 
     return 1;
 }
@@ -892,6 +900,11 @@ static void cli_draw_overlay()
 {
     CLI_CHECK_INITIALIZED("cli_draw_overlay", return);
 
+    static int64_t last_overlay_draw = 0;
+
+    if (av_gettime() - last_overlay_draw < ms2us(50))
+        return;
+
     if (!overlay_sb)
         overlay_sb = sb_create();
 
@@ -960,6 +973,8 @@ static void cli_draw_overlay()
                             overlay_fg_color,
                             overlay_bg_color);
     cli_draw_input(cst, (Vec2){(cst->width / 2) + 7, cst->height - 1}, overlay_fg_color, overlay_bg_color);
+
+    last_overlay_draw = av_gettime();
 }
 
 static void cli_draw()
@@ -1163,6 +1178,48 @@ static void cli_selected_go_up(int *last)
     cst->selected_idx--;
 }
 
+static void cli_restore_session(const char *file)
+{
+    int success;
+    SessionState st = session_read(file, &success);
+
+    // TODO: Add message toast for info and error messages
+    if (success < 0)
+        return;
+
+    // Temporary solution
+    const char *loading = "Loading Last Session...";
+    cli_cursor_to(cst->out, (cst->width / 2) - (strlen(loading) / 2), cst->height / 2);
+    cli_write(cst->out, loading, strlen(loading));
+
+    playlist_update_entry(st.entries, st.entry_size);
+
+    cli_playlist_play(st.playing);
+
+    audio_seek_to(st.timestamp);
+    audio_set_volume(st.volume);
+
+    if (st.paused)
+        audio_pause();
+
+    cst->selected_idx = FFMAX(cst->pl->playing_idx, 0);
+    cli_compute_offset();
+    cli_draw();
+}
+
+static void cli_save_session(const char *file)
+{
+    SessionState st = {
+        .entries = cst->pl->entries,
+        .entry_size = cst->pl->entry_size,
+        .paused = audio_is_paused(),
+        .playing = cst->pl->playing_idx,
+        .timestamp = audio_get_timestamp(),
+        .volume = audio_get_volume()};
+
+    session_write(file, st);
+}
+
 static bool should_close = false;
 
 static void cli_handle_event_key(KeyEvent ev)
@@ -1279,6 +1336,10 @@ static void cli_handle_event_key(KeyEvent ev)
         cst->is_in_input_mode = true;
         cli_write(cst->out, "\x1b[?25h", 7);
     }
+    else if (ev.ascii_key == 'r')
+        cli_restore_session("session.json");
+    else if (ev.ascii_key == 'w')
+        cli_save_session("session.json");
 
     if (ev.vk_key == VIRT_RETURN)
         cli_playlist_play(cst->selected_idx);
@@ -1378,8 +1439,16 @@ static void cli_handle_event(Event ev)
 
 static void *update_thread(void *arg)
 {
+    static int64_t last_update = 0;
+
     while (cst)
     {
+        if (av_gettime() - last_update > ms2us(1000))
+        {
+            cli_save_session("session.auto.json");
+            last_update = av_gettime();
+        }
+
         pthread_mutex_lock(&cst->mutex);
         cli_draw_overlay();
         pthread_mutex_unlock(&cst->mutex);
@@ -1435,6 +1504,9 @@ void cli_playlist_prev()
 void cli_playlist_play(int index)
 {
     CLI_CHECK_INITIALIZED("cli_playlist_play", return);
+
+    if (index < 0 || index > cst->pl->entry_size)
+        return;
 
     playlist_play_idx(index, cli_playlist_next);
     cst->selected_idx = cst->pl->playing_idx;

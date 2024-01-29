@@ -9,11 +9,9 @@
 #include "libcli.h"
 #include "libplaylist.h"
 #include "libhook.h"
-// #include "libgui.h"
 
 void cleanup(void)
 {
-    cli_buffer_switch(BUF_MAIN);
     FILE *fd = fopen("log.log", "a");
 
     const char *separator = "========================== END OF LOG ==========================\n\n";
@@ -35,11 +33,6 @@ void log_callback(void *ptr, int level, const char *fmt, va_list vl)
     fwrite(buf, sizeof(char), strlen(buf), fd);
 
     fclose(fd);
-}
-
-void *cli(void *arg)
-{
-    cli_event_loop();
 }
 
 int main(int argc, char **argv)
@@ -67,22 +60,12 @@ int main(int argc, char **argv)
     if (!pst)
         return -1;
 
-    Playlist *pl = playlist_init(directory, pst);
+    Playlist *pl = playlist_init(directory, pst, !!(directory));
     if (!pl)
         return -1;
 
     if (cli_init(pl) < 0)
         return -1;
-
-    cli_sort_entry(SORT_CTIME, SORT_FLAG_ASC);
-
-    // if (gui_init("Test", 700, 500) < 0)
-    //     return -1;
-
-    // pthread_t cli_thread_id;
-    // pthread_create(&cli_thread_id, NULL, cli, NULL);
-
-    // gui_event_loop();
 
     cli_event_loop();
 
