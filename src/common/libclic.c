@@ -1243,9 +1243,10 @@ static void cli_handle_event_key(KeyEvent ev)
             cst->is_in_input_mode = false;
             int index = atoi(cst->input_buffer);
             cst->selected_idx = FFMAX(FFMIN(index, cst->pl->entry_size - 1), 0);
-            AVLOG("%d %d\n", index, cst->selected_idx);
+
             cli_compute_offset();
             cli_draw();
+
             goto clear_buffer;
         }
         else if (ev.vk_key == VIRT_BACK)
