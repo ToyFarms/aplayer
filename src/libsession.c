@@ -107,8 +107,6 @@ SessionState session_read(const char *path, int *success)
         i++;
     }
 
-    AVLOG("%s - %f - %d\n", path, st.volume, st.entry_size);
-
     goto cleanup;
 
 error:
