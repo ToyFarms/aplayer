@@ -704,16 +704,21 @@ exit:
     sb_reset(overlay_sb);
 }
 
+typedef struct _LoudnessBarState
+{
+    float prev;
+    float cap;
+    int64_t last_cap_set;
+}  _LoudnessBarState;
+
 static void _cli_draw_loudness_bar(CLIState *cst,
                                    Vec2 pos,
                                    int length,
                                    int width,
                                    Color bg,
                                    float loudness,
-                                   float *prev,
                                    Color cap_color,
-                                   float *cap,
-                                   int64_t *last_cap_set)
+                                   _LoudnessBarState *s)
 {
     float y = map3f(loudness,
                     -70.0f, -14.0f, 0.0f,
@@ -723,16 +728,16 @@ static void _cli_draw_loudness_bar(CLIState *cst,
 
     if (cst->pl->pst->paused || cst->pl->pst->volume - 1e-3f < 0.0f)
     {
-        lerp_y = lerpf(*prev, 0, 0.5f);
-        *cap = lerpf(*cap, 0, 0.5f);
+        lerp_y = lerpf(s->prev, 0, 0.5f);
+        s->cap = lerpf(s->cap, 0, 0.5f);
     }
     else
     {
-        lerp_y = lerpf(*prev, y, 0.5f);
+        lerp_y = lerpf(s->prev, y, 0.5f);
 
         // ease in interpolation t = 0 -> 2 in 1 seconds
-        float t = FFMIN((av_gettime() - *last_cap_set) / (float)ms2us(1000), 2.0f);
-        *cap -= ((float)cst->height * 0.01f) * t;
+        float t = FFMIN((av_gettime() - s->last_cap_set) / (float)ms2us(1000), 2.0f);
+        s->cap -= ((float)cst->height * 0.01f) * t;
     }
 
     int color = (int)map3f(lerp_y,
@@ -744,24 +749,24 @@ static void _cli_draw_loudness_bar(CLIState *cst,
                     lerp_y,
                     width,
                     (Color){color, 255 - color, 0},
-                    lerp_y > *cap ? cap_color : bg,
+                    lerp_y > s->cap ? cap_color : bg,
                     true);
 
-    if (lerp_y > *cap)
+    if (lerp_y > s->cap)
     {
-        *last_cap_set = av_gettime();
+        s->last_cap_set = av_gettime();
         float displayed_block = 1.0f - (lerp_y - (int)lerp_y);
-        *cap = lerp_y;
+        s->cap = lerp_y;
 
         if (lerp_y - (int)lerp_y < block_increment)
         {
             displayed_block = 0.0f;
             if (!(lerp_y - (int)lerp_y - 1e-5f < 0.0f))
-                *cap -= 1.0f;
+                s->cap -= 1.0f;
         }
 
         cli_draw_vblock(cst,
-                        (Vec2){pos.x, length - (*cap + 1.0f)},
+                        (Vec2){pos.x, length - (s->cap + 1.0f)},
                         1.0f - displayed_block,
                         width,
                         cap_color,
@@ -769,18 +774,18 @@ static void _cli_draw_loudness_bar(CLIState *cst,
     }
     else
     {
-        if (*cap - (int)*cap > block_increment)
+        if (s->cap - (int)s->cap > block_increment)
         {
             cli_draw_vblock(cst,
-                            (Vec2){pos.x, length - *cap},
-                            *cap - (int)*cap,
+                            (Vec2){pos.x, length - s->cap},
+                            s->cap - (int)s->cap,
                             width,
                             bg,
                             cap_color);
 
             cli_draw_vblock(cst,
-                            (Vec2){pos.x, length - *cap - 1},
-                            *cap - (int)*cap,
+                            (Vec2){pos.x, length - s->cap - 1},
+                            s->cap - (int)s->cap,
                             width,
                             cap_color,
                             bg);
@@ -788,7 +793,7 @@ static void _cli_draw_loudness_bar(CLIState *cst,
         else
         {
             cli_draw_vblock(cst,
-                            (Vec2){pos.x, length - *cap},
+                            (Vec2){pos.x, length - s->cap},
                             1.0f,
                             width,
                             cap_color,
@@ -796,24 +801,20 @@ static void _cli_draw_loudness_bar(CLIState *cst,
         }
     }
 
-    *prev = lerp_y;
+    s->prev = lerp_y;
 }
 
 static void cli_draw_loudness(CLIState *cst, Vec2 pos, int length, Color bg)
 {
-    static float prev_yl = 0.0f;
-    static float prev_yr = 0.0f;
-    static float cap_l = 0.0f;
-    static float cap_r = 0.0f;
-    static int64_t last_cap_set_l = 0;
-    static int64_t last_cap_set_r = 0;
+    static _LoudnessBarState state_l = {0};
+    static _LoudnessBarState state_r = {0};
     static const Color cap_color = {250, 250, 250};
     static int prev_height = 0;
 
     if (prev_height != cst->height)
     {
-        cap_l = mapf(cap_l, 0, prev_height, 0, cst->height);
-        cap_r = mapf(cap_r, 0, prev_height, 0, cst->height);
+        state_l.cap = mapf(state_l.cap, 0, prev_height, 0, cst->height);
+        state_r.cap = mapf(state_r.cap, 0, prev_height, 0, cst->height);
 
         prev_height = cst->height;
     }
@@ -829,10 +830,8 @@ static void cli_draw_loudness(CLIState *cst, Vec2 pos, int length, Color bg)
                            2,
                            bg,
                            cst->pl->pst->LUFS_current_l,
-                           &prev_yl,
                            cap_color,
-                           &cap_l,
-                           &last_cap_set_l);
+                           &state_l);
 
     _cli_draw_loudness_bar(cst,
                            (Vec2){(pos.x + 2) + 1, pos.y},
@@ -840,10 +839,8 @@ static void cli_draw_loudness(CLIState *cst, Vec2 pos, int length, Color bg)
                            2,
                            bg,
                            cst->pl->pst->LUFS_current_r,
-                           &prev_yr,
                            cap_color,
-                           &cap_r,
-                           &last_cap_set_r);
+                           &state_r);
 }
 
 static void cli_draw_media_info(CLIState *cst, Vec2 pos, Color fg, Color bg)
