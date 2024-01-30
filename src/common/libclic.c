@@ -712,7 +712,8 @@ static void _cli_draw_loudness_bar(CLIState *cst,
                                    float loudness,
                                    float *prev,
                                    Color cap_color,
-                                   float *cap)
+                                   float *cap,
+                                   int64_t *last_cap_set)
 {
     float y = map3f(loudness,
                     -70.0f, -14.0f, 0.0f,
@@ -728,7 +729,10 @@ static void _cli_draw_loudness_bar(CLIState *cst,
     else
     {
         lerp_y = lerpf(*prev, y, 0.5f);
-        *cap -= (float)cst->height * 0.01f;
+
+        // ease in interpolation t = 0 -> 2 in 1 seconds
+        float t = FFMIN((av_gettime() - *last_cap_set) / (float)ms2us(1000), 2.0f);
+        *cap -= ((float)cst->height * 0.01f) * t;
     }
 
     int color = (int)map3f(lerp_y,
@@ -745,6 +749,7 @@ static void _cli_draw_loudness_bar(CLIState *cst,
 
     if (lerp_y > *cap)
     {
+        *last_cap_set = av_gettime();
         float displayed_block = 1.0f - (lerp_y - (int)lerp_y);
         *cap = lerp_y;
 
@@ -800,6 +805,8 @@ static void cli_draw_loudness(CLIState *cst, Vec2 pos, int length, Color bg)
     static float prev_yr = 0.0f;
     static float cap_l = 0.0f;
     static float cap_r = 0.0f;
+    static int64_t last_cap_set_l = 0;
+    static int64_t last_cap_set_r = 0;
     static const Color cap_color = {250, 250, 250};
     static int prev_height = 0;
 
@@ -824,7 +831,8 @@ static void cli_draw_loudness(CLIState *cst, Vec2 pos, int length, Color bg)
                            cst->pl->pst->LUFS_current_l,
                            &prev_yl,
                            cap_color,
-                           &cap_l);
+                           &cap_l,
+                           &last_cap_set_l);
 
     _cli_draw_loudness_bar(cst,
                            (Vec2){(pos.x + 2) + 1, pos.y},
@@ -834,7 +842,8 @@ static void cli_draw_loudness(CLIState *cst, Vec2 pos, int length, Color bg)
                            cst->pl->pst->LUFS_current_r,
                            &prev_yr,
                            cap_color,
-                           &cap_r);
+                           &cap_r,
+                           &last_cap_set_r);
 }
 
 static void cli_draw_media_info(CLIState *cst, Vec2 pos, Color fg, Color bg)
