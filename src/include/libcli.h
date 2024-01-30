@@ -165,6 +165,7 @@ typedef struct CLIState
     int height;
     int cursor_x;
     int cursor_y;
+    bool mouse_clicked;
 
     int mouse_x;
     int mouse_y;

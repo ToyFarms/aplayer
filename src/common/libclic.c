@@ -47,6 +47,7 @@ static void cli_state_init()
     cst->width = 0;
     cst->cursor_x = 0;
     cst->cursor_y = 0;
+    cst->mouse_clicked = false;
 
     cst->mouse_x = 0;
     cst->mouse_y = 0;
@@ -482,6 +483,22 @@ static void cli_draw_progress(CLIState *cst,
                               Color fg,
                               Color bg)
 {
+    // TODO: Add visualization of 'hovered' progress bar
+    if (audio_is_initialized() &&
+        cst->mouse_clicked &&
+        cst->mouse_y == pos.y &&
+        cst->mouse_x >= pos.x &&
+        cst->mouse_x < length)
+    {
+        int64_t new_timestamp = (int64_t)map((double)cst->mouse_x,
+                                             (double)pos.x,
+                                             (double)(pos.x + length),
+                                             0.0f,
+                                             (double)cst->pl->pst->duration);
+
+        audio_seek_to(new_timestamp);
+    }
+
     float mapped_length = mapf(current, 0.0f, max, 0.0f, (float)length);
 
     cli_draw_hlinef(cst, pos, mapped_length, fg, bg, false);
@@ -1398,6 +1415,8 @@ static void cli_handle_event_mouse(MouseEvent ev)
 {
     cst->mouse_x = ev.x;
     cst->mouse_y = ev.y;
+    // TODO: Move overlay event handling in this function in the related widget
+    cst->mouse_clicked = ev.state & MOUSE_LEFT_CLICKED;
 
     // overlay area
     if (ev.y > cst->height - 4)
