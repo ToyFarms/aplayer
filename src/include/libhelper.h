@@ -43,16 +43,40 @@ static inline int wrap_around(int n, int min, int max)
     return (((n - min) % (max - min)) + (max - min)) % (max - min) + min;
 }
 
+static inline double map(double value, double _min, double _max, double new_min, double new_max)
+{
+    value = FFMIN(FFMAX(value, _min), _max);
+
+    double v = (value - _min) / (_max - _min) * (new_max - new_min) + new_min;
+
+    return new_min < new_max
+               ? FFMIN(FFMAX(v, new_min), new_max)
+               : FFMIN(FFMAX(v, new_max), new_min);
+}
+
 static inline float mapf(float value, float _min, float _max, float new_min, float new_max)
 {
     value = FFMIN(FFMAX(value, _min), _max);
 
     float v = (value - _min) / (_max - _min) * (new_max - new_min) + new_min;
 
-    return new_min < new_max ? FFMIN(FFMAX(v, new_min), new_max) : FFMIN(FFMAX(v, new_max), new_min);
+    return new_min < new_max
+               ? FFMIN(FFMAX(v, new_min), new_max)
+               : FFMIN(FFMAX(v, new_max), new_min);
 }
 
-static inline float map3f(int value, int min, int mid, int max, int new_min, int new_mid, int new_max)
+static inline double map3(double value,
+                          double min, double mid, double max,
+                          double new_min, double new_mid, double new_max)
+{
+    return value <= mid
+               ? map(value, min, mid, new_min, new_mid)
+               : map(value, mid, max, new_mid, new_max);
+}
+
+static inline float map3f(float value,
+                          float min, float mid, float max,
+                          float new_min, float new_mid, float new_max)
 {
     return value <= mid
                ? mapf(value, min, mid, new_min, new_mid)
