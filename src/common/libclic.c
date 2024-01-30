@@ -578,7 +578,6 @@ static void cli_draw_volume(CLIState *cst, Vec2 pos, Color fg, Color bg)
     else
         cst->volume_control_hovered = false;
 
-
     free(strw);
     free(str);
     sb_reset(overlay_sb);
@@ -1237,11 +1236,16 @@ static void cli_save_session(const char *file)
 }
 
 static bool should_close = false;
+static bool fast_scroll = false;
 
 static void cli_handle_event_key(KeyEvent ev)
 {
     if (!ev.key_down)
+    {
+        if (ev.vk_key == VK_MENU)
+            fast_scroll = false;
         return;
+    }
 
     if (cst->is_in_input_mode)
     {
@@ -1358,6 +1362,22 @@ static void cli_handle_event_key(KeyEvent ev)
     else if (ev.ascii_key == 'w')
         cli_save_session("session.json");
 
+    if (fast_scroll && ev.ascii_key == 'j')
+    {
+        cst->entry_offset = FFMIN(cst->entry_offset + 1, cst->pl->entry_size - cst->height);
+        cst->force_redraw = true;
+        cli_draw();
+    }
+    else if (fast_scroll && ev.ascii_key == 'k')
+    {
+        cst->entry_offset = FFMAX(cst->entry_offset - 1, 0);
+        cst->force_redraw = true;
+        cli_draw();
+    }
+
+    if (ev.vk_key == VIRT_MENU)
+        fast_scroll = true;
+
     if (ev.vk_key == VIRT_RETURN)
         cli_playlist_play(cst->selected_idx);
     else if (ev.vk_key == VIRT_ESCAPE)
@@ -1402,7 +1422,11 @@ static void cli_handle_event_mouse(MouseEvent ev)
 
     if (ev.scrolled)
     {
-        ev.scroll_delta > 0 ? cst->entry_offset-- : cst->entry_offset++;
+        int delta = fast_scroll ? 5 : 1;
+        if (ev.scroll_delta > 0)
+            delta *= -1;
+
+        cst->entry_offset += delta;
 
         cst->force_redraw = true;
         if (cst->entry_offset < 0 || cst->entry_offset > cst->pl->entry_size - cst->height)
