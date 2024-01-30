@@ -86,6 +86,7 @@ static void cli_state_init()
     cst->prev_button_hovered = false;
     cst->playback_button_hovered = false;
     cst->next_button_hovered = false;
+    cst->volume_control_hovered = false;
 }
 
 static void cli_state_free(CLIState **cst)
@@ -570,6 +571,14 @@ static void cli_draw_volume(CLIState *cst, Vec2 pos, Color fg, Color bg)
     cli_cursor_to(cst->out, pos.x, pos.y);
     cli_writew(cst->out, strw, strw_len);
 
+    cli_get_cursor_pos(cst);
+
+    if (cst->mouse_y == pos.y && cst->mouse_x >= pos.x && cst->mouse_x < cst->cursor_x)
+        cst->volume_control_hovered = true;
+    else
+        cst->volume_control_hovered = false;
+
+
     free(strw);
     free(str);
     sb_reset(overlay_sb);
@@ -709,7 +718,7 @@ typedef struct _LoudnessBarState
     float prev;
     float cap;
     int64_t last_cap_set;
-}  _LoudnessBarState;
+} _LoudnessBarState;
 
 static void _cli_draw_loudness_bar(CLIState *cst,
                                    Vec2 pos,
@@ -938,6 +947,7 @@ static void cli_draw_overlay()
                        overlay_bg_color);
 
     cli_get_cursor_pos(cst);
+    Vec2 pre_volume = (Vec2){cst->cursor_x, cst->cursor_y};
 
     cli_draw_volume(cst,
                     (Vec2){cst->width - volume_right_pad,
@@ -946,8 +956,8 @@ static void cli_draw_overlay()
                     overlay_bg_color);
 
     cli_draw_progress(cst,
-                      (Vec2){cst->cursor_x + timestamp_right_pad, cst->height - progress_bottom_pad},
-                      cst->width - cst->cursor_x - (volume_right_pad + timestamp_right_pad + volume_left_pad),
+                      (Vec2){pre_volume.x + timestamp_right_pad, cst->height - progress_bottom_pad},
+                      cst->width - pre_volume.x - (volume_right_pad + timestamp_right_pad + volume_left_pad),
                       (float)cst->pl->pst->timestamp,
                       (float)cst->pl->pst->duration,
                       (Color){255, 0, 0},
@@ -1370,7 +1380,7 @@ static void cli_handle_event_mouse(MouseEvent ev)
     cst->mouse_y = ev.y;
 
     // overlay area
-    if (ev.y > cst->height - 3)
+    if (ev.y > cst->height - 4)
     {
         if (ev.state & MOUSE_LEFT_CLICKED)
         {
@@ -1381,6 +1391,12 @@ static void cli_handle_event_mouse(MouseEvent ev)
             else if (cst->next_button_hovered)
                 cli_playlist_next();
         }
+
+        if (ev.scrolled && cst->volume_control_hovered)
+            ev.scroll_delta > 0
+                ? audio_set_volume(FFMIN(audio_get_volume() + 0.05f, 1.25f))
+                : audio_set_volume(FFMAX(audio_get_volume() - 0.05f, 0));
+
         return;
     }
 

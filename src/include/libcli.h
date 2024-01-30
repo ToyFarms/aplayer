@@ -176,6 +176,7 @@ typedef struct CLIState
     bool prev_button_hovered;
     bool playback_button_hovered;
     bool next_button_hovered;
+    bool volume_control_hovered;
 } CLIState;
 
 int cli_init(Playlist *pl);
