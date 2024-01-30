@@ -488,7 +488,7 @@ static void cli_draw_progress(CLIState *cst,
         cst->mouse_clicked &&
         cst->mouse_y == pos.y &&
         cst->mouse_x >= pos.x &&
-        cst->mouse_x < length)
+        cst->mouse_x < pos.x + length)
     {
         int64_t new_timestamp = (int64_t)map((double)cst->mouse_x,
                                              (double)pos.x,
