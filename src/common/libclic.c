@@ -548,7 +548,7 @@ static void cli_draw_volume(CLIState *cst, Vec2 pos, Color fg, Color bg)
         volume_icon = cst->current_icon->volume_mute;
     else if (cst->pl->pst->volume - 1e-3f < 0.0f)
         volume_icon = cst->current_icon->volume_off;
-    else if (cst->pl->pst->volume < 0.5f)
+    else if (cst->pl->pst->volume < 0.35f)
         volume_icon = cst->current_icon->volume_low;
     else if (cst->pl->pst->volume < 0.75f)
         volume_icon = cst->current_icon->volume_medium;
