@@ -625,7 +625,9 @@ void audio_start(char *filename, void (*finished_callback)(void))
                                         sst->swr_frame->data[0],
                                         sst->swr_frame->nb_samples);
 
-                if (pa_err != paNoError)
+                if (pa_err == paOutputUnderflowed)
+                    continue;
+                else if (pa_err != paNoError)
                 {
                     av_log(NULL,
                            AV_LOG_FATAL,
