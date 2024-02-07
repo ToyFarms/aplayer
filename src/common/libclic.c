@@ -759,7 +759,6 @@ static void _cli_draw_loudness_bar(CLIState *cst,
     {
         lerp_y = LERP(s->prev, y, 0.5f);
 
-        // ease in interpolation t = 0 -> 2 in 1 seconds
         float t = FFMIN((av_gettime() - s->last_cap_set) / (float)MSTOUS(1000), 2.0f);
         s->cap -= ((float)cst->height * 0.01f) * t;
     }
