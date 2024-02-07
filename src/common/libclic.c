@@ -702,10 +702,10 @@ static void cli_draw_now_playing(CLIState *cst, Vec2 pos, Color fg, Color bg)
             shift_interval = 1000;
         }
 
-        if (us2ms(av_gettime()) - last_shifted > shift_interval)
+        if (USTOMS(av_gettime()) - last_shifted > shift_interval)
         {
             offset += direction;
-            last_shifted = us2ms(av_gettime());
+            last_shifted = USTOMS(av_gettime());
             shift_interval = 200;
         }
     }
@@ -752,15 +752,15 @@ static void _cli_draw_loudness_bar(CLIState *cst,
 
     if (cst->pl->pst->paused || cst->pl->pst->volume - 1e-3f < 0.0f)
     {
-        lerp_y = lerpf(s->prev, 0, 0.5f);
-        s->cap = lerpf(s->cap, 0, 0.5f);
+        lerp_y = LERP(s->prev, 0, 0.5f);
+        s->cap = LERP(s->cap, 0, 0.5f);
     }
     else
     {
-        lerp_y = lerpf(s->prev, y, 0.5f);
+        lerp_y = LERP(s->prev, y, 0.5f);
 
         // ease in interpolation t = 0 -> 2 in 1 seconds
-        float t = FFMIN((av_gettime() - s->last_cap_set) / (float)ms2us(1000), 2.0f);
+        float t = FFMIN((av_gettime() - s->last_cap_set) / (float)MSTOUS(1000), 2.0f);
         s->cap -= ((float)cst->height * 0.01f) * t;
     }
 
@@ -932,7 +932,7 @@ static void cli_draw_overlay()
 
     static int64_t last_overlay_draw = 0;
 
-    if (av_gettime() - last_overlay_draw < ms2us(50))
+    if (av_gettime() - last_overlay_draw < MSTOUS(50))
         return;
 
     if (!overlay_sb)
@@ -1508,7 +1508,7 @@ static void *update_thread(void *arg)
 
     while (cst)
     {
-        if (av_gettime() - last_update > ms2us(1000))
+        if (av_gettime() - last_update > MSTOUS(1000))
         {
             cli_save_session("session.auto.json");
             last_update = av_gettime();
@@ -1518,7 +1518,7 @@ static void *update_thread(void *arg)
         cli_draw_overlay();
         pthread_mutex_unlock(&cst->mutex);
 
-        av_usleep(ms2us(50));
+        av_usleep(MSTOUS(50));
     }
 
     return NULL;

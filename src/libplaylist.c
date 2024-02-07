@@ -90,7 +90,7 @@ void playlist_next(void(*finished_callback)(void))
 
     av_log(NULL, AV_LOG_DEBUG, "Playlist next.\n");
 
-    pl->playing_idx = wrap_around(pl->playing_idx + 1, 0, pl->entry_size);
+    pl->playing_idx = WRAP_AROUND(pl->playing_idx + 1, 0, pl->entry_size);
     playlist_play(finished_callback);
 }
 
@@ -100,7 +100,7 @@ void playlist_prev(void(*finished_callback)(void))
 
     av_log(NULL, AV_LOG_DEBUG, "Playlist prev.\n");
 
-    pl->playing_idx = wrap_around(pl->playing_idx - 1, 0, pl->entry_size);
+    pl->playing_idx = WRAP_AROUND(pl->playing_idx - 1, 0, pl->entry_size);
     playlist_play(finished_callback);
 }
 
