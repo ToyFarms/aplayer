@@ -482,34 +482,51 @@ static void cli_draw_progress(CLIState *cst,
                               Color fg,
                               Color bg)
 {
-    // TODO: Add visualization of 'hovered' progress bar
-    if (audio_is_initialized() &&
-        cst->mouse_clicked &&
-        cst->mouse_y == pos.y &&
-        cst->mouse_x >= pos.x &&
-        cst->mouse_x < pos.x + length)
-    {
-        int64_t new_timestamp = (int64_t)map((double)cst->mouse_x,
-                                             (double)pos.x,
-                                             (double)(pos.x + length),
-                                             0.0f,
-                                             (double)cst->pl->pst->duration);
-
-        audio_seek_to(new_timestamp);
-    }
+    bool hovered_visual = (audio_is_initialized() &&
+                           cst->mouse_y == pos.y &&
+                           cst->mouse_x >= pos.x &&
+                           cst->mouse_x < pos.x + length);
 
     float mapped_length = mapf(current, 0.0f, max, 0.0f, (float)length);
 
-    cli_draw_hlinef(cst, pos, mapped_length, fg, bg, false);
+    cli_draw_hlinef(cst, pos, mapped_length, fg, hovered_visual ? (Color){255, 255, 255} : bg, false);
 
-    cli_get_cursor_pos(cst);
+    if (hovered_visual)
+    {
+        if (cst->mouse_clicked)
+        {
+            int64_t new_timestamp = (int64_t)map((double)cst->mouse_x,
+                                                 (double)pos.x,
+                                                 (double)(pos.x + length),
+                                                 0.0f,
+                                                 (double)cst->pl->pst->duration);
+            audio_seek_to(new_timestamp);
+        }
 
-    if ((pos.x + length) - cst->cursor_x > 0)
-        cli_draw_padding(cst,
-                         NULL,
-                         (pos.x + length) - cst->cursor_x,
-                         NULL,
-                         NULL);
+        cli_get_cursor_pos(cst);
+        int draw_marker = cst->mouse_x + 1 < cst->cursor_x ? cst->cursor_x - 1 : -1;
+
+        if (mapped_length <= length - 1)
+            cli_draw_padding(cst, NULL, cst->mouse_x - cst->cursor_x + 1, &bg, &(Color){255, 255, 255});
+
+        Vec2 start = (Vec2){cst->cursor_x + (cst->mouse_x - cst->cursor_x + 1), cst->cursor_y};
+        if ((pos.x + length) - start.x > 0)
+            cli_draw_padding(cst, &start, (pos.x + length) - start.x, NULL, &bg);
+        
+        if (draw_marker >= 0)
+            cli_draw_hblock(cst, (Vec2){draw_marker, pos.y}, FFMAX(mapped_length - (int)mapped_length, 0.5f), fg, bg);
+    }
+    else
+    {
+        cli_get_cursor_pos(cst);
+
+        if ((pos.x + length) - cst->cursor_x > 0)
+            cli_draw_padding(cst,
+                             NULL,
+                             (pos.x + length) - cst->cursor_x,
+                             NULL,
+                             &bg);
+    }
 
     cli_write(cst->out, "\x1b[0m", 5);
 }
