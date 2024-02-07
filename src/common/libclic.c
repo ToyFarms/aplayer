@@ -836,6 +836,9 @@ static void cli_draw_loudness(CLIState *cst, Vec2 pos, int length, Color bg)
     static const Color cap_color = {250, 250, 250};
     static int prev_height = 0;
 
+    if (cst->pl->playing_idx < 0)
+        return;
+
     if (prev_height != cst->height)
     {
         state_l.cap = mapf(state_l.cap, 0, prev_height, 0, cst->height);
@@ -843,9 +846,6 @@ static void cli_draw_loudness(CLIState *cst, Vec2 pos, int length, Color bg)
 
         prev_height = cst->height;
     }
-
-    if (cst->pl->playing_idx < 0)
-        return;
 
     cli_draw_rect(cst, (Rect){pos.x, pos.y, 6, length}, bg);
 
