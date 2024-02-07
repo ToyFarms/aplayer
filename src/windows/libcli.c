@@ -67,7 +67,6 @@ Events cli_read_in()
     }
 
     ULONG read;
-    BOOL exit;
     ReadConsoleInput(in, in_rec, sizeof(in_rec) / sizeof(INPUT_RECORD), &read);
 
     for (int i = 0; i < read; i++)

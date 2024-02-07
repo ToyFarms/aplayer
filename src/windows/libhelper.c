@@ -65,14 +65,14 @@ static char *get_last_error_string()
 
     LPVOID msg_buf;
 
-    size_t size = FormatMessage(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
-                                NULL,
-                                error_code,
-                                MAKELANGID(LANG_NEUTRAL,
-                                           SUBLANG_DEFAULT),
-                                (LPSTR)&msg_buf,
-                                0,
-                                NULL);
+    FormatMessage(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
+                  NULL,
+                  error_code,
+                  MAKELANGID(LANG_NEUTRAL,
+                             SUBLANG_DEFAULT),
+                  (LPSTR)&msg_buf,
+                  0,
+                  NULL);
 
     return (char *)msg_buf;
 }

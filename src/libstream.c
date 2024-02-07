@@ -12,7 +12,7 @@ StreamState *stream_state_init(char *filename)
         goto fail;
     }
 
-    memset(sst, 0, sizeof(sst));
+    memset(sst, 0, sizeof(*sst));
 
     sst->filename = filename;
 

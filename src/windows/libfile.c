@@ -84,7 +84,7 @@ File *list_directory(const char *directory, int *out_size)
 
     if (find == INVALID_HANDLE_VALUE)
     {
-        av_log(NULL, AV_LOG_FATAL, "FindFirstFileW Failed: %d.\n", GetLastError());
+        av_log(NULL, AV_LOG_FATAL, "FindFirstFileW Failed: %ld.\n", GetLastError());
         return NULL;
     }
 

@@ -10,7 +10,7 @@ elseif(APPLE)
   set(OS-DIR macos)
 endif()
 
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-unused-result")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Werror -Wno-unused-function")
 
 add_executable(
   aplayer

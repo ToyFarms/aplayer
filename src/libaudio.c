@@ -49,8 +49,7 @@ float audio_get_volume()
 {
     AUDIO_CHECK_INITIALIZED("audio_get_volume", return 0.0f);
 
-    if (!pst->muted)
-        return pst->volume;
+    return pst->volume;
 }
 
 void audio_mute()
@@ -520,7 +519,6 @@ void audio_start(char *filename, void (*finished_callback)(void))
     pst->duration = sst->ic->duration;
 
     int err;
-    int err_nf; // error non-fatal
     while (true)
     {
     read_frame:
@@ -674,6 +672,8 @@ void (*_finished_callback)(void);
 static void *_audio_start_bridge(void *arg)
 {
     audio_start((char *)arg, _finished_callback);
+
+    return NULL;
 }
 
 /* Run audio_start in another thread, returns -1 on fail, otherwise the thread id */

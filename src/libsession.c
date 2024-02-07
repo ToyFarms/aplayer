@@ -1,7 +1,9 @@
 #include "libsession.h"
 
-int session_write(const char *path, SessionState st)
+void session_write(const char *path, SessionState st)
 {
+    FILE *f = NULL;
+    char *str = NULL;
     cJSON *root = cJSON_CreateObject();
     if (!root)
         goto cleanup;
@@ -29,12 +31,12 @@ int session_write(const char *path, SessionState st)
     if (!cJSON_AddNumberToObject(root, "volume", st.volume))
         goto cleanup;
 
-    char *str = cJSON_PrintUnformatted(root);
+    str = cJSON_PrintUnformatted(root);
     if (!str)
         goto cleanup;
 
     // TODO: Use the executable path as cwd, or use some fixed folder to store the session file
-    FILE *f = fopen(path, "wb");
+    f = fopen(path, "wb");
     if (!f)
         goto cleanup;
 
@@ -53,12 +55,13 @@ SessionState session_read(const char *path, int *success)
 {
     SessionState st = {0};
     int ret_code = 0;
+    cJSON *root = NULL;
 
     char *content = file_read(path);
     if (!content)
         goto error;
 
-    cJSON *root = cJSON_Parse(content);
+    root = cJSON_Parse(content);
     if (!root)
         goto error;
 
