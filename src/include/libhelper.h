@@ -17,31 +17,12 @@
 #define PRM(x) av_log(NULL, AV_LOG_INFO, "[PRM] %s:%d - %s\n", __FILE__, __LINE__, x);
 #define PRPTR(x) av_log(NULL, AV_LOG_INFO, "[PRPTR] %s:%d - %s: %p\n", __FILE__, __LINE__, #x, (void *)x);
 #define AVLOG(fmt, ...) av_log(NULL, AV_LOG_INFO, "[AVLOG] %s:%d - " fmt, __FILE__, __LINE__, __VA_ARGS__)
+#define AVLOGR(fmt, ...) av_log(NULL, AV_LOG_INFO, fmt, __VA_ARGS__)
 
-static inline float lerpf(float v0, float v1, float t)
-{
-    return v0 + t * (v1 - v0);
-}
-
-static inline double lerp(double v0, double v1, double t)
-{
-    return v0 + t * (v1 - v0);
-}
-
-static inline int64_t us2ms(int64_t us)
-{
-    return us / 1000;
-}
-
-static inline int64_t ms2us(int64_t ms)
-{
-    return ms * 1000;
-}
-
-static inline int wrap_around(int n, int min, int max)
-{
-    return (((n - min) % (max - min)) + (max - min)) % (max - min) + min;
-}
+#define LERP(v0, v1, t) ((v0) + (t) * ((v1) - (v0)))
+#define USTOMS(us) ((us) / 1000)
+#define MSTOUS(ms) ((ms) * 1000)
+#define WRAP_AROUND(_n, _min, _max) (((((_n) - (_min)) % ((_max) - (_min))) + ((_max) - (_min))) % ((_max) - (_min)) + (_min))
 
 static inline double map(double value, double _min, double _max, double new_min, double new_max)
 {

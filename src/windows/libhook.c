@@ -21,19 +21,19 @@ void *keyboard_hooks(void *arg)
         {
             audio_toggle_play();
             keypress = true;
-            keypress_cooldown = ms2us(500);
+            keypress_cooldown = MSTOUS(500);
         }
         else if (GetAsyncKeyState(VIRT_MEDIA_NEXT_TRACK) & 0x8001)
         {
             cli_playlist_next();
             keypress = true;
-            keypress_cooldown = ms2us(500);
+            keypress_cooldown = MSTOUS(500);
         }
         else if (GetAsyncKeyState(VIRT_MEDIA_PREV_TRACK) & 0x8001)
         {
             cli_playlist_prev();
             keypress = true;
-            keypress_cooldown = ms2us(500);
+            keypress_cooldown = MSTOUS(500);
         }
 
         if (keypress)
@@ -42,7 +42,7 @@ void *keyboard_hooks(void *arg)
             last_keypress = av_gettime();
         }
         else
-            av_usleep(ms2us(100));
+            av_usleep(MSTOUS(100));
     }
 
     return NULL;

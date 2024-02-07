@@ -149,10 +149,10 @@ void audio_wait_until_initialized()
     av_log(NULL, AV_LOG_DEBUG, "Waiting until audio initialized.\n");
 
     while (!pst)
-        av_usleep(ms2us(100));
+        av_usleep(MSTOUS(100));
 
     while (!pst->initialized)
-        av_usleep(ms2us(100));
+        av_usleep(MSTOUS(100));
 
     av_log(NULL, AV_LOG_DEBUG, "Audio is initialized.\n");
 }
@@ -166,12 +166,12 @@ void audio_wait_until_finished()
     int64_t start = av_gettime();
 
     while (!pst->finished)
-        av_usleep(ms2us(100));
+        av_usleep(MSTOUS(100));
 
     av_log(NULL,
            AV_LOG_DEBUG,
            "Audio finished in %lldms.\n",
-           us2ms(av_gettime() - start));
+           USTOMS(av_gettime() - start));
 }
 
 bool audio_is_finished()
@@ -301,7 +301,7 @@ static double audio_get_lufs(char *filename, int sampling_cap)
         }
 
         while (pst->paused)
-            av_usleep(ms2us(100));
+            av_usleep(MSTOUS(100));
 
         if (pst->req_exit)
         {
@@ -532,7 +532,7 @@ void audio_start(char *filename, void (*finished_callback)(void))
         }
 
         while (pst->paused)
-            av_usleep(ms2us(100));
+            av_usleep(MSTOUS(100));
 
         if (pst->req_exit)
             goto cleanup;
