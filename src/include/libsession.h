@@ -20,7 +20,7 @@ typedef struct SessionState
     int64_t timestamp;
 } SessionState;
 
-int session_write(const char *path, SessionState st);
+void session_write(const char *path, SessionState st);
 SessionState session_read(const char *path, int *success);
 
 #endif /* _LIBSESSION_H */

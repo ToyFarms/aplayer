@@ -23,7 +23,7 @@ static void cli_state_init()
         return;
     }
 
-    memset(cst, 0, sizeof(cst));
+    memset(cst, 0, sizeof(*cst));
 
     pthread_mutex_init(&cst->mutex, NULL);
 
@@ -38,8 +38,7 @@ static void cli_state_init()
 
     cst->is_in_input_mode = false;
     cst->input_buffer_capacity = 4096;
-    cst->input_buffer = (char *)malloc(cst->input_buffer_capacity * sizeof(char));
-    memset(cst->input_buffer, '\0', sizeof(cst->input_buffer));
+    cst->input_buffer = (char *)calloc(cst->input_buffer_capacity, sizeof(char));
     cst->input_buffer_size = 0;
 
     cst->out = cli_get_handle();
@@ -1298,7 +1297,7 @@ static void cli_handle_event_key(KeyEvent ev)
 
         return;
     clear_buffer:
-        memset(cst->input_buffer, '\0', sizeof(cst->input_buffer));
+        memset(cst->input_buffer, '\0', cst->input_buffer_size);
         cst->input_buffer_size = 0;
         return;
     }
@@ -1477,7 +1476,7 @@ static void cli_handle_event_mouse(MouseEvent ev)
     cli_draw();
 }
 
-static int cli_handle_event_buffer_changed(BufferChangedEvent ev)
+static void cli_handle_event_buffer_changed(BufferChangedEvent ev)
 {
     cli_get_console_size(cst);
 
@@ -1521,6 +1520,8 @@ static void *update_thread(void *arg)
 
         av_usleep(ms2us(50));
     }
+
+    return NULL;
 }
 
 void cli_event_loop()

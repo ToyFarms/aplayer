@@ -23,7 +23,7 @@ Playlist *playlist_init(char *directory, PlayerState *pst, bool init_entry)
         return NULL;
     }
 
-    memset(pl, 0, sizeof(pl));
+    memset(pl, 0, sizeof(*pl));
 
     if (init_entry)
         pl->entries = list_directory(directory, &pl->entry_size);

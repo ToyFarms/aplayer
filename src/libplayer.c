@@ -11,7 +11,7 @@ PlayerState *player_state_init()
         return NULL;
     }
 
-    memset(pst, 0, sizeof(pst));
+    memset(pst, 0, sizeof(*pst));
 
     pst->paused = false;
     pst->req_exit = false;

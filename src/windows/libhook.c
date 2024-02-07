@@ -8,8 +8,6 @@ void *keyboard_hooks(void *arg)
     int64_t last_keypress = 0;
     int64_t keypress_cooldown = 0;
     bool keypress = false;
-    float volume_incr = 0.05f;
-    float volume_max = 2.0f;
 
     while (true)
     {
@@ -47,5 +45,5 @@ void *keyboard_hooks(void *arg)
             av_usleep(ms2us(100));
     }
 
-    return 0;
+    return NULL;
 }
