@@ -33,6 +33,7 @@ int session_write(const char *path, SessionState st)
     if (!str)
         goto cleanup;
 
+    // TODO: Use the executable path as cwd, or use some fixed folder to store the session file
     FILE *f = fopen(path, "wb");
     if (!f)
         goto cleanup;

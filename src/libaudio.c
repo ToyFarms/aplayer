@@ -206,6 +206,7 @@ static inline float factor_to_dB(float factor)
     return 20.0f * log10f(factor);
 }
 
+// TODO: Use some SIMD library, apparently SIMD is not portable (this one is for x86 cpu arch)
 static float calculate_lufs(AVFrame *frame)
 {
     float power_sum = 0.0f;
