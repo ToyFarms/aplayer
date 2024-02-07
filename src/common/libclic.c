@@ -787,7 +787,7 @@ static void _cli_draw_loudness_bar(CLIState *cst,
         {
             displayed_block = 0.0f;
             if (!(lerp_y - (int)lerp_y - 1e-5f < 0.0f))
-                s->cap -= 1.0f;
+                s->cap = (int)s->cap;
         }
 
         cli_draw_vblock(cst,
