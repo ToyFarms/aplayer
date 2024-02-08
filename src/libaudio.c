@@ -206,7 +206,7 @@ static inline float factor_to_dB(float factor)
 }
 
 // TODO: Use some SIMD library, apparently SIMD is not portable (this one is for x86 cpu arch)
-static float approx_loudness(AVFrame *frame)
+static float loudness_rms(AVFrame *frame)
 {
     float power_sum = 0.0f;
     int sample;
