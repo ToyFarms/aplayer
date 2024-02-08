@@ -1,6 +1,7 @@
 #include <stdbool.h>
 #include <pthread.h>
 #include <stdlib.h>
+#include <libgen.h>
 
 #include "libos.h"
 #include "libaudio.h"
@@ -43,6 +44,8 @@ int main(int argc, char **argv)
 
     if (argc >= 2)
         directory = argv[1];
+    
+    chdir(dirname(argv[0]));
 
     // TODO: Fix audio normalization (sometimes it doesn't work)
 
