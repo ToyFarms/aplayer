@@ -595,12 +595,12 @@ void audio_start(char *filename, void (*finished_callback)(void))
 
                 if (sst->frame->ch_layout.nb_channels >= 2)
                 {
-                    pst->LUFS_current_l = approx_loudness_ch(sst->frame, 0);
-                    pst->LUFS_current_r = approx_loudness_ch(sst->frame, 1);
+                    pst->LUFS_current_l = loudness_rms_ch(sst->frame, 0);
+                    pst->LUFS_current_r = loudness_rms_ch(sst->frame, 1);
                 }
                 else
                 {
-                    pst->LUFS_current_l = approx_loudness(sst->frame);
+                    pst->LUFS_current_l = loudness_rms(sst->frame);
                     pst->LUFS_current_r = pst->LUFS_current_l;
                 }
 
