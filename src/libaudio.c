@@ -206,7 +206,7 @@ static inline float factor_to_dB(float factor)
 }
 
 // TODO: Use some SIMD library, apparently SIMD is not portable (this one is for x86 cpu arch)
-static float calculate_lufs(AVFrame *frame)
+static float approx_loudness(AVFrame *frame)
 {
     float power_sum = 0.0f;
     int sample;
@@ -232,6 +232,7 @@ static float calculate_lufs(AVFrame *frame)
 
         power_sum += result / (float)frame->nb_samples;
     }
+    power_sum /= frame->ch_layout.nb_channels;
 
     if (power_sum == 0.0f)
         return -70.0f; // silence
@@ -239,9 +240,8 @@ static float calculate_lufs(AVFrame *frame)
     return -0.691f + 10.0f * log10f(power_sum);
 }
 
-static float calculate_lufs_ch(AVFrame *frame, int ch)
+static float approx_loudness_ch(AVFrame *frame, int ch)
 {
-    float power_sum = 0.0f;
     int sample;
 
     __m128 sum_squared = _mm_setzero_ps();
@@ -261,12 +261,12 @@ static float calculate_lufs_ch(AVFrame *frame, int ch)
     for (; sample < frame->nb_samples; sample++)
         result += channel[sample] * channel[sample];
 
-    power_sum += result / (float)frame->nb_samples;
+    result /= (float)frame->nb_samples;
 
-    if (power_sum == 0.0f)
+    if (result == 0.0f)
         return -70.0f; // silence
 
-    return -0.691f + 10.0f * log10f(power_sum);
+    return -0.691f + 10.0f * log10f(result);
 }
 
 static void audio_apply_gain(AVFrame *frame, float target_dB, float dB)
@@ -537,10 +537,6 @@ void audio_start(char *filename, void (*finished_callback)(void))
     pst->initialized = true;
     pst->duration = sst->ic->duration;
 
-    // TODO: make this an array of SlidingArray (channel-length) like those in audio_get_lufs
-    SlidingArray *sarr_l = sarray_alloc((float)sst->audiodec->avctx->sample_rate * 0.2f, sizeof(float));
-    SlidingArray *sarr_r = sarray_alloc((float)sst->audiodec->avctx->sample_rate * 0.2f, sizeof(float));
-
     int err;
     while (true)
     {
@@ -597,19 +593,15 @@ void audio_start(char *filename, void (*finished_callback)(void))
 
                 _audio_set_volume(sst->frame, gain_factor * pst->volume);
 
-                sarray_append(sarr_l, (float *)(sst->frame->data[0]), sst->frame->nb_samples);
-                sarray_append(sarr_r, (float *)(sst->frame->data[1]), sst->frame->nb_samples);
-
-                if (sarr_l->len == sarr_l->capacity)
+                if (sst->frame->ch_layout.nb_channels >= 2)
                 {
-                    // TODO: Sometimes one or both of these will get 'stuck' in INF until the application restarted, it seems random
-                    float LUFS_l = calculate_loudness((float *)sarr_l->data, 1, sarr_l->capacity, sst->frame->sample_rate, 50.0f);
-                    if (!isinf(LUFS_l))
-                        pst->LUFS_current_l = LUFS_l;
-
-                    float LUFS_r = calculate_loudness((float *)sarr_r->data, 1, sarr_r->capacity, sst->frame->sample_rate, 50.0f);
-                    if (!isinf(LUFS_r))
-                        pst->LUFS_current_r = LUFS_r;
+                    pst->LUFS_current_l = approx_loudness_ch(sst->frame, 0);
+                    pst->LUFS_current_r = approx_loudness_ch(sst->frame, 1);
+                }
+                else
+                {
+                    pst->LUFS_current_l = approx_loudness(sst->frame);
+                    pst->LUFS_current_r = pst->LUFS_current_l;
                 }
 
                 pst->frame = sst->frame;
@@ -675,9 +667,6 @@ void audio_start(char *filename, void (*finished_callback)(void))
 cleanup:
     stream_state_free(&sst);
     _sst = NULL;
-
-    sarray_free(&sarr_l);
-    sarray_free(&sarr_r);
 
     if (stream)
     {
