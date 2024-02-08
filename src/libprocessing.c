@@ -28,6 +28,7 @@ static void lfilter(const float *b, int b_size, const float *a, int a_size, cons
 {
     for (int i = 0; i < x_size; i++)
     {
+        out_y[i] = 0;
         for (int j = 0; j < b_size && i - j >= 0; j++)
             out_y[i] += x[i - j] * b[j];
 
@@ -70,8 +71,6 @@ float calculate_loudness(float *samples,
     {
         lfilter(stage1_coeff_b, 3, stage1_coeff_a, 3, samples + (ch * num_sample), num_sample, filtered);
         memcpy(samples_copy + (ch * num_sample), filtered, num_sample);
-
-        memset(filtered, 0, num_sample * sizeof(float));
 
         lfilter(stage2_coeff_b, 3, stage2_coeff_a, 3, samples + (ch * num_sample), num_sample, filtered);
         memcpy(samples_copy + (ch * num_sample), filtered, num_sample);
