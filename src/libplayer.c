@@ -27,7 +27,8 @@ PlayerState *player_state_init()
 
     pst->muted = false;
     pst->volume = 1.0f;
-    pst->LUFS_target = -23.0f;
+    // TODO: Use config file for settings like these
+    pst->LUFS_target = -20.0f;
     pst->LUFS_avg = pst->LUFS_target;
     pst->LUFS_current_l = pst->LUFS_target;
     pst->LUFS_current_r = pst->LUFS_target;
