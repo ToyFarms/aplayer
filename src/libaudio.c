@@ -240,7 +240,7 @@ static float approx_loudness(AVFrame *frame)
     return -0.691f + 10.0f * log10f(power_sum);
 }
 
-static float approx_loudness_ch(AVFrame *frame, int ch)
+static float loudness_rms_ch(AVFrame *frame, int ch)
 {
     int sample;
 
