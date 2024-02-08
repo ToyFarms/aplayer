@@ -296,13 +296,12 @@ int stream_get_input_format(StreamState *sst, char *filename)
 int stream_init_swr(StreamState *sst)
 {
     av_log(NULL, AV_LOG_DEBUG, "Initializing SwrContext parameter.\n");
-    av_channel_layout_default(&sst->audiodec->avctx->ch_layout, sst->audiodec->avctx->ch_layout.nb_channels);
 
     int err = swr_alloc_set_opts2(&sst->swr_ctx,
                                   &(AVChannelLayout)AV_CHANNEL_LAYOUT_STEREO,
                                   AV_SAMPLE_FMT_FLT,
                                   sst->audiodec->avctx->sample_rate,
-                                  &(AVChannelLayout)AV_CHANNEL_LAYOUT_STEREO,
+                                  &sst->audiodec->avctx->ch_layout,
                                   sst->audiodec->avctx->sample_fmt,
                                   sst->audiodec->avctx->sample_rate,
                                   AV_LOG_DEBUG, NULL);
