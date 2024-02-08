@@ -74,6 +74,7 @@ float calculate_loudness(float *samples,
         lfilter(stage2_coeff_b, 3, stage2_coeff_a, 3, samples + (ch * num_sample), num_sample, &filtered);
         memcpy(samples_copy + (ch * num_sample), filtered, num_sample);
     }
+    free(filtered);
 
     float sample_len_secs = (float)num_sample / (float)sample_rate;
     int block_len = (int)roundf(((sample_len_secs - block_size_s) / (block_size_s * block_step)) + 1);
