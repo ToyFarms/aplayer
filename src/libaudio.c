@@ -276,9 +276,9 @@ static void audio_apply_gain(AVFrame *frame, float target_dB, float dB)
     _audio_set_volume(frame, gain);
 }
 
-static double audio_get_lufs(char *filename, int sampling_cap)
+static double audio_get_lufs(char *filename)
 {
-    av_log(NULL, AV_LOG_DEBUG, "Getting LUFS from %s, cap=%d.\n", filename, sampling_cap);
+    av_log(NULL, AV_LOG_DEBUG, "Getting LUFS from %s, cap=%d.\n", filename, pst->LUFS_sampling_cap);
 
     StreamState *sst = stream_state_init(filename);
     if (!sst)
@@ -286,6 +286,11 @@ static double audio_get_lufs(char *filename, int sampling_cap)
 
     double lufs_sum = 0.0;
     int lufs_sampled = 0;
+    int num_ch = sst->audiodec->avctx->ch_layout.nb_channels;
+
+    SlidingArray **sarr_ch = (SlidingArray **)malloc(num_ch * sizeof(SlidingArray *));
+    for (int ch = 0; ch < num_ch; ch++)
+        sarr_ch[ch] = sarray_alloc((float)sst->audiodec->avctx->sample_rate, sizeof(float));
 
     int err;
     while (true)
@@ -300,14 +305,8 @@ static double audio_get_lufs(char *filename, int sampling_cap)
             goto cleanup;
         }
 
-        while (pst->paused)
-            av_usleep(MSTOUS(100));
-
         if (pst->req_exit)
-        {
-            pst->req_exit = false;
             goto cleanup;
-        }
 
         if (sst->audiodec->pkt->stream_index == sst->audio_stream_index)
         {
@@ -372,10 +371,30 @@ static double audio_get_lufs(char *filename, int sampling_cap)
                     goto cleanup;
                 }
 
-                lufs_sum += (double)calculate_lufs(sst->frame);
-                lufs_sampled++;
+                for (int ch = 0; ch < num_ch; ch++)
+                    sarray_append(sarr_ch[ch], (float *)(sst->frame->data[ch]), sst->frame->nb_samples);
 
-                if (lufs_sampled > sampling_cap)
+                if (sarr_ch[0]->len == sarr_ch[0]->capacity)
+                {
+                    float *combined = (float *)malloc(num_ch * sarr_ch[0]->capacity * sizeof(float));
+                    for (int ch = 0; ch < num_ch; ch++)
+                    {
+                        memcpy_s(combined + (ch * sarr_ch[0]->capacity), sarr_ch[0]->capacity, sarr_ch[ch]->data, sarr_ch[0]->capacity);
+                    }
+
+                    float LUFS = calculate_loudness(combined, num_ch, sarr_ch[0]->capacity, sst->frame->sample_rate, 400.0f);
+                    if (!isinf(LUFS))
+                    {
+                        lufs_sum += (double)LUFS;
+                    }
+                    lufs_sampled++;
+
+                    pst->LUFS_avg = lufs_sum / (double)lufs_sampled;
+
+                    free(combined);
+                }
+
+                if (lufs_sampled > pst->LUFS_sampling_cap)
                     goto cleanup;
 
                 av_frame_unref(sst->swr_frame);
@@ -387,7 +406,17 @@ static double audio_get_lufs(char *filename, int sampling_cap)
 
 cleanup:
     stream_state_free(&sst);
+
+    for (int ch = 0; ch < num_ch; ch++)
+        sarray_free(&sarr_ch[ch]);
+
     return lufs_sum / (double)lufs_sampled;
+}
+
+static void *audio_get_lufs_async(void *arg)
+{
+    audio_get_lufs((char *)arg);
+    return NULL;
 }
 
 static void _audio_seek(StreamState *sst, PlayerState *pst)
@@ -447,17 +476,8 @@ void audio_start(char *filename, void (*finished_callback)(void))
 
     _sst = sst;
 
-    float lufs = (float)audio_get_lufs(filename, pst->LUFS_sampling_cap);
-    pst->LUFS_avg = lufs;
-    float gain = pst->LUFS_target - lufs;
-    float gain_factor = dB_to_factor(gain);
-    av_log(NULL,
-           AV_LOG_INFO,
-           "\"%s\":\n    loudness: %f LUFS\n    gain: %f LUFS\n    factor: %f\n",
-           filename,
-           lufs,
-           gain,
-           gain_factor);
+    pthread_t t;
+    pthread_create(&t, NULL, audio_get_lufs_async, filename);
 
     av_log(NULL, AV_LOG_DEBUG, "Initializing PortAudio.\n");
     PaError pa_err;
@@ -518,6 +538,10 @@ void audio_start(char *filename, void (*finished_callback)(void))
     pst->initialized = true;
     pst->duration = sst->ic->duration;
 
+    // TODO: make this an array of SlidingArray (channel-length) like those in audio_get_lufs
+    SlidingArray *sarr_l = sarray_alloc((float)sst->audiodec->avctx->sample_rate * 0.2f, sizeof(float));
+    SlidingArray *sarr_r = sarray_alloc((float)sst->audiodec->avctx->sample_rate * 0.2f, sizeof(float));
+
     int err;
     while (true)
     {
@@ -569,17 +593,24 @@ void audio_start(char *filename, void (*finished_callback)(void))
 
                 pst->timestamp = (sst->audiodec->pkt->pts * sst->audio_stream->time_base.num * AV_TIME_BASE) / sst->audio_stream->time_base.den;
 
+                float gain = pst->LUFS_target - pst->LUFS_avg;
+                float gain_factor = dB_to_factor(gain);
+
                 _audio_set_volume(sst->frame, gain_factor * pst->volume);
 
-                if (sst->frame->ch_layout.nb_channels >= 2)
+                sarray_append(sarr_l, (float *)(sst->frame->data[0]), sst->frame->nb_samples);
+                sarray_append(sarr_r, (float *)(sst->frame->data[1]), sst->frame->nb_samples);
+
+                if (sarr_l->len == sarr_l->capacity)
                 {
-                    pst->LUFS_current_l = calculate_lufs_ch(sst->frame, 0);
-                    pst->LUFS_current_r = calculate_lufs_ch(sst->frame, 1);
-                }
-                else
-                {
-                    pst->LUFS_current_l = calculate_lufs(sst->frame);
-                    pst->LUFS_current_r = pst->LUFS_current_l;
+                    // TODO: Sometimes one or both of these will get 'stuck' in INF until the application restarted, it seems random
+                    float LUFS_l = calculate_loudness((float *)sarr_l->data, 1, sarr_l->capacity, sst->frame->sample_rate, 50.0f);
+                    if (!isinf(LUFS_l))
+                        pst->LUFS_current_l = LUFS_l;
+
+                    float LUFS_r = calculate_loudness((float *)sarr_r->data, 1, sarr_r->capacity, sst->frame->sample_rate, 50.0f);
+                    if (!isinf(LUFS_r))
+                        pst->LUFS_current_r = LUFS_r;
                 }
 
                 pst->frame = sst->frame;
@@ -645,6 +676,9 @@ void audio_start(char *filename, void (*finished_callback)(void))
 cleanup:
     stream_state_free(&sst);
     _sst = NULL;
+
+    sarray_free(&sarr_l);
+    sarray_free(&sarr_r);
 
     if (stream)
     {

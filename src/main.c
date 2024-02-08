@@ -47,8 +47,6 @@ int main(int argc, char **argv)
     
     chdir(dirname(argv[0]));
 
-    // TODO: Fix audio normalization (sometimes it doesn't work)
-
     atexit(cleanup);
 
     av_log_set_callback(log_callback);

@@ -79,6 +79,18 @@ bool array_find(const void *array,
                 int *out_index);
 bool is_numeric(char *str);
 
+typedef struct SlidingArray
+{
+    int capacity;    
+    int len;
+    void *data;
+    int item_size;
+} SlidingArray;
+
+SlidingArray *sarray_alloc(int capacity, int item_size);
+void sarray_append(SlidingArray *sarr, const void *data, int data_len);
+void sarray_free(SlidingArray **sarr);
+
 #ifdef AP_WINDOWS
 
 #include <windows.h>
