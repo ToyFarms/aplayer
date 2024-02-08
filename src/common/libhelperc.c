@@ -98,3 +98,52 @@ bool is_numeric(char *str)
     }
     return true;
 }
+
+SlidingArray *sarray_alloc(int capacity, int item_size)
+{
+    SlidingArray *sarr = (SlidingArray *)calloc(1, sizeof(SlidingArray));
+
+    sarr->capacity = capacity;
+    sarr->data = (void *)malloc(capacity * item_size);
+    sarr->item_size = item_size;
+
+    return sarr;
+}
+
+#define PTR_OFFSET(ptr, n) (ptr + (n))
+
+void sarray_append(SlidingArray *sarr, const void *data, int data_len)
+{
+    if (sarr->capacity - sarr->len >= data_len)
+    {
+        // enough space to fit data
+        memcpy_s(PTR_OFFSET(sarr->data, sarr->len * sarr->item_size), sarr->capacity - sarr->len, data, data_len);
+        sarr->len += data_len;
+    }
+    else if (data_len > sarr->capacity)
+    {
+        // data is bigger than capacity, discard anything above capacity
+        memcpy_s(sarr->data, sarr->capacity, data, sarr->capacity);
+        sarr->len = sarr->capacity;
+    }
+    else if (data_len > sarr->capacity - sarr->len)
+    {
+        // slide array to make space for new data
+        int space_needed = data_len - (sarr->capacity - sarr->len);
+        memmove_s(sarr->data, sarr->capacity - data_len, PTR_OFFSET(sarr->data, space_needed), sarr->len - space_needed);
+        memcpy_s(PTR_OFFSET(sarr->data, sarr->capacity - data_len), sarr->capacity - data_len, data, data_len);
+        sarr->len = sarr->capacity;
+    }
+}
+
+void sarray_free(SlidingArray **sarr)
+{
+    if (!sarr || !(*sarr))
+        return;
+    
+    free((*sarr)->data);
+    (*sarr)->data = NULL;
+
+    free(*sarr);
+    *sarr = NULL;
+}

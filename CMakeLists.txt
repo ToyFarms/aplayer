@@ -25,6 +25,7 @@ add_executable(
   src/ini.c
   src/libsession.c
   src/cJSON.c
+  src/libprocessing.c
   src/${OS-DIR}/libcli.c
   src/${OS-DIR}/libfile.c
   src/${OS-DIR}/libhelper.c

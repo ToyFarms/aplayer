@@ -16,6 +16,7 @@
 #include "libhelper.h"
 #include "libstream.h"
 #include "libplayer.h"
+#include "libprocessing.h"
 
 void audio_set_volume(float volume);
 float audio_get_volume();
