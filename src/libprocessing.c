@@ -64,7 +64,6 @@ float calculate_loudness(float *samples,
         return -INFINITY;
 
     float *samples_copy = (float *)malloc(num_sample * num_channel * sizeof(float));
-    memcpy(samples_copy, samples, num_sample * sizeof(float));
 
     float *filtered = (float *)malloc(num_sample * sizeof(float));
     for (int ch = 0; ch < num_channel; ch++)
