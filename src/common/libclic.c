@@ -1241,11 +1241,6 @@ static void cli_restore_session(const char *file)
 
     playlist_update_entry(st.entries, st.entry_size);
 
-    cst->pl->playing_idx = st.playing;
-    cst->selected_idx = FFMAX(cst->pl->playing_idx, 0);
-    cli_compute_offset();
-    cli_draw();
-
     cli_playlist_play(st.playing);
 
     audio_seek_to(st.timestamp);
@@ -1254,6 +1249,8 @@ static void cli_restore_session(const char *file)
     if (st.paused)
         audio_pause();
 
+    cst->selected_idx = FFMAX(cst->pl->playing_idx, 0);
+    cli_compute_offset();
     cli_draw();
 }
 
