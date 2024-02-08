@@ -45,11 +45,11 @@ static const float abs_threshold = -70.0f;
 static const float block_overlap = 0.75f;
 static const float block_step = 1.0f - block_overlap;
 
-float calculate_loudness(float *samples,
-                         int num_channel,
-                         int num_sample,
-                         int sample_rate,
-                         float block_size_ms)
+float loudness_lufs(float *samples,
+                    int num_channel,
+                    int num_sample,
+                    int sample_rate,
+                    float block_size_ms)
 {
     /*
     reference:

@@ -206,6 +206,7 @@ static inline float factor_to_dB(float factor)
 }
 
 // TODO: Use some SIMD library, apparently SIMD is not portable (this one is for x86 cpu arch)
+// TODO: Move these function to libprocessing
 static float loudness_rms(AVFrame *frame)
 {
     float power_sum = 0.0f;
@@ -382,7 +383,7 @@ static double audio_get_lufs(char *filename)
                         memcpy_s(combined + (ch * sarr_ch[0]->capacity), sarr_ch[0]->capacity, sarr_ch[ch]->data, sarr_ch[0]->capacity);
                     }
 
-                    float LUFS = calculate_loudness(combined, num_ch, sarr_ch[0]->capacity, sst->frame->sample_rate, 400.0f);
+                    float LUFS = loudness_lufs(combined, num_ch, sarr_ch[0]->capacity, sst->frame->sample_rate, 400.0f);
                     if (!isinf(LUFS))
                     {
                         lufs_sum += (double)LUFS;

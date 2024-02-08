@@ -7,7 +7,7 @@
 
 #include "libhelper.h"
 
-float calculate_loudness(float *samples,
+float loudness_lufs(float *samples,
                          int num_channel,
                          int num_sample,
                          int sample_rate,
