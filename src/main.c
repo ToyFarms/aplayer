@@ -45,7 +45,6 @@ int main(int argc, char **argv)
         directory = argv[1];
 
     // TODO: Fix audio normalization (sometimes it doesn't work)
-    // TODO: Prompt the user for directory if not supplied from the argument
 
     atexit(cleanup);
 
