@@ -24,22 +24,19 @@ static const float stage2_coeff_b[] = {
     1.0f,
 };
 
-static float *lfilter(const float *b, int b_size, const float *a, int a_size, const float *x, int x_size)
+static void lfilter(const float *b, int b_size, const float *a, int a_size, const float *x, int x_size, float **out_y)
 {
-    float *y = (float *)calloc(x_size, sizeof(float));
     for (int i = 0; i < x_size; i++)
     {
         for (int j = 0; j < b_size && i - j >= 0; j++)
-            y[i] += x[i - j] * b[j];
+            (*out_y)[i] += x[i - j] * b[j];
 
         for (int j = 1; j < a_size && i - j >= 0; j++)
-            y[i] -= y[i - j] * a[j];
+            (*out_y)[i] -= (*out_y)[i - j] * a[j];
 
         if (a_size > 0 && a[0] != 0.0f)
-            y[i] /= a[0];
+            (*out_y)[i] /= a[0];
     }
-
-    return y;
 }
 
 static const float channel_gains[] = {1.0f, 1.0f, 1.0f, 1.41f, 1.41f};
@@ -69,15 +66,14 @@ float calculate_loudness(float *samples,
     float *samples_copy = (float *)malloc(num_sample * num_channel * sizeof(float));
     memcpy(samples_copy, samples, num_sample * sizeof(float));
 
+    float *filtered = (float *)malloc(num_sample * sizeof(float));
     for (int ch = 0; ch < num_channel; ch++)
     {
-        float *filtered = lfilter(stage1_coeff_b, 3, stage1_coeff_a, 3, samples + (ch * num_sample), num_sample);
+        lfilter(stage1_coeff_b, 3, stage1_coeff_a, 3, samples + (ch * num_sample), num_sample, &filtered);
         memcpy(samples_copy + (ch * num_sample), filtered, num_sample);
-        free(filtered);
 
-        filtered = lfilter(stage2_coeff_b, 3, stage2_coeff_a, 3, samples + (ch * num_sample), num_sample);
+        lfilter(stage2_coeff_b, 3, stage2_coeff_a, 3, samples + (ch * num_sample), num_sample, &filtered);
         memcpy(samples_copy + (ch * num_sample), filtered, num_sample);
-        free(filtered);
     }
 
     float sample_len_secs = (float)num_sample / (float)sample_rate;
