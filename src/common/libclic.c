@@ -1560,6 +1560,8 @@ void cli_event_loop()
             cli_handle_event(events.event[i]);
         }
     }
+
+    cli_save_session("session.auto.json");
 }
 
 void cli_playlist_next()
