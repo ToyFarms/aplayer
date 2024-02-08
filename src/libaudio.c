@@ -291,6 +291,7 @@ static double audio_get_lufs(char *filename)
     SlidingArray **sarr_ch = (SlidingArray **)malloc(num_ch * sizeof(SlidingArray *));
     for (int ch = 0; ch < num_ch; ch++)
         sarr_ch[ch] = sarray_alloc((float)sst->audiodec->avctx->sample_rate, sizeof(float));
+    float *combined = (float *)malloc(num_ch * sarr_ch[0]->capacity * sizeof(float));
 
     int err;
     while (true)
@@ -376,7 +377,6 @@ static double audio_get_lufs(char *filename)
 
                 if (sarr_ch[0]->len == sarr_ch[0]->capacity)
                 {
-                    float *combined = (float *)malloc(num_ch * sarr_ch[0]->capacity * sizeof(float));
                     for (int ch = 0; ch < num_ch; ch++)
                     {
                         memcpy_s(combined + (ch * sarr_ch[0]->capacity), sarr_ch[0]->capacity, sarr_ch[ch]->data, sarr_ch[0]->capacity);
@@ -390,8 +390,6 @@ static double audio_get_lufs(char *filename)
                     lufs_sampled++;
 
                     pst->LUFS_avg = lufs_sum / (double)lufs_sampled;
-
-                    free(combined);
                 }
 
                 if (lufs_sampled > pst->LUFS_sampling_cap)
@@ -409,6 +407,7 @@ cleanup:
 
     for (int ch = 0; ch < num_ch; ch++)
         sarray_free(&sarr_ch[ch]);
+    free(combined);
 
     return lufs_sum / (double)lufs_sampled;
 }
