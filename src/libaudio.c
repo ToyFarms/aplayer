@@ -494,7 +494,7 @@ void audio_start(char *filename, void (*finished_callback)(void))
     av_log(NULL, AV_LOG_DEBUG, "Opening PortAudio default stream.\n");
     PaStreamParameters param;
     param.device = Pa_GetDefaultOutputDevice();
-    param.channelCount = sst->audiodec->avctx->ch_layout.nb_channels;
+    param.channelCount = 2;
     param.sampleFormat = paFloat32;
     param.suggestedLatency = Pa_GetDeviceInfo(param.device)->defaultLowOutputLatency;
     param.hostApiSpecificStreamInfo = NULL;
