@@ -79,17 +79,18 @@ bool array_find(const void *array,
                 int *out_index);
 bool is_numeric(char *str);
 
-typedef struct SlidingArray
+typedef struct Array
 {
-    int capacity;    
+    int capacity;
     int len;
     void *data;
     int item_size;
-} SlidingArray;
+} Array;
 
-SlidingArray *sarray_alloc(int capacity, int item_size);
-void sarray_append(SlidingArray *sarr, const void *data, int data_len);
-void sarray_free(SlidingArray **sarr);
+Array *array_alloc(int capacity, int item_size);
+void array_free(Array **arr);
+void array_append_slide(Array *arr, const void *data, int data_len);
+void array_append_wrap(Array *arr, const void *data, int data_len, bool reset_partial_fit);
 
 #ifdef AP_WINDOWS
 
