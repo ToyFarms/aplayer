@@ -51,6 +51,7 @@ int main(int argc, char **argv)
     // TODO: Better session manager
     // TODO: Add low cpu mode (the program itself is relatively light, but windows terminal really struggling with the overlay updates)
     // TODO: Fix "Loading Last Session" screen not disappearing (it doesn't get overwritten by entries)
+    // TODO: Fix abnormal exit (almost everytime)
     
     atexit(cleanup);
 
