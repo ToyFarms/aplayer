@@ -44,9 +44,14 @@ int main(int argc, char **argv)
 
     if (argc >= 2)
         directory = argv[1];
-    
-    chdir(dirname(argv[0]));
 
+    // TODO: Fix surround audio (it crash)
+    // TODO: .wav file is not recognized in av_probe_input_format() ?
+    // TODO: expand path (~/)
+    // TODO: Better session manager
+    // TODO: Add low cpu mode (the program itself is relatively light, but windows terminal really struggling with the overlay updates)
+    // TODO: Fix "Loading Last Session" screen not disappearing (it doesn't get overwritten by entries)
+    
     atexit(cleanup);
 
     av_log_set_callback(log_callback);
