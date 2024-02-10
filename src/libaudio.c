@@ -289,10 +289,10 @@ static double audio_get_lufs(char *filename)
     int lufs_sampled = 0;
     int num_ch = sst->audiodec->avctx->ch_layout.nb_channels;
 
-    SlidingArray **sarr_ch = (SlidingArray **)malloc(num_ch * sizeof(SlidingArray *));
+    Array **channels = (Array **)malloc(num_ch * sizeof(Array *));
     for (int ch = 0; ch < num_ch; ch++)
-        sarr_ch[ch] = sarray_alloc((float)sst->audiodec->avctx->sample_rate, sizeof(float));
-    float *combined = (float *)malloc(num_ch * sarr_ch[0]->capacity * sizeof(float));
+        channels[ch] = array_alloc((float)sst->audiodec->avctx->sample_rate, sizeof(float));
+    float *combined = (float *)malloc(num_ch * channels[0]->capacity * sizeof(float));
 
     int err;
     while (true)
@@ -374,20 +374,19 @@ static double audio_get_lufs(char *filename)
                 }
 
                 for (int ch = 0; ch < num_ch; ch++)
-                    sarray_append(sarr_ch[ch], (float *)(sst->frame->data[ch]), sst->frame->nb_samples);
+                    array_append_wrap(channels[ch], (float *)(sst->frame->data[ch]), sst->frame->nb_samples, false);
+                    // array_append_slide(channels[ch], (float *)(sst->frame->data[ch]), sst->frame->nb_samples);
 
-                if (sarr_ch[0]->len == sarr_ch[0]->capacity)
+                if (channels[0]->len == channels[0]->capacity)
                 {
                     for (int ch = 0; ch < num_ch; ch++)
-                    {
-                        memcpy_s(combined + (ch * sarr_ch[0]->capacity), sarr_ch[0]->capacity, sarr_ch[ch]->data, sarr_ch[0]->capacity);
-                    }
+                        memcpy_s(combined + (ch * channels[0]->capacity), channels[0]->capacity, channels[ch]->data, channels[0]->capacity);
 
-                    float LUFS = loudness_lufs(combined, num_ch, sarr_ch[0]->capacity, sst->frame->sample_rate, 400.0f);
+                    float LUFS = loudness_lufs(combined, num_ch, channels[0]->capacity, sst->frame->sample_rate, 400.0f);
+
                     if (!isinf(LUFS))
-                    {
                         lufs_sum += (double)LUFS;
-                    }
+
                     lufs_sampled++;
 
                     pst->LUFS_avg = lufs_sum / (double)lufs_sampled;
@@ -407,7 +406,7 @@ cleanup:
     stream_state_free(&sst);
 
     for (int ch = 0; ch < num_ch; ch++)
-        sarray_free(&sarr_ch[ch]);
+        array_free(&channels[ch]);
     free(combined);
 
     return lufs_sum / (double)lufs_sampled;

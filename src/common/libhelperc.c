@@ -99,51 +99,90 @@ bool is_numeric(char *str)
     return true;
 }
 
-SlidingArray *sarray_alloc(int capacity, int item_size)
+Array *array_alloc(int capacity, int item_size)
 {
-    SlidingArray *sarr = (SlidingArray *)calloc(1, sizeof(SlidingArray));
+    Array *arr = (Array *)calloc(1, sizeof(Array));
 
-    sarr->capacity = capacity;
-    sarr->data = (void *)malloc(capacity * item_size);
-    sarr->item_size = item_size;
+    arr->capacity = capacity;
+    arr->data = (void *)calloc(capacity, item_size);
+    arr->item_size = item_size;
 
-    return sarr;
+    return arr;
 }
 
-#define PTR_OFFSET(ptr, n) (ptr + (n))
-
-void sarray_append(SlidingArray *sarr, const void *data, int data_len)
+void array_free(Array **arr)
 {
-    if (sarr->capacity - sarr->len >= data_len)
-    {
-        // enough space to fit data
-        memcpy_s(PTR_OFFSET(sarr->data, sarr->len * sarr->item_size), sarr->capacity - sarr->len, data, data_len);
-        sarr->len += data_len;
-    }
-    else if (data_len > sarr->capacity)
-    {
-        // data is bigger than capacity, discard anything above capacity
-        memcpy_s(sarr->data, sarr->capacity, data, sarr->capacity);
-        sarr->len = sarr->capacity;
-    }
-    else if (data_len > sarr->capacity - sarr->len)
-    {
-        // slide array to make space for new data
-        int space_needed = data_len - (sarr->capacity - sarr->len);
-        memmove_s(sarr->data, sarr->capacity - data_len, PTR_OFFSET(sarr->data, space_needed), sarr->len - space_needed);
-        memcpy_s(PTR_OFFSET(sarr->data, sarr->capacity - data_len), sarr->capacity - data_len, data, data_len);
-        sarr->len = sarr->capacity;
-    }
-}
-
-void sarray_free(SlidingArray **sarr)
-{
-    if (!sarr || !(*sarr))
+    if (!arr || !(*arr))
         return;
-    
-    free((*sarr)->data);
-    (*sarr)->data = NULL;
 
-    free(*sarr);
-    *sarr = NULL;
+    free((*arr)->data);
+    (*arr)->data = NULL;
+
+    free(*arr);
+    *arr = NULL;
+}
+
+#define ARR_OFFSET(array, offset) (((array)->data) + ((offset) * (array)->item_size))
+#define ARR_APPEND(array, start, data, count)                        \
+    do                                                               \
+    {                                                                \
+        memcpy_s(ARR_OFFSET((array), (start)),                       \
+                 ((array)->capacity - (start)) * (array)->item_size, \
+                 (data),                                             \
+                 (count) * (array)->item_size);                      \
+        if ((start) + (count) > (array)->len)                        \
+            (array)->len += ((start) + (count)) - (array)->len;      \
+    } while (0)
+#define ARR_MOVE(from_arr, from_start, count, to_arr, to_start)            \
+    do                                                                     \
+    {                                                                      \
+        memmove_s(ARR_OFFSET((to_arr), (to_start)),                        \
+                  ((to_arr)->capacity - (to_start)) * (to_arr)->item_size, \
+                  ARR_OFFSET((from_arr), (from_start)),                    \
+                  (count) * (from_arr)->item_size);                        \
+        if ((from_start) + (count) >= (from_arr)->len)                     \
+            (from_arr)->len = from_start;                                  \
+        if ((to_start) + (count) > (to_arr)->len)                          \
+            (to_arr)->len += ((to_start) + (count)) - (to_arr)->len;       \
+                                                                           \
+    } while (0)
+#define ARR_CLEAR(array)                                                 \
+    do                                                                   \
+    {                                                                    \
+        memset((array)->data, 0, (array)->capacity *(array)->item_size); \
+        (array)->len = 0;                                                \
+    } while (0)
+#define ARR_FULL(array) ((array)->len == (array)->capacity)
+#define ARR_FREESPACE(array) ((array)->capacity - (array)->len)
+
+void array_append_slide(Array *arr, const void *data, int data_len)
+{
+    if (ARR_FREESPACE(arr) >= data_len)
+        ARR_APPEND(arr, arr->len, data, data_len);
+    else if (data_len > arr->capacity)
+        ARR_APPEND(arr, 0, data, arr->capacity);
+    else if (data_len > ARR_FREESPACE(arr))
+    {
+        int space_needed = data_len - ARR_FREESPACE(arr);
+        ARR_MOVE(arr, space_needed, arr->len - space_needed, arr, 0);
+        ARR_APPEND(arr, arr->capacity - data_len, data, data_len);
+    }
+}
+
+void array_append_wrap(Array *arr, const void *data, int data_len, bool reset_partial_fit)
+{
+    if (ARR_FREESPACE(arr) >= data_len)
+        ARR_APPEND(arr, arr->len, data, data_len);
+    else if (data_len > arr->capacity)
+        ARR_APPEND(arr, 0, data, arr->capacity);
+    else if (data_len > ARR_FREESPACE(arr))
+    {
+        if (reset_partial_fit || ARR_FULL(arr))
+        {
+            ARR_CLEAR(arr);
+            ARR_APPEND(arr, 0, data, data_len);
+        }
+        else
+            ARR_APPEND(arr, arr->len, data, ARR_FREESPACE(arr));
+    }
 }
