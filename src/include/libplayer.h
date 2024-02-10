@@ -30,6 +30,7 @@ typedef struct PlayerState
     float LUFS_avg;
     float LUFS_current_l;
     float LUFS_current_r;
+    int64_t LUFS_calculation_progress;
     int64_t LUFS_sampling_cap;
     AVFrame *frame;
 } PlayerState;
