@@ -57,7 +57,6 @@ float loudness_lufs(float *samples,
         - https://docs.scipy.org/doc/scipy/reference/generated/scipy.signal.lfilter.html
         - https://www.itu.int/dms_pubrec/itu-r/rec/bs/R-REC-BS.1770-5-202311-I!!PDF-E.pdf
     */
-    // TODO: Make this more efficient
 
     float block_size_s = block_size_ms / 1000.0f;
 
