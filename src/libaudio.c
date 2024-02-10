@@ -391,7 +391,6 @@ static void audio_get_lufs(char *filename)
 
                 for (int ch = 0; ch < num_ch; ch++)
                     array_append_wrap(channels[ch], (float *)(sst->frame->data[ch]), sst->frame->nb_samples, false);
-                    // array_append_slide(channels[ch], (float *)(sst->frame->data[ch]), sst->frame->nb_samples);
 
                 if (channels[0]->len == channels[0]->capacity)
                 {
