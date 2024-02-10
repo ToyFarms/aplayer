@@ -900,12 +900,18 @@ static void cli_draw_media_info(CLIState *cst, Vec2 pos, Color fg, Color bg)
 
     sb_appendf(overlay_sb, "\x1b[38;2;%d;%d;%d;48;2;%d;%d;%dm", fg.r, fg.g, fg.b, bg.r, bg.g, bg.b);
     sb_appendf(overlay_sb,
-               "ch=%d sr=%dk ld=%.1f g=%.1f f=%.2f",
+               "ch=%d sr=%dk ld=%.1f g=%.1f f=%.2f %d%%",
                avctx->ch_layout.nb_channels,
                avctx->sample_rate / 1000,
                cst->pl->pst->LUFS_avg,
                cst->pl->pst->LUFS_target - cst->pl->pst->LUFS_avg,
-               powf(10.0f, (cst->pl->pst->LUFS_target - cst->pl->pst->LUFS_avg) / 20.0f));
+               powf(10.0f, (cst->pl->pst->LUFS_target - cst->pl->pst->LUFS_avg) / 20.0f),
+               (int)round(
+                   ((double)cst->pl->pst->LUFS_calculation_progress /
+                    (double)(FFMIN(
+                        cst->pl->pst->LUFS_sampling_cap,
+                        cst->pl->pst->duration))) *
+                   100.0));
 
     sb_append(overlay_sb, "\x1b[0m");
 

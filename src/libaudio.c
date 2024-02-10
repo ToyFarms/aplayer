@@ -350,6 +350,8 @@ static void audio_get_lufs(char *filename)
                 }
 
                 int64_t timestamp = (sst->audiodec->pkt->pts * sst->audio_stream->time_base.num * AV_TIME_BASE) / sst->audio_stream->time_base.den;
+                pst->LUFS_calculation_progress = timestamp;
+
                 int dst_nb_samples = av_rescale_rnd(swr_get_delay(sst->swr_ctx,
                                                                   sst->audiodec->avctx->sample_rate) +
                                                         sst->frame->nb_samples,
