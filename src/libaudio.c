@@ -286,7 +286,12 @@ static void audio_get_lufs(char *filename)
 
     audio_lufs_thread_id = filename;
 
-    av_log(NULL, AV_LOG_DEBUG, "Getting LUFS from %s, cap=%d.\n", filename, pst->LUFS_sampling_cap);
+    av_log(NULL,
+           AV_LOG_DEBUG,
+           "Getting LUFS from %s, cap = % .2fs(% .2fm).\n ",
+           filename,
+           pst->LUFS_sampling_cap / 1e6,
+           (pst->LUFS_sampling_cap / 1e6) / 60);
 
     StreamState *sst = stream_state_init(filename);
     if (!sst)
@@ -314,7 +319,7 @@ static void audio_get_lufs(char *filename)
             goto cleanup;
         }
 
-        if  (audio_lufs_thread_id && strcmp(audio_lufs_thread_id, filename))
+        if (audio_lufs_thread_id && strcmp(audio_lufs_thread_id, filename))
             goto cleanup;
 
         if (sst->audiodec->pkt->stream_index == sst->audio_stream_index)
@@ -344,6 +349,7 @@ static void audio_get_lufs(char *filename)
                     goto cleanup;
                 }
 
+                int64_t timestamp = (sst->audiodec->pkt->pts * sst->audio_stream->time_base.num * AV_TIME_BASE) / sst->audio_stream->time_base.den;
                 int dst_nb_samples = av_rescale_rnd(swr_get_delay(sst->swr_ctx,
                                                                   sst->audiodec->avctx->sample_rate) +
                                                         sst->frame->nb_samples,
@@ -399,7 +405,7 @@ static void audio_get_lufs(char *filename)
                     pst->LUFS_avg = lufs_sum / (double)lufs_sampled;
                 }
 
-                if (lufs_sampled > pst->LUFS_sampling_cap)
+                if (timestamp > pst->LUFS_sampling_cap)
                     goto cleanup;
 
                 av_frame_unref(sst->swr_frame);
