@@ -299,6 +299,7 @@ static void audio_get_lufs(char *filename)
 
     double lufs_sum = 0.0;
     int lufs_sampled = 0;
+    int sample_dropped = 0;
     int num_ch = sst->audiodec->avctx->ch_layout.nb_channels;
 
     Array **channels = (Array **)malloc(num_ch * sizeof(Array *));
@@ -401,6 +402,8 @@ static void audio_get_lufs(char *filename)
 
                     if (!isinf(LUFS) && !isnan(LUFS))
                         lufs_sum += (double)LUFS;
+                    else
+                        sample_dropped++;
 
                     lufs_sampled++;
 
@@ -418,6 +421,13 @@ static void audio_get_lufs(char *filename)
     }
 
 cleanup:
+    av_log(NULL,
+           AV_LOG_INFO,
+           "Finished processing audio: %f LUFS from %d samples, %d samples dropped.\n",
+           lufs_sum,
+           lufs_sampled,
+           sample_dropped);
+
     stream_state_free(&sst);
 
     for (int ch = 0; ch < num_ch; ch++)
