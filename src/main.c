@@ -45,6 +45,9 @@ int main(int argc, char **argv)
     if (argc >= 2)
         directory = argv[1];
     
+    // TODO: Fix audio lufs thread not stopping when the main audio switched
+    // TODO: Add indicator for audio lufs calculation progress
+    
     chdir(dirname(argv[0]));
 
     atexit(cleanup);
