@@ -32,7 +32,7 @@ PlayerState *player_state_init()
     pst->LUFS_avg = pst->LUFS_target;
     pst->LUFS_current_l = pst->LUFS_target;
     pst->LUFS_current_r = pst->LUFS_target;
-    pst->LUFS_sampling_cap = 50000;
+    pst->LUFS_sampling_cap = MSTOUS(60000 * 20);
     pst->frame = NULL;
 
     return pst;
