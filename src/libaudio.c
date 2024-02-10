@@ -399,7 +399,7 @@ static void audio_get_lufs(char *filename)
 
                     float LUFS = loudness_lufs(combined, num_ch, channels[0]->capacity, sst->frame->sample_rate, 400.0f);
 
-                    if (!isinf(LUFS))
+                    if (!isinf(LUFS) && !isnan(LUFS))
                         lufs_sum += (double)LUFS;
 
                     lufs_sampled++;
