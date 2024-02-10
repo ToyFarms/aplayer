@@ -277,13 +277,20 @@ static void audio_apply_gain(AVFrame *frame, float target_dB, float dB)
     _audio_set_volume(frame, gain);
 }
 
-static double audio_get_lufs(char *filename)
+char *audio_lufs_thread_id = NULL;
+
+static void audio_get_lufs(char *filename)
 {
+    if (audio_lufs_thread_id && strcmp(audio_lufs_thread_id, filename) == 0)
+        return;
+
+    audio_lufs_thread_id = filename;
+
     av_log(NULL, AV_LOG_DEBUG, "Getting LUFS from %s, cap=%d.\n", filename, pst->LUFS_sampling_cap);
 
     StreamState *sst = stream_state_init(filename);
     if (!sst)
-        return 0.0f;
+        return;
 
     double lufs_sum = 0.0;
     int lufs_sampled = 0;
@@ -307,7 +314,7 @@ static double audio_get_lufs(char *filename)
             goto cleanup;
         }
 
-        if (pst->req_exit)
+        if  (audio_lufs_thread_id && strcmp(audio_lufs_thread_id, filename))
             goto cleanup;
 
         if (sst->audiodec->pkt->stream_index == sst->audio_stream_index)
@@ -408,8 +415,6 @@ cleanup:
     for (int ch = 0; ch < num_ch; ch++)
         array_free(&channels[ch]);
     free(combined);
-
-    return lufs_sum / (double)lufs_sampled;
 }
 
 static void *audio_get_lufs_async(void *arg)
