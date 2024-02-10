@@ -423,7 +423,7 @@ cleanup:
     av_log(NULL,
            AV_LOG_INFO,
            "Finished processing audio: %f LUFS from %d samples, %d samples dropped.\n",
-           lufs_sum,
+           lufs_sum / (double)lufs_sampled,
            lufs_sampled,
            sample_dropped);
 
