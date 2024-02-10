@@ -304,7 +304,7 @@ static void audio_get_lufs(char *filename)
 
     Array **channels = (Array **)malloc(num_ch * sizeof(Array *));
     for (int ch = 0; ch < num_ch; ch++)
-        channels[ch] = array_alloc((float)sst->audiodec->avctx->sample_rate, sizeof(float));
+        channels[ch] = array_alloc(sst->audiodec->avctx->sample_rate, sizeof(float));
     float *combined = (float *)malloc(num_ch * channels[0]->capacity * sizeof(float));
 
     int err;
@@ -422,9 +422,10 @@ static void audio_get_lufs(char *filename)
 cleanup:
     av_log(NULL,
            AV_LOG_INFO,
-           "Finished processing audio: %f LUFS from %d samples, %d samples dropped.\n",
+           "Finished processing audio: %f LUFS from %d samples (%.3fs each), %d samples dropped.\n",
            lufs_sum / (double)lufs_sampled,
            lufs_sampled,
+		   (float)channels[0]->capacity / (float)sst->audiodec->avctx->sample_rate,
            sample_dropped);
 
     stream_state_free(&sst);
