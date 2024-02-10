@@ -63,6 +63,8 @@ int main(int argc, char **argv)
     if (!pl)
         return -1;
 
+    chdir(dirname(argv[0]));
+
     if (cli_init(pl) < 0)
         return -1;
 
