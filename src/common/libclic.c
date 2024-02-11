@@ -1412,6 +1412,10 @@ static void cli_handle_event_key(KeyEvent ev)
         cst->force_redraw = true;
         cli_draw();
     }
+    else if (ev.vk_key == VIRT_HOME)
+        audio_seek_to(0);
+    else if (ev.vk_key == VIRT_END)
+        cli_playlist_next();
 
     if (ev.vk_key == VIRT_MENU)
         fast_scroll = true;
