@@ -749,6 +749,8 @@ typedef struct _LoudnessBarState
 {
     float prev;
     float cap;
+    float *cells;
+    int cell_length;
     int64_t last_cap_set;
 } _LoudnessBarState;
 
@@ -764,84 +766,26 @@ static void _cli_draw_loudness_bar(CLIState *cst,
     float y = map3f(loudness,
                     -70.0f, -14.0f, 0.0f,
                     0.0f, (float)length * 0.65f, (float)length);
+    y = LERP(s->prev, y, 0.5f);
 
-    float lerp_y = 0.0f;
+    if (!s->cells)
+        s->cells = (float *)calloc(s->cell_length, sizeof(float));
 
-    if (cst->pl->pst->paused || cst->pl->pst->volume - 1e-3f < 0.0f)
+    for (int i = 0; i < s->cell_length; i++)
     {
-        lerp_y = LERP(s->prev, 0, 0.5f);
-        s->cap = LERP(s->cap, 0, 0.5f);
-    }
-    else
-    {
-        lerp_y = LERP(s->prev, y, 0.5f);
+        float current = FFMIN(FFMAX(y - (float)i, 0.0f), 1.0f);
+        if (current == s->cells[i])
+            continue;
 
-        float t = FFMIN((av_gettime() - s->last_cap_set) / (float)MSTOUS(1000), 2.0f);
-        s->cap -= ((float)cst->height * 0.01f) * t;
-    }
+        int color = (int)map3f(i,
+                               0.0f, (float)s->cell_length * 0.70f, (float)s->cell_length,
+                               0.0f, 100.0f, 255.0f);
+        cli_draw_vblock(cst, (Vec2){pos.x, length - i}, current, width, (Color){color, 255 - color, 0}, bg);
 
-    int color = (int)map3f(lerp_y,
-                           0.0f, (float)length * 0.70f, (float)length,
-                           0.0f, 100.0f, 255.0f);
-
-    cli_draw_vlinef(cst,
-                    (Vec2){pos.x, length},
-                    lerp_y,
-                    width,
-                    (Color){color, 255 - color, 0},
-                    lerp_y > s->cap ? cap_color : bg,
-                    true);
-
-    if (lerp_y > s->cap)
-    {
-        s->last_cap_set = av_gettime();
-        float displayed_block = 1.0f - (lerp_y - (int)lerp_y);
-        s->cap = lerp_y;
-
-        if (lerp_y - (int)lerp_y < block_increment)
-        {
-            displayed_block = 0.0f;
-            if (!(lerp_y - (int)lerp_y - 1e-5f < 0.0f))
-                s->cap = (int)s->cap;
-        }
-
-        cli_draw_vblock(cst,
-                        (Vec2){pos.x, length - (s->cap + 1.0f)},
-                        1.0f - displayed_block,
-                        width,
-                        cap_color,
-                        bg);
-    }
-    else
-    {
-        if (s->cap - (int)s->cap > block_increment)
-        {
-            cli_draw_vblock(cst,
-                            (Vec2){pos.x, length - s->cap},
-                            s->cap - (int)s->cap,
-                            width,
-                            bg,
-                            cap_color);
-
-            cli_draw_vblock(cst,
-                            (Vec2){pos.x, length - s->cap - 1},
-                            s->cap - (int)s->cap,
-                            width,
-                            cap_color,
-                            bg);
-        }
-        else
-        {
-            cli_draw_vblock(cst,
-                            (Vec2){pos.x, length - s->cap},
-                            1.0f,
-                            width,
-                            cap_color,
-                            bg);
-        }
+        s->cells[i] = current;
     }
 
-    s->prev = lerp_y;
+    s->prev = y;
 }
 
 static void cli_draw_loudness(CLIState *cst, Vec2 pos, int length, Color bg)
@@ -850,6 +794,9 @@ static void cli_draw_loudness(CLIState *cst, Vec2 pos, int length, Color bg)
     static _LoudnessBarState state_r = {0};
     static const Color cap_color = {250, 250, 250};
     static int prev_height = 0;
+
+    state_l.cell_length = length;
+    state_r.cell_length = length;
 
     if (cst->pl->playing_idx < 0)
         return;
@@ -862,7 +809,7 @@ static void cli_draw_loudness(CLIState *cst, Vec2 pos, int length, Color bg)
         prev_height = cst->height;
     }
 
-    cli_draw_rect(cst, (Rect){pos.x, pos.y, 6, length}, bg);
+    // cli_draw_rect(cst, (Rect){pos.x, pos.y, 6, length}, bg);
 
     _cli_draw_loudness_bar(cst,
                            (Vec2){pos.x + 1, pos.y},
