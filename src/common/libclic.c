@@ -767,14 +767,24 @@ static void _cli_draw_loudness_bar(CLIState *cst,
                     -70.0f, -14.0f, 0.0f,
                     0.0f, (float)length * 0.65f, (float)length);
     y = LERP(s->prev, y, 0.5f);
+    bool redraw = false;
 
     if (!s->cells)
-        s->cells = (float *)calloc(s->cell_length, sizeof(float));
+    {
+        s->cells = (float *)calloc(length, sizeof(float));
+        s->cell_length = length;
+    }
+    else if (s->cell_length != length)
+    {
+        s->cells = (float *)realloc(s->cells, length * sizeof(float));
+        s->cell_length = length;
+        redraw = true;
+    }
 
     for (int i = 0; i < s->cell_length; i++)
     {
         float current = FFMIN(FFMAX(y - (float)i, 0.0f), 1.0f);
-        if (current == s->cells[i])
+        if (!redraw && current == s->cells[i])
             continue;
 
         int color = (int)map3f(i,
@@ -795,9 +805,6 @@ static void cli_draw_loudness(CLIState *cst, Vec2 pos, int length, Color bg)
     static const Color cap_color = {250, 250, 250};
     static int prev_height = 0;
 
-    state_l.cell_length = length;
-    state_r.cell_length = length;
-
     if (cst->pl->playing_idx < 0)
         return;
 
@@ -807,9 +814,9 @@ static void cli_draw_loudness(CLIState *cst, Vec2 pos, int length, Color bg)
         state_r.cap = mapf(state_r.cap, 0, prev_height, 0, cst->height);
 
         prev_height = cst->height;
+        cli_draw_rect(cst, (Rect){pos.x, pos.y, 6, length}, bg);
     }
 
-    // cli_draw_rect(cst, (Rect){pos.x, pos.y, 6, length}, bg);
 
     _cli_draw_loudness_bar(cst,
                            (Vec2){pos.x + 1, pos.y},
