@@ -1494,7 +1494,7 @@ static void *update_thread(void *arg)
 
         pthread_mutex_lock(&cst->mutex);
         cli_draw_overlay();
-        cli_draw_loudness(cst, (Vec2){cst->width - 6, 0}, cst->height - 2, overlay_bg_color);
+        cli_draw_loudness(cst, (Vec2){cst->width - 6, 0}, cst->height - 4, overlay_bg_color);
         pthread_mutex_unlock(&cst->mutex);
 
         av_usleep(MSTOUS(10));
