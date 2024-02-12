@@ -790,7 +790,7 @@ static void _cli_draw_loudness_bar(CLIState *cst,
         int color = (int)map3f(i,
                                0.0f, (float)s->cell_length * 0.70f, (float)s->cell_length,
                                0.0f, 100.0f, 255.0f);
-        cli_draw_vblock(cst, (Vec2){pos.x, length - i}, current, width, (Color){color, 255 - color, 0}, bg);
+        cli_draw_vblock(cst, (Vec2){pos.x, length - i - pos.y}, current, width, (Color){color, 255 - color, 0}, bg);
 
         s->cells[i] = current;
     }
