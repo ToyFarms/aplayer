@@ -590,7 +590,7 @@ static void cli_draw_volume(CLIState *cst, Vec2 pos, Color fg, Color bg)
         volume_icon = cst->current_icon->volume_high;
 
     sb_appendf(overlay_sb,
-               "\x1b[48;2;%d;%d;%dm%s\x1b[38;2;%d;%d;%dm%.0f\x1b[0m",
+               "\x1b[48;2;%d;%d;%dm%s\x1b[38;2;%d;%d;%dm%-3.0f\x1b[0m",
                bg.r, bg.g, bg.b,
                volume_icon,
                fg.r, fg.g, fg.b,
