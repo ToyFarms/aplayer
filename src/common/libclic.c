@@ -313,6 +313,8 @@ static void cli_draw_vline(CLIState *cst,
     sb_reset(pad_sb);
 }
 
+static void cli_draw_loudness(CLIState *cst, Vec2 pos, int length, Color bg, int *specific_y);
+
 static LineState *lines_state_cache = NULL;
 static int lines_state_cache_size = 0;
 
@@ -343,7 +345,11 @@ static void cli_draw_list(CLIState *cst)
         int pad = cst->width - cst->cursor_x - 6; // -6 : right overlay
         if (pad <= 0)
         {
-            cli_draw_padding(cst, &(Vec2){cst->width - 6, viewport_offset}, 6, NULL, &overlay_bg_color);
+            cli_draw_loudness(cst,
+                              (Vec2){cst->width - 6, 0},
+                              cst->height - 4,
+                              overlay_bg_color,
+                              &viewport_offset);
             continue;
         }
 
@@ -798,7 +804,24 @@ static void _cli_draw_loudness_bar(CLIState *cst,
     s->prev = y;
 }
 
-static void cli_draw_loudness(CLIState *cst, Vec2 pos, int length, Color bg)
+static void _cli_draw_loudness_at_y(CLIState *cst,
+                                    Vec2 pos,
+                                    int length,
+                                    int width,
+                                    Color bg,
+                                    float loudness,
+                                    Color cap_color,
+                                    _LoudnessBarState *s)
+{
+    if (!s->cells)
+        return;    
+    int color = (int)map3f(length - pos.y,
+                           0.0f, (float)s->cell_length * 0.70f, (float)s->cell_length,
+                           0.0f, 100.0f, 255.0f);
+    cli_draw_vblock(cst, (Vec2){pos.x, pos.y}, s->cells[length - pos.y], width, (Color){color, 255 - color, 0}, bg);
+}
+
+static void cli_draw_loudness(CLIState *cst, Vec2 pos, int length, Color bg, int *specific_y)
 {
     static _LoudnessBarState state_l = {0};
     static _LoudnessBarState state_r = {0};
@@ -817,6 +840,27 @@ static void cli_draw_loudness(CLIState *cst, Vec2 pos, int length, Color bg)
         cli_draw_rect(cst, (Rect){pos.x, pos.y, 6, length}, bg);
     }
 
+    if (specific_y)
+    {
+        cli_draw_padding(cst, &(Vec2){pos.x, pos.y + *specific_y}, 6, &bg, &bg);
+        _cli_draw_loudness_at_y(cst,
+                                (Vec2){pos.x + 1, *specific_y},
+                                length,
+                                2,
+                                bg,
+                                cst->pl->pst->LUFS_current_l,
+                                cap_color,
+                                &state_l);
+        _cli_draw_loudness_at_y(cst,
+                                (Vec2){(pos.x + 2) + 1, *specific_y},
+                                length,
+                                2,
+                                bg,
+                                cst->pl->pst->LUFS_current_r,
+                                cap_color,
+                                &state_r);
+        return;
+    }
 
     _cli_draw_loudness_bar(cst,
                            (Vec2){pos.x + 1, pos.y},
@@ -1492,7 +1536,7 @@ static void *update_thread(void *arg)
 
         pthread_mutex_lock(&cst->mutex);
         cli_draw_overlay();
-        cli_draw_loudness(cst, (Vec2){cst->width - 6, 0}, cst->height - 4, overlay_bg_color);
+        cli_draw_loudness(cst, (Vec2){cst->width - 6, 0}, cst->height - 4, overlay_bg_color, NULL);
         pthread_mutex_unlock(&cst->mutex);
 
         av_usleep(MSTOUS(10));
