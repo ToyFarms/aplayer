@@ -191,7 +191,7 @@ static const Color overlay_bg_color = {10, 10, 10};
 
 static wchar_t *cli_line_routine(CLIState *cst, int idx, LineState line_state, int *out_strwlen)
 {
-    sb_appendf(list_sb, "\x1b[38;2;%d;%d;%d;48;2;41;41;41m%3d \x1b[39m", overlay_fg_color.r, overlay_fg_color.g, overlay_fg_color.b, idx);
+    sb_appendf(list_sb, "\x1b[38;2;%d;%d;%d;48;2;41;41;41m%3d \x1b[39m", overlay_fg_color.r, overlay_fg_color.g, overlay_fg_color.b, idx + 1);
     switch (line_state)
     {
     case LINE_PLAYING:
@@ -814,7 +814,7 @@ static void _cli_draw_loudness_at_y(CLIState *cst,
                                     _LoudnessBarState *s)
 {
     if (!s->cells)
-        return;    
+        return;
     int color = (int)map3f(length - pos.y,
                            0.0f, (float)s->cell_length * 0.70f, (float)s->cell_length,
                            0.0f, 100.0f, 255.0f);
@@ -1293,7 +1293,7 @@ static void cli_handle_event_key(KeyEvent ev)
         {
             cli_write(cst->out, "\x1b[?25l", 7);
             cst->is_in_input_mode = false;
-            int index = atoi(cst->input_buffer);
+            int index = atoi(cst->input_buffer) - 1;
             cst->selected_idx = FFMAX(FFMIN(index, cst->pl->entry_size - 1), 0);
 
             cli_compute_offset();
