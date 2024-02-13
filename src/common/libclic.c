@@ -830,12 +830,13 @@ static void cli_draw_loudness(CLIState *cst, Vec2 pos, int length, Color bg, int
     if (cst->pl->playing_idx < 0)
         return;
 
-    if (prev_dim.x != cst->width)
+    if (prev_dim.x != cst->width || prev_dim.y != cst->height)
     {
         cli_draw_rect(cst, (Rect){pos.x, pos.y, 6, length}, bg);
         state_l.force_redraw = true;
         state_r.force_redraw = true;
         prev_dim.x = cst->width;
+        prev_dim.y = cst->height;
     }
 
     if (specific_y)
