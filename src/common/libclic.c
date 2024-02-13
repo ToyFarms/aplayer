@@ -746,6 +746,8 @@ static void cli_draw_now_playing(CLIState *cst, Vec2 pos, Color fg, Color bg)
     cli_write(cst->out, "\x1b[0m", 5);
 
     free(strw);
+    if (text_len < max_len)
+        cli_draw_padding(cst, &(Vec2){cst->cursor_x, pos.y}, max_len - text_len, &fg, &bg);
 exit:
     free(str);
     sb_reset(overlay_sb);
