@@ -790,7 +790,8 @@ static void _cli_draw_loudness_bar(CLIState *cst,
     for (int i = 0; i < s->cell_length; i++)
     {
         float current = FFMIN(FFMAX(y - (float)i, 0.0f), 1.0f);
-        if (!s->force_redraw && current == s->cells[i])
+        
+        if (!s->force_redraw && (int)(current * (block_len - 1)) == (int)(s->cells[i] * (block_len - 1)))
             continue;
 
         int color = (int)map3f(i,
