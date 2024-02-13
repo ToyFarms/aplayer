@@ -758,6 +758,7 @@ typedef struct _LoudnessBarState
     float *cells;
     int cell_length;
     int64_t last_cap_set;
+    bool force_redraw;
 } _LoudnessBarState;
 
 static void _cli_draw_loudness_bar(CLIState *cst,
@@ -773,7 +774,6 @@ static void _cli_draw_loudness_bar(CLIState *cst,
                     -70.0f, -14.0f, 0.0f,
                     0.0f, (float)length * 0.65f, (float)length);
     y = LERP(s->prev, y, 0.5f);
-    bool redraw = false;
 
     if (!s->cells)
     {
@@ -784,13 +784,13 @@ static void _cli_draw_loudness_bar(CLIState *cst,
     {
         s->cells = (float *)realloc(s->cells, length * sizeof(float));
         s->cell_length = length;
-        redraw = true;
+        s->force_redraw = true;
     }
 
     for (int i = 0; i < s->cell_length; i++)
     {
         float current = FFMIN(FFMAX(y - (float)i, 0.0f), 1.0f);
-        if (!redraw && current == s->cells[i])
+        if (!s->force_redraw && current == s->cells[i])
             continue;
 
         int color = (int)map3f(i,
@@ -802,6 +802,7 @@ static void _cli_draw_loudness_bar(CLIState *cst,
     }
 
     s->prev = y;
+    s->force_redraw = false;
 }
 
 static void _cli_draw_loudness_at_y(CLIState *cst,
@@ -826,18 +827,25 @@ static void cli_draw_loudness(CLIState *cst, Vec2 pos, int length, Color bg, int
     static _LoudnessBarState state_l = {0};
     static _LoudnessBarState state_r = {0};
     static const Color cap_color = {250, 250, 250};
-    static int prev_height = 0;
+    static Vec2 prev_dim = {0};
 
     if (cst->pl->playing_idx < 0)
         return;
 
-    if (prev_height != cst->height)
+    if (prev_dim.y != cst->height)
     {
-        state_l.cap = mapf(state_l.cap, 0, prev_height, 0, cst->height);
-        state_r.cap = mapf(state_r.cap, 0, prev_height, 0, cst->height);
+        state_l.cap = mapf(state_l.cap, 0, prev_dim.y, 0, cst->height);
+        state_r.cap = mapf(state_r.cap, 0, prev_dim.y, 0, cst->height);
+        AVLOG("%d %d\n", length, cst->height);
 
-        prev_height = cst->height;
+        prev_dim.y = cst->height;
+    }
+    if (prev_dim.x != cst->width)
+    {
         cli_draw_rect(cst, (Rect){pos.x, pos.y, 6, length}, bg);
+        state_l.force_redraw = true;
+        state_r.force_redraw = true;
+        prev_dim.x = cst->width;
     }
 
     if (specific_y)
@@ -1499,6 +1507,8 @@ static void cli_handle_event_mouse(MouseEvent ev)
 static void cli_handle_event_buffer_changed(BufferChangedEvent ev)
 {
     cli_get_console_size(cst);
+
+    cli_draw_rect(cst, (Rect){0, cst->height - 4, cst->width, 4}, overlay_bg_color);
 
     cst->force_redraw = true;
     cli_draw();
