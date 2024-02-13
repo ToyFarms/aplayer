@@ -754,10 +754,8 @@ exit:
 typedef struct _LoudnessBarState
 {
     float prev;
-    float cap;
     float *cells;
     int cell_length;
-    int64_t last_cap_set;
     bool force_redraw;
 } _LoudnessBarState;
 
@@ -832,14 +830,6 @@ static void cli_draw_loudness(CLIState *cst, Vec2 pos, int length, Color bg, int
     if (cst->pl->playing_idx < 0)
         return;
 
-    if (prev_dim.y != cst->height)
-    {
-        state_l.cap = mapf(state_l.cap, 0, prev_dim.y, 0, cst->height);
-        state_r.cap = mapf(state_r.cap, 0, prev_dim.y, 0, cst->height);
-        AVLOG("%d %d\n", length, cst->height);
-
-        prev_dim.y = cst->height;
-    }
     if (prev_dim.x != cst->width)
     {
         cli_draw_rect(cst, (Rect){pos.x, pos.y, 6, length}, bg);
