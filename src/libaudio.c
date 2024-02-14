@@ -165,7 +165,7 @@ void audio_wait_until_finished()
 
     int64_t start = av_gettime();
 
-    while (!pst->finished)
+    while (pst && !pst->finished)
         av_usleep(MSTOUS(100));
 
     av_log(NULL,
