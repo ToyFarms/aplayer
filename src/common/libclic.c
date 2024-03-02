@@ -1545,7 +1545,6 @@ static void *update_thread(void *arg)
             {
                 cli_save_session("session-backup.auto.json");
                 slow_save_interval_i = 0;
-                PR
             }
         }
 
