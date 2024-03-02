@@ -412,6 +412,21 @@ static void audio_get_lufs(char *filename)
                     pst->LUFS_avg = lufs_sum / (double)lufs_sampled;
                 }
 
+                if (sample_dropped > 20)
+                {
+                    avformat_seek_file(sst->ic,
+                                       -1,
+                                       INT64_MIN,
+                                       0,
+                                       INT64_MAX,
+                                       AVSEEK_FLAG_BACKWARD | AVSEEK_FLAG_ANY);
+                    sample_dropped = 0;
+                    lufs_sampled = 0;
+                    lufs_sum = 0;
+                    for (int ch = 0; ch < num_ch; ch++)
+                        memset(channels[ch]->data, 0, channels[ch]->capacity * channels[ch]->item_size);
+                }
+
                 if (timestamp > pst->LUFS_sampling_cap)
                     goto cleanup;
 
