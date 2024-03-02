@@ -395,7 +395,10 @@ static void audio_get_lufs(char *filename)
                 if (channels[0]->len == channels[0]->capacity)
                 {
                     for (int ch = 0; ch < num_ch; ch++)
-                        memcpy_s(combined + (ch * channels[0]->capacity), channels[0]->capacity, channels[ch]->data, channels[0]->capacity);
+                        memcpy_s(combined + (ch * channels[0]->capacity),
+                                 channels[0]->capacity * channels[0]->item_size,
+                                 channels[ch]->data,
+                                 channels[0]->capacity * channels[0]->item_size);
 
                     float LUFS = loudness_lufs(combined, num_ch, channels[0]->capacity, sst->frame->sample_rate, 400.0f);
 
