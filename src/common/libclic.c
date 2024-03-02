@@ -134,6 +134,8 @@ int cli_init(Playlist *pl)
     {
         if (file_exists("session.auto.json") && !file_empty("session.auto.json"))
             cli_restore_session("session.auto.json");
+        else if (file_exists("session-backup.auto.json") && !file_empty("session-backup.auto.json"))
+            cli_restore_session("session-backup.auto.json");
     }
 
     return 1;
@@ -1528,14 +1530,23 @@ static void cli_handle_event(Event ev)
 
 static void *update_thread(void *arg)
 {
-    static int64_t last_update = 0;
+    static int64_t last_save = 0;
+    static const int64_t save_interval = MSTOUS(1000);
+    static int slow_save_interval = 10;
+    static int slow_save_interval_i = 0;
 
     while (cst)
     {
-        if (av_gettime() - last_update > MSTOUS(1000))
+        if (av_gettime() - last_save > save_interval)
         {
             cli_save_session("session.auto.json");
-            last_update = av_gettime();
+            last_save = av_gettime();
+            if ((slow_save_interval_i++) > slow_save_interval)
+            {
+                cli_save_session("session-backup.auto.json");
+                slow_save_interval_i = 0;
+                PR
+            }
         }
 
         pthread_mutex_lock(&cst->mutex);
