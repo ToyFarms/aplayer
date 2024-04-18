@@ -5,16 +5,24 @@
 #include "ap_utils.h"
 #include <pthread.h>
 #include "ap_playlist.h"
+#include <sys/stat.h>
+
+bool is_path_file(const char *path)
+{
+   struct stat s;
+   if (stat(path, &s) != 0)
+       return 0;
+    return s.st_mode & S_IFREG;
+}
 
 int main(int argc, char **argv)
 {
     prepare_app_arguments(&argc, &argv);
     APPlaylist pl;
-    pl.sources = ap_array_alloc(10, sizeof(APSource));
-    ap_array_append_resize(pl.sources, &(APSource){"D:/home/music/youtube-dl", false}, 1);
-    ap_array_append_resize(pl.sources, &(APSource){"D:/home/music/pop", false}, 1);
-    ap_array_append_resize(pl.sources, &(APSource){"C:/Users/ASUS/Downloads/Stayin-Alive.flac", true}, 1);
     pl.entries = ap_array_alloc(10, sizeof(APEntryGroup));
+    pl.sources = ap_array_alloc(10, sizeof(APSource));
+    for (int i = 1; i < argc; i++)
+        ap_array_append_resize(pl.sources, &(APSource){argv[i], is_path_file(argv[i])}, 1);
 
     ap_playlist_load(&pl);
 
