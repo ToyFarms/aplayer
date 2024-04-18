@@ -1,9 +1,8 @@
 {
-    "name": "aplayer",
-    "version": "0.1.0",
-    "dependencies": [
-        "portaudio",
-        "ffmpeg",
-        "sdl2"
-    ]
+  "name": "aplayer",
+  "version": "1.0",
+  "dependencies": [
+    "portaudio",
+    "ffmpeg"
+  ]
 }

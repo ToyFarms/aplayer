@@ -1,84 +1,78 @@
-#include <stdbool.h>
+#include "ap_os.h"
+#include "ap_terminal.h"
+#include "ap_tui.h"
+#include "ap_ui.h"
+#include "ap_utils.h"
 #include <pthread.h>
-#include <stdlib.h>
-#include <libgen.h>
-
-#include "libos.h"
-#include "libaudio.h"
-#include "libhelper.h"
-#include "libfile.h"
-#include "libcli.h"
-#include "libplaylist.h"
-#include "libhook.h"
-
-void cleanup(void)
-{
-    FILE *fd = fopen("log.log", "a");
-
-    const char *separator = "========================== END OF LOG ==========================\n\n";
-    fwrite(separator, sizeof(char), strlen(separator), fd);
-
-    fclose(fd);
-}
-
-void log_callback(void *ptr, int level, const char *fmt, va_list vl)
-{
-    if (level > av_log_get_level())
-        return;
-
-    FILE *fd = fopen("log.log", "a");
-
-    char buf[8192];
-    vsprintf_s(buf, 8192, fmt, vl);
-
-    fwrite(buf, sizeof(char), strlen(buf), fd);
-
-    fclose(fd);
-}
+#include "ap_playlist.h"
 
 int main(int argc, char **argv)
 {
     prepare_app_arguments(&argc, &argv);
+    APPlaylist pl;
+    pl.sources = ap_array_alloc(10, sizeof(APSource));
+    ap_array_append_resize(pl.sources, &(APSource){"D:/home/music/youtube-dl", false}, 1);
+    ap_array_append_resize(pl.sources, &(APSource){"D:/home/music/pop", false}, 1);
+    ap_array_append_resize(pl.sources, &(APSource){"C:/Users/ASUS/Downloads/Stayin-Alive.flac", true}, 1);
+    pl.entries = ap_array_alloc(10, sizeof(APEntryGroup));
 
-    char *directory = NULL;
+    ap_playlist_load(&pl);
 
-    if (argc >= 2)
-        directory = argv[1];
+    for (int i = 0; i < pl.entries->len; i++)
+    {
+        APEntryGroup group = ARR_INDEX(pl.entries, APEntryGroup *, i);
+        printf("\n%s\n", group.id);
+        for (int j = 0; j < group.entry->len; j++)
+        {
+            APFile entry = ARR_INDEX(group.entry, APFile *, j);
+            printf("    %s\n", entry.filename);
+        }
+    }
 
-    // TODO: Fix surround audio (it crash)
-    // TODO: .wav file is not recognized in av_probe_input_format() ?
-    // TODO: expand path (~/)
-    // TODO: Better session manager
-    // TODO: Add low cpu mode (the program itself is relatively light, but windows terminal really struggling with the overlay updates)
-    // TODO: Fix "Loading Last Session" screen not disappearing (it doesn't get overwritten by entries)
-    // TODO: Fix abnormal exit (almost everytime)
-    
-    atexit(cleanup);
-
-    av_log_set_callback(log_callback);
-    av_log_set_level(AV_LOG_DEBUG);
-
-    pthread_t event_thread_id;
-    pthread_create(&event_thread_id, NULL, keyboard_hooks, NULL);
-
-    PlayerState *pst = audio_init();
-    if (!pst)
+    return 0;
+    APTermContext *termctx = calloc(1, sizeof(*termctx));
+    if (!termctx)
         return -1;
 
-    Playlist *pl = playlist_init(directory, pst, !!(directory));
-    if (!pl)
-        return -1;
+    termctx->handle_out = ap_term_get_std_handle(HANDLE_STDOUT);
+    termctx->handle_in = ap_term_get_std_handle(HANDLE_STDIN);
+    termctx->size = ap_term_get_size(termctx->handle_out);
 
-    chdir(dirname(argv[0]));
+    ap_term_switch_alt_buf(termctx->handle_out);
 
-    if (cli_init(pl) < 0)
-        return -1;
+    pthread_t tui_tid;
+    pthread_create(&tui_tid, NULL, ap_tui_render_loop, termctx);
 
-    cli_event_loop();
+    APTermEvent events[128];
+    int event_read;
+    bool should_close = false;
+    while (!should_close)
+    {
+        ap_term_get_events(termctx->handle_in, events, 128, &event_read);
+        for (int i = 0; i < event_read; i++)
+        {
+            APTermEvent e = events[i];
+            if (e.type == AP_TERM_KEY_EVENT)
+            {
+                // handle key event
+                if (e.key_event.ascii_key == 'q')
+                    should_close = true;
+            }
+            else if (e.type == AP_TERM_MOUSE_EVENT)
+            {
+                if (e.mouse_event.moved)
+                    termctx->mouse_pos = VEC(e.mouse_event.x, e.mouse_event.y);
+            }
+            else if (e.type == AP_TERM_BUF_EVENT)
+            {
+                termctx->size =
+                    VEC(e.buf_event.to_width, e.buf_event.to_height);
+                termctx->resized = true;
+            }
+        }
+    }
 
-    playlist_free();
-    cli_free();
-    audio_free();
+    ap_term_switch_main_buf(termctx->handle_out);
 
     return 0;
 }
