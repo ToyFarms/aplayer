@@ -19,8 +19,7 @@ int main(int argc, char **argv)
 {
     prepare_app_arguments(&argc, &argv);
     APPlaylist pl;
-    pl.entries = ap_array_alloc(10, sizeof(APEntryGroup));
-    pl.sources = ap_array_alloc(10, sizeof(APSource));
+    ap_playlist_init(&pl);
     for (int i = 1; i < argc; i++)
         ap_array_append_resize(pl.sources, &(APSource){argv[i], is_path_file(argv[i])}, 1);
 

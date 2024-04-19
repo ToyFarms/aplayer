@@ -1,5 +1,23 @@
 #include "ap_playlist.h"
 
+APPlaylist *ap_playlist_alloc()
+{
+    APPlaylist *p = calloc(1, sizeof(*p));
+    if (!p)
+        return NULL;
+
+    ap_playlist_init(p);
+
+    return p;
+}
+
+void ap_playlist_init(APPlaylist *p)
+{
+    assert(p != NULL);
+    p->entries = ap_array_alloc(16, sizeof(APEntryGroup));
+    p->sources = ap_array_alloc(16, sizeof(APSource));
+}
+
 void ap_playlist_deserialize(APPlaylist *p, const char *bytes);
 char *ap_playlist_serialize(APPlaylist *p);
 

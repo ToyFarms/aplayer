@@ -23,6 +23,8 @@ typedef struct APPlaylist
     T(APEntryGroup) APArray *entries;
 } APPlaylist;
 
+APPlaylist *ap_playlist_alloc();
+void ap_playlist_init(APPlaylist *p);
 void ap_playlist_deserialize(APPlaylist *p, const char *bytes);
 char *ap_playlist_serialize(APPlaylist *p);
 /* load entries from sources */
