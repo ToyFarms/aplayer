@@ -20,14 +20,15 @@ int main(int argc, char **argv)
     prepare_app_arguments(&argc, &argv);
     APPlaylist pl;
     ap_playlist_init(&pl);
+    assert(pl.groups && pl.sources);
     for (int i = 1; i < argc; i++)
         ap_array_append_resize(pl.sources, &(APSource){argv[i], is_path_file(argv[i])}, 1);
 
     ap_playlist_load(&pl);
 
-    for (int i = 0; i < pl.entries->len; i++)
+    for (int i = 0; i < pl.groups->len; i++)
     {
-        APEntryGroup group = ARR_INDEX(pl.entries, APEntryGroup *, i);
+        APEntryGroup group = ARR_INDEX(pl.groups, APEntryGroup *, i);
         printf("\n%s\n", group.id);
         for (int j = 0; j < group.entry->len; j++)
         {
@@ -35,6 +36,7 @@ int main(int argc, char **argv)
             printf("    %s\n", entry.filename);
         }
     }
+    ap_playlist_free(&pl);
 
     return 0;
     APTermContext *termctx = calloc(1, sizeof(*termctx));

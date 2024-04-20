@@ -36,8 +36,8 @@ typedef struct APFileStat
 
 typedef struct APFile
 {
-    const char *directory;
-    const char *filename;
+    char *directory;
+    char *filename;
     APFileStat stat;
 } APFile;
 

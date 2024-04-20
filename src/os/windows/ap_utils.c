@@ -1,5 +1,4 @@
 #include "ap_utils.h"
-#include "ap_terminal.h"
 
 char *wchartombs(const wchar_t *strw, int strwlen, int *strlen_out)
 {
@@ -59,24 +58,36 @@ wchar_t *mbstowchar(const char *str, int strlen, int *strwlen_out)
 
 T(APFile) APArray *read_directory(const char *dir)
 {
+    if (!dir || !strlen(dir))
+        return NULL;
+
     WIN32_FIND_DATAW ffd;
-    HANDLE find;
-    APArray *files = ap_array_alloc(256, sizeof(APFile));
+    HANDLE find = NULL;
+    APArray *files = NULL;
+    wchar_t *dirw = NULL;
+    char *dir_copy = NULL;
 
     int dirw_len;
-    wchar_t *dirw = mbstowchar(dir, -1, &dirw_len);
+    dirw = mbstowchar(dir, -1, &dirw_len);
 
     wchar_t search_path[dirw_len + 10];
+    if (!dirw)
+        goto cleanup;
+
     wcscpy_s(search_path, dirw_len + 10, dirw);
     wcscat_s(search_path, dirw_len + 10, L"\\*");
 
     find = FindFirstFileW(search_path, &ffd);
-
     if (find == INVALID_HANDLE_VALUE)
-    {
-        ap_array_free(&files);
-        return NULL;
-    }
+        goto cleanup;
+
+    dir_copy = strdup(dir);
+    if (!dir_copy)
+        goto error;
+
+    files = ap_array_alloc(256, sizeof(APFile));
+    if (!files)
+        goto cleanup;
 
     do
     {
@@ -84,6 +95,9 @@ T(APFile) APArray *read_directory(const char *dir)
             wcscmp(ffd.cFileName, L"..") != 0)
         {
             char *normalized_mbs = wchartombs(ffd.cFileName, -1, NULL);
+            if (!normalized_mbs)
+                continue;
+
             int fullpath_len = dirw_len + MAX_PATH;
             wchar_t fullpath[fullpath_len];
             memcpy_s(fullpath, fullpath_len, dirw, dirw_len * sizeof(wchar_t));
@@ -92,14 +106,24 @@ T(APFile) APArray *read_directory(const char *dir)
 
             ap_array_append_resize(
                 files,
-                &(APFile){.directory = dir,
+                &(APFile){.directory = dir_copy,
                           .filename = normalized_mbs,
                           .stat = file_get_statw(fullpath, NULL)},
                 1);
         }
     } while (FindNextFileW(find, &ffd) != 0);
 
+    goto cleanup;
+
+error:
+    if (dir_copy)
+        free(dir_copy);
+    ap_array_free(&files);
+
+cleanup:
     FindClose(find);
+    if (dirw)
+        free(dirw);
 
     return files;
 }

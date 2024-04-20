@@ -7,24 +7,25 @@
 
 typedef struct APSource
 {
-    const char *path;
+    char *path;
     bool is_file;
 } APSource;
 
 typedef struct APEntryGroup
 {
-    const char *id;
+    char *id;
     T(APFile *) APArray *entry;
 } APEntryGroup;
 
 typedef struct APPlaylist
 {
     T(APSource) APArray *sources;
-    T(APEntryGroup) APArray *entries;
+    T(APEntryGroup) APArray *groups;
 } APPlaylist;
 
 APPlaylist *ap_playlist_alloc();
 void ap_playlist_init(APPlaylist *p);
+void ap_playlist_free(APPlaylist *p);
 void ap_playlist_deserialize(APPlaylist *p, const char *bytes);
 char *ap_playlist_serialize(APPlaylist *p);
 /* load entries from sources */
