@@ -10,6 +10,12 @@ elseif(CMAKE_BUILD_TYPE STREQUAL "Debug")
 endif()
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
+execute_process(
+  COMMAND ${CMAKE_COMMAND} -E copy
+        ${CMAKE_BINARY_DIR}/compile_commands.json
+        ${CMAKE_SOURCE_DIR}/compile_commands.json
+)
+
 set(OS-DIR NOT_SUPPORTED)
 
 if(WIN32)

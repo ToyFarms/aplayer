@@ -1,6 +1,6 @@
 #include "ap_utils.h"
 
-char *file_read(const char *path, bool byte_mode)
+char *file_read(const char *path, bool byte_mode, int *out_size)
 {
     FILE *fd = fopen(path, byte_mode ? "rb" : "r");
     if (!fd)
@@ -16,6 +16,9 @@ char *file_read(const char *path, bool byte_mode)
     fread(buf, 1, size, fd);
 
     fclose(fd);
+
+    if (out_size)
+        *out_size =  size;
 
     return buf;
 }
