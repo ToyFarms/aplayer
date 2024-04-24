@@ -11,17 +11,21 @@
 #define PLAYLIST_VERSION_PATCH 0
 
 #define PLAYLIST_FLAG_FILE (1 << 0)
+#define PLAYLIST_FLAG_EXPAND (1 << 1)
 
 typedef struct APSource
 {
     char *path;
     bool is_file;
+
+    /* specify whether to serialize all the files or only the directory */
+    bool expand;
 } APSource;
 
 typedef struct APEntryGroup
 {
     char *id;
-    T(APFile *) APArray *entries;
+    T(APFile) APArray *entries;
 } APEntryGroup;
 
 typedef struct APPlaylist

@@ -22,20 +22,13 @@ int main(int argc, char **argv)
     ap_playlist_init(&pl);
     assert(pl.groups && pl.sources);
     for (int i = 1; i < argc; i++)
-        ap_array_append_resize(pl.sources, &(APSource){argv[i], is_path_file(argv[i])}, 1);
+        ap_array_append_resize(pl.sources, &(APSource){strdup(argv[i]), is_path_file(argv[i]), !is_path_file(argv[i])}, 1);
 
     ap_playlist_load(&pl);
 
-    for (int i = 0; i < pl.groups->len; i++)
-    {
-        APEntryGroup group = ARR_INDEX(pl.groups, APEntryGroup *, i);
-        printf("\n%s\n", group.id);
-        for (int j = 0; j < group.entries->len; j++)
-        {
-            APFile entry = ARR_INDEX(group.entries, APFile *, j);
-            // printf("    %s\n", entry.filename);
-        }
-    }
+    // TODO: fix memory management
+
+    // serializing
     int size;
     FILE *fd = NULL;
     fopen_s(&fd, "test.txt", "wb");
@@ -48,16 +41,29 @@ int main(int argc, char **argv)
 
     free(buf);
 
+    ap_playlist_free_member(&pl);
+
+    // deserializing
+    APPlaylist pl2;
+    ap_playlist_init(&pl2);
+
     fopen_s(&fd, "test.txt", "rb");
     if (!fd)
         return -1;
 
     int buf_size;
     buf = file_read("test.txt", true, &buf_size);
-    ap_playlist_deserialize(&pl, buf, buf_size);
+    ap_playlist_deserialize(&pl2, buf, buf_size);
+
+    for (int i = 0; i < pl2.groups->len; i++)
+    {
+        APEntryGroup group = ARR_INDEX(pl2.groups, APEntryGroup *, i);
+        printf("%s: %d entry\n", group.id, group.entries->len);
+    }
+
     free(buf);
 
-    ap_playlist_free_member(&pl);
+    ap_playlist_free_member(&pl2);
 
     return 0;
 

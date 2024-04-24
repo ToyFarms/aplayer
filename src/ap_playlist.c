@@ -54,8 +54,8 @@ void ap_playlist_free_member(APPlaylist *p)
         for (int j = 0; j < group.entries->len; j++)
         {
             APFile file = ARR_INDEX(group.entries, APFile *, j);
-            free(file.directory);
-            file.directory = NULL;
+            // free(file.directory);
+            // file.directory = NULL;
             free(file.filename);
             file.filename = NULL;
         }
@@ -119,11 +119,11 @@ void ap_playlist_deserialize(APPlaylist *p, void *_buf, int buf_size)
     buf.offset += 2;
     uint32_t patch = BUF_READ(buf, uint32_t);
     buf.offset += 4;
-    printf("version %d.%d.%d\n", major, minor, patch);
+
+    T(APFile) APArray *root = ap_array_alloc(16, sizeof(APFile));
 
     uint32_t source_len = BUF_READ(buf, uint32_t);
     buf.offset += 4;
-    printf("source: %d\n", source_len);
     for (int i = 0; i < source_len; i++)
     {
         uint64_t size = BUF_READ(buf, uint64_t);
@@ -131,19 +131,38 @@ void ap_playlist_deserialize(APPlaylist *p, void *_buf, int buf_size)
         int64_t flag = BUF_READ(buf, int64_t);
         buf.offset += 8;
         bool is_file = flag & PLAYLIST_FLAG_FILE;
+        bool need_expand = flag & PLAYLIST_FLAG_EXPAND;
 
-        char *source = (char *)calloc((size - 8) + 1, 1);
-        memcpy(source, BUF_OFFSET(buf), size - 8);
+        uint32_t source_size = BUF_READ(buf, uint32_t);
+        buf.offset += 4;
 
-        buf.offset += size;
+        char *source = (char *)calloc(source_size + 1, 1);
+        memcpy(source, BUF_OFFSET(buf), source_size);
+        buf.offset += source_size;
 
-        printf("{\n");
-        printf("    size: %lld, is_file: %d\n", size, is_file);
-        printf("    source: %s\n", source);
-        printf("}\n");
-
-        free(source);
+        if (is_file)
+        {
+            ap_array_append_resize(root, &(APFile){"*root*", source, file_get_stat(source, NULL)}, 1);
+        }
+        else if (need_expand)
+        {
+            uint32_t entry_len = BUF_READ(buf, uint32_t);
+            buf.offset += 4;
+            T(APFile) APArray *entries = ap_array_alloc(entry_len, sizeof(APFile));
+            for (int j = 0; j < entry_len; j++)
+            {
+                uint32_t entry_size = BUF_READ(buf, uint32_t);
+                buf.offset += 4;
+                char *filename = (char *)calloc(entry_size + 1, 1);
+                memcpy(filename, BUF_OFFSET(buf), entry_size);
+                buf.offset += entry_size;
+                ap_array_append_resize(entries, &(APFile){source, filename, file_get_stat(filename, NULL)}, 1);
+            }
+            ap_array_append_resize(p->groups,  &(APEntryGroup){source, entries}, 1);
+        }
     }
+
+    ap_array_append_resize(p->groups, &(APEntryGroup){"*root*", root}, 1);
 }
 
 /*
@@ -152,11 +171,11 @@ void ap_playlist_deserialize(APPlaylist *p, void *_buf, int buf_size)
  * version uses semantic versioning
  * with format [major:u16 minor:u16 patch:u32]
  *
- * structure: [size:u64 flags:i64 source:b, ...]
+ * structure: [size:u64 flags:i64 source_size:u32 source:b, ...]
  * if flags specify file:
- *     structure: [size:u64 flags:i64 entry:b, ...]
+ *     structure: [size:u64 flags:i64 entry_size:u32 entry:b, ...]
  * if flags specify expand:
- *     structure: [size:u64 flags:i64 source:b [entry_size:u32 entry:b, ...], ...]
+ *     structure: [size:u64 flags:i64 source_size:u32 source:b entry_len:u32 [entry_size:u32 entry:b, ...], ...]
  * */
 void *ap_playlist_serialize(APPlaylist *p, bool expand_source, int *out_size)
 {
@@ -176,10 +195,12 @@ void *ap_playlist_serialize(APPlaylist *p, bool expand_source, int *out_size)
     for (int i = 0; i < p->sources->len; i++)
     {
         APSource source = ARR_INDEX(p->sources, APSource *, i);
-        uint64_t size = 0;
         int32_t flag = 0;
         if (source.is_file)
             flag |= PLAYLIST_FLAG_FILE;
+        if (source.expand)
+            flag |= PLAYLIST_FLAG_EXPAND;
+        int start_offset = buf.offset;
 
         int size_offset = buf.offset;
         buf.offset += 8;
@@ -187,17 +208,71 @@ void *ap_playlist_serialize(APPlaylist *p, bool expand_source, int *out_size)
         ap_dynbuf_ensure_free(&buf, 8);
         i64tob(BUF_OFFSET(buf), flag, true);
         buf.offset += 8;
-        size += 8;
 
-        int source_len = strlen(source.path);
-        ap_dynbuf_ensure_free(&buf, source_len);
-        memcpy(BUF_OFFSET(buf), source.path, source_len);
-        buf.offset += source_len;
-        size += source_len;
+        int source_size = strlen(source.path);
+        ap_dynbuf_ensure_free(&buf, 4);
+        i64tob(BUF_OFFSET(buf), source_size, true);
+        buf.offset += 4;
 
-        printf("%lld\n", size);
-        i64tob(buf.data + size_offset, size, true);
-        buf.offset += 8;
+        ap_dynbuf_ensure_free(&buf, source_size);
+        memcpy(BUF_OFFSET(buf), source.path, source_size);
+        buf.offset += source_size;
+
+        if (source.expand && !source.is_file)
+        {
+            int found = -1;
+            if (p->groups)
+                for (int j = 0; j < p->groups->len; j++)
+                {
+                    APEntryGroup group = ARR_INDEX(p->groups, APEntryGroup *, j);
+                    if (path_compare(group.id, source.path))
+                    {
+                        found = j;
+                        break;
+                    }
+                }
+
+            T(APFile) APArray *entries = NULL;
+            if (found < 0)
+                entries = read_directory(source.path);
+            else
+                entries = ARR_INDEX(p->groups, APEntryGroup *, found).entries;
+
+            if (entries)
+            {
+                ap_dynbuf_ensure_free(&buf, 4);
+                i32tob(BUF_OFFSET(buf), entries->len, true);
+                buf.offset += 4;
+
+                for (int j = 0; j < entries->len; j++)
+                {
+                    APFile entry = ARR_INDEX(entries, APFile *, j);
+                    int entry_size = strlen(entry.filename);
+
+                    ap_dynbuf_ensure_free(&buf, 4);
+                    i32tob(BUF_OFFSET(buf), entry_size, true);
+                    buf.offset += 4;
+
+                    ap_dynbuf_ensure_free(&buf, entry_size);
+                    memcpy(BUF_OFFSET(buf), entry.filename, entry_size);
+                    buf.offset += entry_size;
+                }
+
+                if (found < 0)
+                {
+                    for (int j = 0; j < entries->len; j++)
+                    {
+                        APFile file = ARR_INDEX(entries, APFile *, j);
+                        // free(file.directory);
+                        // file.directory = NULL;
+                        free(file.filename);
+                        file.filename = NULL;
+                    }
+                }
+            }
+        }
+
+        i64tob(buf.data + size_offset, buf.offset - start_offset, true);
     }
 
     if (out_size)
@@ -210,7 +285,7 @@ void ap_playlist_load(APPlaylist *p)
 {
     if (!p->groups)
         ap_array_init(p->groups, 128, sizeof(APEntryGroup));
-    T(APFile *) APArray *root = ap_array_alloc(128, sizeof(APFile));
+    T(APFile) APArray *root = ap_array_alloc(128, sizeof(APFile));
     for (int i = 0; i < p->sources->len; i++)
     {
         APSource src = ARR_INDEX(p->sources, APSource *, i);
@@ -221,12 +296,12 @@ void ap_playlist_load(APPlaylist *p)
                                    1);
         else
         {
-            T(APFile *) APArray *files = read_directory(src.path);
+            T(APFile) APArray *entries = read_directory(src.path);
             // TODO: Report error
-            if (!files)
+            if (!entries)
                 continue;
             ap_array_append_resize(p->groups,
-                                   &(APEntryGroup){strdup(src.path), files}, 1);
+                                   &(APEntryGroup){strdup(src.path), entries}, 1);
         }
     }
 
