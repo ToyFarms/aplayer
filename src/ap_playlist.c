@@ -23,6 +23,8 @@ static void ap_dynbuf_ensure_free(APDynBuf *buf, int size)
     buf->data = realloc(buf->data, buf->size);
 }
 
+static void ap_playlist_entries_free(T(APFile) APArray *entries);
+
 APPlaylist *ap_playlist_alloc()
 {
     APPlaylist *p = calloc(1, sizeof(*p));
@@ -41,6 +43,21 @@ void ap_playlist_init(APPlaylist *p)
     p->sources = ap_array_alloc(16, sizeof(APSource));
 }
 
+static void ap_playlist_entries_free(T(APFile) APArray *entries)
+{
+    for (int i = 0; i < entries->len; i++)
+    {
+        APFile file = ARR_INDEX(entries, APFile *, i);
+        if (i == 0)
+        {
+            free(file.directory);
+            file.directory = NULL;
+        }
+        free(file.filename);
+        file.filename = NULL;
+    }
+}
+
 void ap_playlist_free_member(APPlaylist *p)
 {
     if (!p)
@@ -49,26 +66,11 @@ void ap_playlist_free_member(APPlaylist *p)
     for (int i = 0; i < p->groups->len; i++)
     {
         APEntryGroup group = ARR_INDEX(p->groups, APEntryGroup *, i);
-        free(group.id);
-        group.id = NULL;
-        for (int j = 0; j < group.entries->len; j++)
-        {
-            APFile file = ARR_INDEX(group.entries, APFile *, j);
-            // free(file.directory);
-            // file.directory = NULL;
-            free(file.filename);
-            file.filename = NULL;
-        }
+        ap_playlist_entries_free(group.entries);
         ap_array_free(&group.entries);
     }
 
     ap_array_free(&p->groups);
-    for (int i = 0; i < p->sources->len; i++)
-    {
-        APSource source = ARR_INDEX(p->sources, APSource *, i);
-        free(source.path);
-        source.path = NULL;
-    }
     ap_array_free(&p->sources);
 }
 
@@ -142,7 +144,7 @@ void ap_playlist_deserialize(APPlaylist *p, void *_buf, int buf_size)
 
         if (is_file)
         {
-            ap_array_append_resize(root, &(APFile){"*root*", source, file_get_stat(source, NULL)}, 1);
+            ap_array_append_resize(root, &(APFile){strdup("*root*"), source, file_get_stat(source, NULL)}, 1);
         }
         else if (need_expand)
         {
@@ -259,16 +261,7 @@ void *ap_playlist_serialize(APPlaylist *p, bool expand_source, int *out_size)
                 }
 
                 if (found < 0)
-                {
-                    for (int j = 0; j < entries->len; j++)
-                    {
-                        APFile file = ARR_INDEX(entries, APFile *, j);
-                        // free(file.directory);
-                        // file.directory = NULL;
-                        free(file.filename);
-                        file.filename = NULL;
-                    }
-                }
+                    ap_playlist_entries_free(entries);
             }
         }
 
@@ -291,7 +284,7 @@ void ap_playlist_load(APPlaylist *p)
         APSource src = ARR_INDEX(p->sources, APSource *, i);
         if (src.is_file)
             ap_array_append_resize(root,
-                                   &(APFile){"*root*", strdup(src.path),
+                                   &(APFile){strdup("*root*"), strdup(src.path),
                                              file_get_stat(src.path, NULL)},
                                    1);
         else
@@ -301,9 +294,9 @@ void ap_playlist_load(APPlaylist *p)
             if (!entries)
                 continue;
             ap_array_append_resize(p->groups,
-                                   &(APEntryGroup){strdup(src.path), entries}, 1);
+                                   &(APEntryGroup){src.path, entries}, 1);
         }
     }
 
-    ap_array_append_resize(p->groups, &(APEntryGroup){strdup("*root*"), root}, 1);
+    ap_array_append_resize(p->groups, &(APEntryGroup){"*root*", root}, 1);
 }

@@ -22,11 +22,9 @@ int main(int argc, char **argv)
     ap_playlist_init(&pl);
     assert(pl.groups && pl.sources);
     for (int i = 1; i < argc; i++)
-        ap_array_append_resize(pl.sources, &(APSource){strdup(argv[i]), is_path_file(argv[i]), !is_path_file(argv[i])}, 1);
+        ap_array_append_resize(pl.sources, &(APSource){argv[i], is_path_file(argv[i]), !is_path_file(argv[i])}, 1);
 
     ap_playlist_load(&pl);
-
-    // TODO: fix memory management
 
     // serializing
     int size;
