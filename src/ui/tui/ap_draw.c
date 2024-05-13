@@ -2,7 +2,7 @@
 
 sds ap_draw_pos(sds cmd, Vec2 pos)
 {
-    return sdscatprintf(cmd, ESC "[%d;%dH", pos.y, pos.x);
+    return sdscatprintf(cmd, ESC "[%d;%dH", pos.y + 1, pos.x + 1);
 }
 
 sds ap_draw_posmove(sds cmd, Vec2 pos)
@@ -18,15 +18,15 @@ sds ap_draw_posmove(sds cmd, Vec2 pos)
     return cmd;
 }
 
-sds ap_draw_color(sds cmd, APColor bg, APColor fg)
+sds ap_draw_color(sds cmd, APColor fg, APColor bg)
 {
     if (bg.a != 0 && fg.a != 0)
-        return sdscatprintf(cmd, ESC "[38;2;%d;%d;%d;48;2;%d;%d;%dm", bg.r,
+        return sdscatprintf(cmd, ESC "[48;2;%d;%d;%d;38;2;%d;%d;%dm", bg.r,
                             bg.g, bg.b, fg.r, fg.g, fg.b);
     else if (bg.a != 0)
-        return sdscatprintf(cmd, ESC "[38;2;%d;%d;%dm", bg.r, bg.g, bg.b);
+        return sdscatprintf(cmd, ESC "[48;2;%d;%d;%dm", bg.r, bg.g, bg.b);
     else if (fg.a != 0)
-        return sdscatprintf(cmd, ESC "[48;2;%d;%d;%dm", fg.r, fg.g, fg.b);
+        return sdscatprintf(cmd, ESC "[38;2;%d;%d;%dm", fg.r, fg.g, fg.b);
     else
         return cmd;
 }
@@ -64,8 +64,24 @@ sds ap_draw_reset_attr(sds cmd)
     return sdscat(cmd, ESC "[0m");
 }
 
+sds ap_draw_padding(sds cmd, int length)
+{
+    if (length <= 0)
+        return cmd;
+
+    char *pad = malloc(length);
+    memset(pad, ' ', length);
+
+    cmd = sdscatlen(cmd, pad, length);
+    free(pad);
+
+    return cmd;
+}
+
 sds ap_draw_hline(sds cmd, int length)
 {
+    if (length <= 0)
+        return cmd;
     return sdscatprintf(cmd, ESC "[%dX", length);
 }
 
@@ -79,7 +95,7 @@ sds ap_draw_vline(sds cmd, int length)
 sds ap_draw_rect(sds cmd, Vec2 size)
 {
     for (int i = 0; i < size.y; i++)
-        cmd = sdscatprintf(cmd, ESC "[1B" ESC "[%dX", size.x);
+        cmd = sdscatprintf(cmd, ESC "[%dX" ESC "[1B", size.x);
     return cmd;
 }
 

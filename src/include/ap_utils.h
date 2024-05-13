@@ -8,6 +8,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include "ap_array.h"
+#include "wcwidth.h"
 
 #define ARRLEN(arr)     (sizeof((arr)) / sizeof((arr)[0]))
 #define NOT_IMPLEMENTED assert(0 && "Not Implemented")
@@ -39,6 +40,7 @@ typedef struct APFile
     char *directory;
     char *filename;
     APFileStat stat;
+    wchar_t *filenamew;
 } APFile;
 
 // not a limitation, just an arbitrary cap
@@ -54,5 +56,8 @@ bool path_compare(const char *a, const char *b);
 bool path_comparew(const wchar_t *a, const wchar_t *b);
 APFileStat file_get_stat(const char *filename, int *success);
 APFileStat file_get_statw(const wchar_t *filename, int *success);
+bool is_path_file(const char *path);
+bool is_ascii(const char *str, int str_len);
+int strw_fit_into_column(const wchar_t *strw, int strwlen, int target_column, int *column_out);
 
 #endif /* __AP_UTILS_H */

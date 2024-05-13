@@ -76,7 +76,8 @@ void ap_term_writew(APHandle h, const wchar_t *wstr, size_t wstr_len)
 
 #define EVENT_RAW_SIZE 128
 
-void ap_term_get_events(APHandle h_in, APTermEvent *events_out, int len, int *out_len)
+void ap_term_get_events(APHandle h_in, APEvent *events_out, int len,
+                        int *out_len)
 {
     static INPUT_RECORD event_raw[EVENT_RAW_SIZE];
     ULONG event_read;
@@ -89,20 +90,15 @@ void ap_term_get_events(APHandle h_in, APTermEvent *events_out, int len, int *ou
         MOUSE_EVENT_RECORD m = e.Event.MouseEvent;
         WINDOW_BUFFER_SIZE_RECORD b = e.Event.WindowBufferSizeEvent;
 
-        APTermEventType type = {0};
-        APTermKeyEvent key_event = {0};
-        APTermMouseEvent mouse_event = {0};
-        APTermBufEvent buf_event = {0};
-
         switch (e.EventType)
         {
         case KEY_EVENT:
-            type = AP_TERM_KEY_EVENT;
+            APEventKey key_ev = {0};
 
-            key_event.key_down = k.bKeyDown;
-            key_event.ascii_key = k.uChar.AsciiChar;
-            key_event.unicode_key = k.uChar.UnicodeChar;
-            key_event.vk_key = k.wVirtualKeyCode;
+            key_ev.keydown = k.bKeyDown;
+            key_ev.ascii = k.uChar.AsciiChar;
+            key_ev.unicode = k.uChar.UnicodeChar;
+            key_ev.virtual = k.wVirtualKeyCode;
 
             DWORD ks = k.dwControlKeyState;
 
@@ -111,45 +107,40 @@ void ap_term_get_events(APHandle h_in, APTermEvent *events_out, int len, int *ou
             int alt_key_pressed =
                 (ks & LEFT_ALT_PRESSED) || (ks & RIGHT_ALT_PRESSED);
 
-            key_event.modifier_key = ((ks & SHIFT_PRESSED) << 0) |
-                                     (control_key_pressed << 1) |
-                                     (alt_key_pressed << 2);
+            key_ev.mod = ((ks & SHIFT_PRESSED) << 0) |
+                         (control_key_pressed << 1) | (alt_key_pressed << 2);
 
+            events_out[i] = (APEvent){AP_EVENT_KEY, .event.key = key_ev};
             break;
         case MOUSE_EVENT:
-            type = AP_TERM_MOUSE_EVENT;
+            APEventMouse mouse_ev = {0};
 
-            mouse_event.x = m.dwMousePosition.X;
-            mouse_event.y = m.dwMousePosition.Y;
+            mouse_ev.x = m.dwMousePosition.X;
+            mouse_ev.y = m.dwMousePosition.Y;
             DWORD ms = m.dwButtonState;
-            mouse_event.state = ((ms & FROM_LEFT_1ST_BUTTON_PRESSED) << 0) |
-                                ((ms & FROM_LEFT_2ND_BUTTON_PRESSED) << 1) |
-                                ((ms & FROM_LEFT_3RD_BUTTON_PRESSED) << 2);
-            mouse_event.double_clicked = m.dwEventFlags == DOUBLE_CLICK;
-            mouse_event.moved = m.dwEventFlags & MOUSE_MOVED;
-            mouse_event.scrolled = m.dwEventFlags & MOUSE_WHEELED;
-            mouse_event.scroll_delta = GET_WHEEL_DELTA_WPARAM(m.dwButtonState);
+            mouse_ev.state = ((ms & FROM_LEFT_1ST_BUTTON_PRESSED) << 0) |
+                             ((ms & FROM_LEFT_2ND_BUTTON_PRESSED) << 1) |
+                             ((ms & FROM_LEFT_3RD_BUTTON_PRESSED) << 2);
+            mouse_ev.double_clicked = m.dwEventFlags == DOUBLE_CLICK;
+            mouse_ev.moved = m.dwEventFlags & MOUSE_MOVED;
+            mouse_ev.scrolled = m.dwEventFlags & MOUSE_WHEELED;
+            mouse_ev.scroll_delta = GET_WHEEL_DELTA_WPARAM(m.dwButtonState);
 
+            events_out[i] = (APEvent){AP_EVENT_MOUSE, .event.mouse = mouse_ev};
             break;
         case WINDOW_BUFFER_SIZE_EVENT:
-            type = AP_TERM_BUF_EVENT;
-            buf_event.to_width = b.dwSize.X;
-            buf_event.to_height = b.dwSize.Y;
+            APEventBuffer buf_ev = {0};
+            buf_ev.width = b.dwSize.X;
+            buf_ev.height = b.dwSize.Y;
 
+            events_out[i] = (APEvent){AP_EVENT_BUFFER, .event.buf = buf_ev};
             break;
         default:
-            type = AP_TERM_UNKNOWN_EVENT;
+            events_out[i] = (APEvent){AP_EVENT_UNKNOWN};
             break;
         }
 
-        events_out[i] = (APTermEvent){
-            .type = type,
-            .key_event = key_event,
-            .mouse_event = mouse_event,
-            .buf_event = buf_event,
-        };
+        if (out_len)
+            *out_len = event_read;
     }
-
-    if (out_len)
-        *out_len = event_read;
 }

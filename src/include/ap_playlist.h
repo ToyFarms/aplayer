@@ -24,7 +24,7 @@ typedef struct APSource
 
 typedef struct APEntryGroup
 {
-    char *id;
+    char *name;
     T(APFile) APArray *entries;
 } APEntryGroup;
 

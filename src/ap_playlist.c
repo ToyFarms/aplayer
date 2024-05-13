@@ -55,6 +55,8 @@ static void ap_playlist_entries_free(T(APFile) APArray *entries)
         }
         free(file.filename);
         file.filename = NULL;
+        free(file.filenamew);
+        file.filenamew = NULL;
     }
 }
 
@@ -84,7 +86,7 @@ void ap_playlist_free(APPlaylist **p)
 }
 
 #define GET_OFFSET(small_endian, size, i)                                      \
-    ((small_endian) ? (i) * 8 : ((size) - (i) - 1) * 8)
+    ((small_endian) ? (i) * 8 : ((size) - (i)-1) * 8)
 
 static void i64tob(char *buf, int64_t n, bool small_endian)
 {
@@ -110,7 +112,7 @@ static void i8tob(char *buf, int8_t n, bool small_endian)
 }
 
 #define BUF_READ(buf, T) (*(T *)((buf).data + (buf).offset))
-#define BUF_OFFSET(buf) ((buf).data + (buf).offset)
+#define BUF_OFFSET(buf)  ((buf).data + (buf).offset)
 
 void ap_playlist_deserialize(APPlaylist *p, void *_buf, int buf_size)
 {
@@ -144,13 +146,17 @@ void ap_playlist_deserialize(APPlaylist *p, void *_buf, int buf_size)
 
         if (is_file)
         {
-            ap_array_append_resize(root, &(APFile){strdup("*root*"), source, file_get_stat(source, NULL)}, 1);
+            ap_array_append_resize(root,
+                                   &(APFile){strdup("*root*"), source,
+                                             file_get_stat(source, NULL)},
+                                   1);
         }
         else if (need_expand)
         {
             uint32_t entry_len = BUF_READ(buf, uint32_t);
             buf.offset += 4;
-            T(APFile) APArray *entries = ap_array_alloc(entry_len, sizeof(APFile));
+            T(APFile)
+            APArray *entries = ap_array_alloc(entry_len, sizeof(APFile));
             for (int j = 0; j < entry_len; j++)
             {
                 uint32_t entry_size = BUF_READ(buf, uint32_t);
@@ -158,9 +164,13 @@ void ap_playlist_deserialize(APPlaylist *p, void *_buf, int buf_size)
                 char *filename = (char *)calloc(entry_size + 1, 1);
                 memcpy(filename, BUF_OFFSET(buf), entry_size);
                 buf.offset += entry_size;
-                ap_array_append_resize(entries, &(APFile){source, filename, file_get_stat(filename, NULL)}, 1);
+                ap_array_append_resize(
+                    entries,
+                    &(APFile){source, filename, file_get_stat(filename, NULL)},
+                    1);
             }
-            ap_array_append_resize(p->groups,  &(APEntryGroup){source, entries}, 1);
+            ap_array_append_resize(p->groups, &(APEntryGroup){source, entries},
+                                   1);
         }
     }
 
@@ -177,7 +187,8 @@ void ap_playlist_deserialize(APPlaylist *p, void *_buf, int buf_size)
  * if flags specify file:
  *     structure: [size:u64 flags:i64 entry_size:u32 entry:b, ...]
  * if flags specify expand:
- *     structure: [size:u64 flags:i64 source_size:u32 source:b entry_len:u32 [entry_size:u32 entry:b, ...], ...]
+ *     structure: [size:u64 flags:i64 source_size:u32 source:b entry_len:u32
+ * [entry_size:u32 entry:b, ...], ...]
  * */
 void *ap_playlist_serialize(APPlaylist *p, bool expand_source, int *out_size)
 {
@@ -226,8 +237,9 @@ void *ap_playlist_serialize(APPlaylist *p, bool expand_source, int *out_size)
             if (p->groups)
                 for (int j = 0; j < p->groups->len; j++)
                 {
-                    APEntryGroup group = ARR_INDEX(p->groups, APEntryGroup *, j);
-                    if (path_compare(group.id, source.path))
+                    APEntryGroup group =
+                        ARR_INDEX(p->groups, APEntryGroup *, j);
+                    if (path_compare(group.name, source.path))
                     {
                         found = j;
                         break;
@@ -285,7 +297,8 @@ void ap_playlist_load(APPlaylist *p)
         if (src.is_file)
             ap_array_append_resize(root,
                                    &(APFile){strdup("*root*"), strdup(src.path),
-                                             file_get_stat(src.path, NULL)},
+                                             file_get_stat(src.path, NULL),
+                                             mbstowchar(src.path, -1, NULL)},
                                    1);
         else
         {
@@ -296,6 +309,12 @@ void ap_playlist_load(APPlaylist *p)
             ap_array_append_resize(p->groups,
                                    &(APEntryGroup){src.path, entries}, 1);
         }
+    }
+
+    if (root->len == 0)
+    {
+        ap_array_free(&root);
+        return;
     }
 
     ap_array_append_resize(p->groups, &(APEntryGroup){"*root*", root}, 1);

@@ -1,20 +1,18 @@
 cmake_minimum_required(VERSION 3.10)
-
 project(audio_player)
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wno-unused-variable -Wno-unused-function -Wno-unused-but-set-variable")
 if(NOT CMAKE_BUILD_TYPE STREQUAL "Release")
-  # to fix sds overflow warning
   set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Werror")
 elseif(CMAKE_BUILD_TYPE STREQUAL "Debug")
   set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -E")
 endif()
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-execute_process(
-  COMMAND ${CMAKE_COMMAND} -E copy
-        ${CMAKE_BINARY_DIR}/compile_commands.json
-        ${CMAKE_SOURCE_DIR}/compile_commands.json
-)
+
+set(VCPKG_TARGET_TRIPLET "x64-windows")
+set(CMAKE_TOOLCHAIN_FILE $ENV{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake)
+
+include(${CMAKE_TOOLCHAIN_FILE})
 
 set(OS-DIR NOT_SUPPORTED)
 
@@ -51,24 +49,29 @@ add_executable(
   src/audio/ap_audio_processing.c
 
   src/ui/ap_ui.c
+  src/ui/ap_widget.c
   src/ui/tui/ap_draw.c
   src/ui/tui/ap_tui.c
 
   ${widgets}
 )
 
+find_package(portaudio REQUIRED)
+target_link_libraries(aplayer PRIVATE portaudio)
+
+find_package(ffmpeg REQUIRED)
+target_include_directories(aplayer PRIVATE ${FFMPEG_INCLUDE_DIRS})
+target_link_directories(aplayer PRIVATE ${FFMPEG_LIBRARY_DIRS})
+target_link_libraries(aplayer PRIVATE avformat avcodec avutil swresample)
+
 target_include_directories(aplayer PUBLIC src/include)
 target_include_directories(aplayer PUBLIC src/audio/include)
 target_include_directories(aplayer PUBLIC src/ui/include)
 target_include_directories(aplayer PUBLIC src/ui/tui/include)
-target_include_directories(aplayer PUBLIC vcpkg_installed/x64-windows/include)
 target_include_directories(aplayer PUBLIC thirdparty)
 
-target_link_directories(aplayer PUBLIC vcpkg_installed/x64-windows/lib)
-target_link_libraries(aplayer PUBLIC
-  avformat
-  avcodec
-  avutil
-  swresample
-  portaudio
+execute_process(
+  COMMAND ${CMAKE_COMMAND} -E copy
+        ${CMAKE_BINARY_DIR}/compile_commands.json
+        ${CMAKE_SOURCE_DIR}/compile_commands.json
 )

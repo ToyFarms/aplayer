@@ -210,10 +210,10 @@ sds sdsMakeRoomFor(sds s, size_t addlen) {
 
     /* Return ASAP if there is enough space left. */
     if (avail >= addlen) return s;
+
     len = sdslen(s);
     sh = (char*)s-sdsHdrSize(oldtype);
     reqlen = newlen = (len+addlen);
-
     if (newlen < SDS_MAX_PREALLOC)
         newlen *= 2;
     else

@@ -108,6 +108,7 @@ T(APFile) APArray *read_directory(const char *dir)
                 files,
                 &(APFile){.directory = dir_copy,
                           .filename = normalized_mbs,
+                          .filenamew = wcsdup(ffd.cFileName),
                           .stat = file_get_statw(fullpath, NULL)},
                 1);
         }
@@ -225,4 +226,12 @@ APFileStat file_get_statw(const wchar_t *filename, int *success)
         *success = 0;
 
     return fstat;
+}
+
+bool is_path_file(const char *path)
+{
+    struct stat st;
+    if (stat(path, &st) != 0)
+        return false;
+    return st.st_mode & S_IFREG;
 }
