@@ -1,11 +1,25 @@
 #include "ap_widgets.h"
 
+typedef enum LineType
+{
+    LINE_EMPTY,
+    LINE_GROUPNAME,
+    LINE_ENTRY,
+} LineType;
+
+typedef struct LineDef
+{
+    sds data;
+    LineType type;
+} LineDef;
+
+typedef T(LineDef) APArray *LineDefs;
+
 typedef struct FileListState
 {
     int offset;
-    int *cache;
-    int cache_size;
     APPlaylist *pl;
+    LineDefs lines;
 } FileListState;
 
 void ap_widget_filelist_init(APWidget *w, APPlaylist *pl)
@@ -13,9 +27,7 @@ void ap_widget_filelist_init(APWidget *w, APPlaylist *pl)
     w->state.tui->internal = calloc(1, sizeof(FileListState));
     FileListState *state = w->state.tui->internal;
 
-    state->cache_size = w->size.y;
-    state->cache = malloc(state->cache_size * sizeof(*state->cache));
-    memset(state->cache, 0xDEADBEEF, state->cache_size);
+    // state->lines = ap_array_alloc(16, sizeof(LineDef));
     state->pl = pl;
 }
 
@@ -45,23 +57,12 @@ static inline int __fixsubtract(int a, int b)
     return a - b;
 }
 
-void ap_widget_filelist_draw(APWidget *w)
+static LineDefs generate_lines(APWidget *w)
 {
     FileListState *state = w->state.tui->internal;
     APPlaylist *pl = state->pl;
-    sds c = w->state.tui->draw_cmd;
 
-    if (!pl || !pl->groups->len)
-        return;
-
-    if (state->cache_size != w->size.y)
-    {
-        state->cache = realloc(state->cache, w->size.y);
-        state->cache_size = w->size.y;
-    }
-
-    T(sds) APArray buf;
-    ap_array_init(&buf, w->size.y, sizeof(sds));
+    LineDefs lines = ap_array_alloc(1, sizeof(LineDef));
 
     int current_row = 0;
     for (int i = 0; i < pl->groups->len; i++)
@@ -69,11 +70,10 @@ void ap_widget_filelist_draw(APWidget *w)
         if (current_row > w->size.y + state->offset)
             continue;
 
-        sds header = sdsempty();
-
         APEntryGroup group = ARR_INDEX(pl->groups, APEntryGroup *, i);
         // TODO: Add colorscheme (dict) for each widget
 
+        sds header = sdsempty();
         header = ap_draw_color(header, APCOLOR(0, 0, 0, 255),
                                APCOLOR(152, 195, 121, 255));
         header = ap_draw_hline(header, w->size.x);
@@ -81,8 +81,7 @@ void ap_widget_filelist_draw(APWidget *w)
         header = ap_draw_strf(header, " %s", group.name);
         header = ap_draw_color(header, APCOLOR(255, 255, 255, 255),
                                APCOLOR(0, 0, 0, 255));
-        ap_array_append_resize(&buf, &header, 1);
-        current_row++;
+        ap_array_append_resize(lines, &(LineDef){header, LINE_GROUPNAME}, 1);
 
         for (int j = 0; j < group.entries->len; j++)
         {
@@ -95,7 +94,7 @@ void ap_widget_filelist_draw(APWidget *w)
             file = ap_draw_color(file, w->fg, w->bg);
 
             int num_len = sdslen(file);
-            file = ap_draw_strf(file, "  %3d ", j);
+            file = ap_draw_strf(file, "  %3d ", j + 1);
             num_len = sdslen(file) - num_len;
 
             file =
@@ -108,17 +107,7 @@ void ap_widget_filelist_draw(APWidget *w)
                     MATH_MIN(strlen(entry.filename), w->size.x - num_len));
                 file = ap_draw_padding(
                     file,
-                    __fixsubtract(w->size.x, strlen(entry.filename)) - num_len);
-
-                // caused (null) to the whole row
-                // int a = w->size.x - strlen(entry.filename);
-                /* NOTE: subtracting "w->size.x - strlen(entry.filename)" inline
-                    would caused the row to be (null). I dont know why, even
-                    though the operation didn't involve any other variable at
-                    all, this issues only appear in Debug mode on Windows
-                    Terminal; testing with mingw terminal, only the first frame
-                    are (null) but its fine after
-                 */
+                    w->size.x - strlen(entry.filename) - num_len);
             }
             else
             {
@@ -131,30 +120,42 @@ void ap_widget_filelist_draw(APWidget *w)
             }
 
             file = ap_draw_reset_attr(file);
-
-            ap_array_append_resize(&buf, &file, 1);
-            current_row++;
+            ap_array_append_resize(lines, &(LineDef){file, LINE_ENTRY}, 1);
         }
 
         sds footer = sdsempty();
         footer = ap_draw_color(footer, APCOLOR_ZERO, w->bg);
         footer = ap_draw_hline(footer, w->size.x);
-        ap_array_append_resize(&buf, &footer, 1);
-        current_row++;
+        ap_array_append_resize(lines, &(LineDef){footer, LINE_EMPTY}, 1);
     }
+
+    return lines;
+}
+
+void ap_widget_filelist_draw(APWidget *w)
+{
+    FileListState *state = w->state.tui->internal;
+    APPlaylist *pl = state->pl;
+    sds c = w->state.tui->draw_cmd;
+
+    if (!pl || !pl->groups->len)
+        return;
+
+    if (!state->lines)
+        state->lines = generate_lines(w);
 
     for (int i = 0; i < w->size.y; i++)
     {
-        if (i + state->offset > buf.len - 1 || i + state->offset < 0)
+        if (i + state->offset > state->lines->len - 1 || i + state->offset < 0)
             break;
 
-        sds row = ARR_INDEX(&buf, sds *, i + state->offset);
-        c = ap_draw_pos(c, VEC(w->pos.x, w->pos.y + i));
-        c = ap_draw_strf(c, "%s", row);
-    }
+        LineDef line = ARR_INDEX(state->lines, LineDef *, i + state->offset);
+        if (line.data == NULL)
+            continue;
 
-    for (int i = 0; i < buf.len; i++)
-        sdsfree(ARR_INDEX(&buf, sds *, i));
+        c = ap_draw_pos(c, VEC(w->pos.x, w->pos.y + i));
+        c = ap_draw_strf(c, "%s", line.data);
+    }
 
     w->state.tui->draw_cmd = c;
 }
