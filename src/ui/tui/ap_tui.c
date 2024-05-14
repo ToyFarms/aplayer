@@ -5,6 +5,9 @@ void ap_tui_init_widgets(APWidgets *ws)
     for (int i = 0; i < ws->len; i++)
     {
         APWidget *w = ARR_INDEX(ws, APWidget **, i);
+        if (w->init)
+            w->init(w);
+
         w->state.tui = calloc(1, sizeof(*w->state.tui));
         w->state.tui->draw_cmd = sdsempty();
     }
