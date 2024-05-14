@@ -103,9 +103,10 @@ void ap_array_append_resize(APArray *arr, const void *data, int data_len)
         ARR_APPEND(arr, arr->len, data, data_len);
     else
     {
-        while (data_len >= ARR_FREESPACE(arr))
-            arr->capacity *= 2;
-        arr->data = realloc(arr->data, arr->capacity * arr->item_size);
+        int capacity = arr->capacity;
+        while (data_len >= capacity - arr->len)
+            capacity *= 2;
+        ap_array_resize(arr, capacity);
         ARR_APPEND(arr, arr->len, data, data_len);
     }
 }
@@ -113,6 +114,11 @@ void ap_array_append_resize(APArray *arr, const void *data, int data_len)
 void ap_array_resize(APArray *arr, int new_capacity)
 {
     arr->data = realloc(arr->data, new_capacity * arr->item_size);
+    if (new_capacity > arr->capacity)
+    {
+        memset(ARR_OFFSET(arr, arr->capacity), 0,
+               (new_capacity - arr->capacity) * arr->item_size);
+    }
     arr->capacity = new_capacity;
     arr->len = arr->len > new_capacity ? new_capacity : arr->len;
 }
