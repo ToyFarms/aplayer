@@ -4,7 +4,7 @@ set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wno-unused-variable -Wno-unused-funct
 if(NOT CMAKE_BUILD_TYPE STREQUAL "Release")
   set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Werror")
 elseif(CMAKE_BUILD_TYPE STREQUAL "Debug")
-  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -E")
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS}")
 endif()
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
