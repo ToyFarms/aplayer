@@ -18,6 +18,7 @@ typedef T(LineDef) APArray *LineDefs;
 typedef struct FileListState
 {
     int offset;
+    int cursor;
     APPlaylist *pl;
     LineDefs lines;
 } FileListState;
@@ -27,7 +28,6 @@ void ap_widget_filelist_init(APWidget *w, APPlaylist *pl)
     w->state.tui->internal = calloc(1, sizeof(FileListState));
     FileListState *state = w->state.tui->internal;
 
-    // state->lines = ap_array_alloc(16, sizeof(LineDef));
     state->pl = pl;
 }
 
@@ -50,11 +50,6 @@ static int get_current_group_index(int i, int *offsets, int offset_len)
         return offset_len;
 
     return -1;
-}
-
-static inline int __fixsubtract(int a, int b)
-{
-    return a - b;
 }
 
 static LineDefs generate_lines(APWidget *w)
@@ -146,14 +141,23 @@ void ap_widget_filelist_draw(APWidget *w)
 
     for (int i = 0; i < w->size.y; i++)
     {
-        if (i + state->offset > state->lines->len - 1 || i + state->offset < 0)
+        int absline = i + state->offset;
+        if (absline > state->lines->len - 1 || absline < 0)
             break;
 
-        LineDef line = ARR_INDEX(state->lines, LineDef *, i + state->offset);
+        LineDef line = ARR_INDEX(state->lines, LineDef *, absline);
         if (line.data == NULL)
             continue;
 
         c = ap_draw_pos(c, VEC(w->pos.x, w->pos.y + i));
+
+        if (absline == state->cursor)
+        {
+            c = ap_draw_hline(c, w->size.x);
+            c = ap_draw_strf(c, "%d", state->cursor);
+            continue;
+        }
+
         c = ap_draw_strf(c, "%s", line.data);
     }
 
@@ -167,8 +171,27 @@ void ap_widget_filelist_on_event(APWidget *w, APEvent e)
     if (e.type == AP_EVENT_KEY && e.event.key.keydown)
     {
         if (e.event.key.ascii == 'j')
-            state->offset += 1;
+            state->cursor += 1;
         else if (e.event.key.ascii == 'k')
-            state->offset = MATH_MAX(0, state->offset - 1);
+            state->cursor = MATH_MAX(0, state->cursor - 1);
     }
+
+    if (state->cursor - state->offset >= w->size.y - 10)
+        state->offset += 1;
+    else if (state->cursor - state->offset < 10)
+        state->offset = MATH_MAX(0, state->offset - 1);
+}
+
+void ap_widget_filelist_free(APWidget *w)
+{
+    FileListState *state = w->state.tui->internal;
+    for (int i = 0; i < state->lines->len; i++)
+    {
+        LineDef line = ARR_INDEX(state->lines, LineDef *, i);
+        sdsfree(line.data);
+        line.data = NULL;
+    }
+    ap_array_free(&state->lines);
+    free(state);
+    state = NULL;
 }

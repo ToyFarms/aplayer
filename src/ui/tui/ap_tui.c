@@ -1,6 +1,6 @@
 #include "ap_tui.h"
 
-void ap_tui_init_widgets(APWidgets *ws)
+void ap_tui_widgets_init(APWidgets *ws)
 {
     for (int i = 0; i < ws->len; i++)
     {
@@ -11,6 +11,25 @@ void ap_tui_init_widgets(APWidgets *ws)
         w->state.tui = calloc(1, sizeof(*w->state.tui));
         w->state.tui->draw_cmd = sdsempty();
     }
+}
+
+void ap_tui_widgets_free(APWidgets *ws)
+{
+    for (int i = 0; i < ws->len; i++)
+    {
+        APWidget *w = ARR_INDEX(ws, APWidget **, i);
+        if (w->free)
+            w->free(w);
+
+        sdsfree(w->state.tui->draw_cmd);
+        w->state.tui->draw_cmd = NULL;
+        free(w->state.tui);
+        w->state.tui = NULL;
+        free(w);
+        w = NULL;
+    }
+
+    ap_array_free(&ws);
 }
 
 void ap_tui_propagate_event(APWidgets *ws, APEvent e)

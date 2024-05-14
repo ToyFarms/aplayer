@@ -2,31 +2,31 @@
 
 sds ap_draw_pos(sds cmd, Vec2 pos)
 {
-    return sdscatprintf(cmd, ESC "[%d;%dH", pos.y + 1, pos.x + 1);
+    return sdscatprintf(cmd, ESC TCMD_POSYX, pos.y + 1, pos.x + 1);
 }
 
 sds ap_draw_posmove(sds cmd, Vec2 pos)
 {
     if (pos.y > 0)
-        cmd = sdscatprintf(cmd, ESC "[%dE", pos.y);
+        cmd = sdscatprintf(cmd, ESC TCMD_NDOWN, pos.y);
     else if (pos.y < 0)
-        cmd = sdscatprintf(cmd, ESC "[%dA", pos.y * -1);
+        cmd = sdscatprintf(cmd, ESC TCMD_NUP, pos.y * -1);
     if (pos.x > 0)
-        cmd = sdscatprintf(cmd, ESC "[%dC", pos.x);
+        cmd = sdscatprintf(cmd, ESC TCMD_NRIGHT, pos.x);
     else if (pos.x < 0)
-        cmd = sdscatprintf(cmd, ESC "[%dD", pos.x * -1);
+        cmd = sdscatprintf(cmd, ESC TCMD_NLEFT, pos.x * -1);
     return cmd;
 }
 
 sds ap_draw_color(sds cmd, APColor fg, APColor bg)
 {
     if (bg.a != 0 && fg.a != 0)
-        return sdscatprintf(cmd, ESC "[48;2;%d;%d;%d;38;2;%d;%d;%dm", bg.r,
-                            bg.g, bg.b, fg.r, fg.g, fg.b);
+        return sdscatprintf(cmd, ESC TCMD_BGFG, bg.r, bg.g, bg.b, fg.r, fg.g,
+                            fg.b);
     else if (bg.a != 0)
-        return sdscatprintf(cmd, ESC "[48;2;%d;%d;%dm", bg.r, bg.g, bg.b);
+        return sdscatprintf(cmd, ESC TCMD_BG, bg.r, bg.g, bg.b);
     else if (fg.a != 0)
-        return sdscatprintf(cmd, ESC "[38;2;%d;%d;%dm", fg.r, fg.g, fg.b);
+        return sdscatprintf(cmd, ESC TCMD_FG, fg.r, fg.g, fg.b);
     else
         return cmd;
 }
@@ -61,7 +61,7 @@ sds ap_draw_cmd(sds cmd, sds cmd2)
 
 sds ap_draw_reset_attr(sds cmd)
 {
-    return sdscat(cmd, ESC "[0m");
+    return sdscat(cmd, ESC TCMD_RESET);
 }
 
 sds ap_draw_padding(sds cmd, int length)
@@ -82,20 +82,20 @@ sds ap_draw_hline(sds cmd, int length)
 {
     if (length <= 0)
         return cmd;
-    return sdscatprintf(cmd, ESC "[%dX", length);
+    return sdscatprintf(cmd, ESC TCMD_HLINE, length);
 }
 
 sds ap_draw_vline(sds cmd, int length)
 {
     for (int i = 0; i < length; i++)
-        cmd = sdscat(cmd, ESC "[1B ");
+        cmd = sdscat(cmd, " " ESC TCMD_DOWN ESC TCMD_LEFT);
     return cmd;
 }
 
 sds ap_draw_rect(sds cmd, Vec2 size)
 {
     for (int i = 0; i < size.y; i++)
-        cmd = sdscatprintf(cmd, ESC "[%dX" ESC "[1B", size.x);
+        cmd = sdscatprintf(cmd, ESC TCMD_HLINE ESC TCMD_DOWN, size.x);
     return cmd;
 }
 

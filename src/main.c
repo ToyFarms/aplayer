@@ -45,7 +45,7 @@ int main(int argc, char **argv)
                    ap_widget_filelist_draw, ap_widget_filelist_on_event, NULL);
     ap_array_append_resize(widgets, &filelist, 1);
 
-    ap_tui_init_widgets(widgets);
+    ap_tui_widgets_init(widgets);
 
     ap_widget_filelist_init(filelist, pl);
 
@@ -82,6 +82,7 @@ int main(int argc, char **argv)
 
     ap_term_switch_main_buf(termctx->handle_out);
     ap_playlist_free(&pl);
+    ap_tui_widgets_free(widgets);
 
     return 0;
 }

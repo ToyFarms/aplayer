@@ -25,6 +25,7 @@ APHandle ap_term_get_std_handle(HandleType type)
 
 void ap_term_switch_alt_buf(APHandle h)
 {
+    // TODO: Config for these modes
     DWORD out_mode;
     GetConsoleMode(h.handle, &out_mode);
     out_mode |= ENABLE_VIRTUAL_TERMINAL_PROCESSING;
@@ -42,7 +43,7 @@ void ap_term_switch_alt_buf(APHandle h)
     SetConsoleMode(in, in_mode);
 
     ap_term_show_cursor(h, false);
-    printf(ESC "[?1049h");
+    ap_term_write(h, ESC TCMD_ALTBUF, -1);
 }
 
 static CSBI os_term_get_csbi(APHandle h)
@@ -64,14 +65,14 @@ Vec2 ap_term_get_cursor(APHandle h)
     return VEC(csbi.dwCursorPosition.X, csbi.dwCursorPosition.Y);
 }
 
-void ap_term_write(APHandle h, const char *str, size_t str_len)
+void ap_term_write(APHandle h, const char *str, int str_len)
 {
-    WriteConsole(h.handle, str, str_len, NULL, NULL);
+    WriteConsole(h.handle, str, str_len > 0 ? str_len : strlen(str), NULL, NULL);
 }
 
-void ap_term_writew(APHandle h, const wchar_t *wstr, size_t wstr_len)
+void ap_term_writew(APHandle h, const wchar_t *wstr, int wstr_len)
 {
-    WriteConsoleW(h.handle, wstr, wstr_len, NULL, NULL);
+    WriteConsoleW(h.handle, wstr, wstr_len > 0 ? wstr_len : wcslen(wstr), NULL, NULL);
 }
 
 #define EVENT_RAW_SIZE 128
