@@ -30,6 +30,8 @@ static uint64_t hash_theme(const char *key)
     if (i > 0)
         hash += ap_hash_djb2(seg);
 
+    free(seg);
+
     return hash;
 }
 
@@ -80,7 +82,7 @@ int main(int argc, char **argv)
     ap_dict_insert(theme, "filelist-entry-num-fg",              &APCOLOR(150, 150, 150, 255));
     ap_dict_insert(theme, "filelist-entry-num-hovered-fg",      &APCOLOR(50,  50,  50,  255));
     ap_dict_insert(theme, "filelist-groupname-name-bg",         &APCOLOR(30,  30,  30,  255));
-    ap_dict_insert(theme, "filelist-groupname-name-hovered-bg", &APCOLOR(100, 100, 100,  255));
+    ap_dict_insert(theme, "filelist-groupname-name-hovered-bg", &APCOLOR(100, 100, 100, 255));
     ap_dict_insert(theme, "filelist-groupname-name-fg",         &APCOLOR(178, 32,  227, 255));
     ap_dict_insert(theme, "filelist-groupname-name-hovered-fg", &APCOLOR(235, 176, 255, 255));
     ap_dict_insert(theme, "filelist-groupname-num-bg",          &APCOLOR(30,  30,  30,  255));
@@ -94,8 +96,8 @@ int main(int argc, char **argv)
 
     APWidget *filelist = calloc(1, sizeof(*filelist));
     ap_widget_init(filelist, VEC(1, 1), VEC(69, termctx->size.y - 5),
-                   theme, NULL,
-                   ap_widget_filelist_draw, ap_widget_filelist_on_event, NULL);
+                   theme, NULL, ap_widget_filelist_draw,
+                   ap_widget_filelist_on_event, ap_widget_filelist_free);
     ap_array_append_resize(widgets, &filelist, 1);
 
     ap_tui_widgets_init(widgets);
@@ -136,6 +138,7 @@ int main(int argc, char **argv)
     ap_term_switch_main_buf(termctx->handle_out);
     ap_playlist_free(&pl);
     ap_tui_widgets_free(widgets);
+    ap_dict_free(&theme);
 
     return 0;
 }
