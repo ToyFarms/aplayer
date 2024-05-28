@@ -59,6 +59,9 @@ void *ap_tui_render_loop(void *arg)
             if (w->draw != NULL)
                 w->draw(w);
 
+            if (!w->state.tui->draw_cmd || sdslen(w->state.tui->draw_cmd) == 0)
+                continue;
+
             int len;
             wchar_t *out = mbstowchar(w->state.tui->draw_cmd,
                                       sdslen(w->state.tui->draw_cmd), &len);
