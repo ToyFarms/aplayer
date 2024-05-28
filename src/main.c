@@ -7,10 +7,40 @@
 #include <pthread.h>
 #include "ap_flags.h"
 
+static uint64_t hash_theme(const char *key)
+{
+    char c;
+    const char *k = key;
+    char *seg = calloc(strlen(key), 1);
+    int i = 0;
+    uint64_t hash = 0;
+
+    while ((c = *k++))
+    {
+        if (c == '-')
+        {
+            hash += ap_hash_djb2(seg);
+            memset(seg, 0, strlen(key));
+            i = 0;
+            continue;
+        }
+        seg[i++] = c;
+    }
+
+    if (i > 0)
+        hash += ap_hash_djb2(seg);
+
+    return hash;
+}
+
+static int compare_theme(const char *k1, const char *k2)
+{
+    return !(hash_theme(k1) == hash_theme(k2));
+}
+
 int main(int argc, char **argv)
 {
     prepare_app_arguments(&argc, &argv);
-
     if (argc < 2)
     {
         fprintf(stderr, "Usage: %s [dir/file, ...]", argv[0]);
@@ -37,11 +67,34 @@ int main(int argc, char **argv)
     ap_term_switch_alt_buf(termctx->handle_out);
 #endif // _DEBUG_TUI_OUTPUT
 
-    APWidgets *widgets = ap_array_alloc(16, sizeof(APWidget *));
+    APArrayT(APWidget) *widgets = ap_array_alloc(16, sizeof(APWidget *));
+
+    APDict *theme = ap_dict_alloc(16, hash_theme);
+    theme->keycmp_fn = compare_theme;
+    ap_dict_insert(theme, "filelist-entry-name-bg",             &APCOLOR(30,  30,  30,  255));
+    ap_dict_insert(theme, "filelist-entry-name-hovered-bg",     &APCOLOR(66,  135, 245, 255));
+    ap_dict_insert(theme, "filelist-entry-name-fg",             &APCOLOR(66,  135, 245, 255));
+    ap_dict_insert(theme, "filelist-entry-name-hovered-fg",     &APCOLOR(30,  30,  30,  255));
+    ap_dict_insert(theme, "filelist-entry-num-bg",              &APCOLOR(50,  50,  50,  255));
+    ap_dict_insert(theme, "filelist-entry-num-hovered-bg",      &APCOLOR(150, 150, 150, 255));
+    ap_dict_insert(theme, "filelist-entry-num-fg",              &APCOLOR(150, 150, 150, 255));
+    ap_dict_insert(theme, "filelist-entry-num-hovered-fg",      &APCOLOR(50,  50,  50,  255));
+    ap_dict_insert(theme, "filelist-groupname-name-bg",         &APCOLOR(30,  30,  30,  255));
+    ap_dict_insert(theme, "filelist-groupname-name-hovered-bg", &APCOLOR(100, 100, 100,  255));
+    ap_dict_insert(theme, "filelist-groupname-name-fg",         &APCOLOR(178, 32,  227, 255));
+    ap_dict_insert(theme, "filelist-groupname-name-hovered-fg", &APCOLOR(235, 176, 255, 255));
+    ap_dict_insert(theme, "filelist-groupname-num-bg",          &APCOLOR(30,  30,  30,  255));
+    ap_dict_insert(theme, "filelist-groupname-num-hovered-bg",  &APCOLOR(35,  35,  35,  255));
+    ap_dict_insert(theme, "filelist-groupname-num-fg",          &APCOLOR(100, 100, 100, 255));
+    ap_dict_insert(theme, "filelist-groupname-num-hovered-fg",  &APCOLOR(255, 255, 255, 255));
+    ap_dict_insert(theme, "filelist-empty-bg",                  &APCOLOR(255, 255, 255, 255));
+    ap_dict_insert(theme, "filelist-empty-hovered-bg",          &APCOLOR(255, 255, 255, 255));
+    ap_dict_insert(theme, "filelist-empty-fg",                  &APCOLOR(255, 255, 255, 255));
+    ap_dict_insert(theme, "filelist-empty-hovered-fg",          &APCOLOR(255, 255, 255, 255));
 
     APWidget *filelist = calloc(1, sizeof(*filelist));
     ap_widget_init(filelist, VEC(1, 1), VEC(69, termctx->size.y - 5),
-                   APCOLOR(230, 200, 150, 255), APCOLOR(30, 30, 30, 255), NULL,
+                   theme, NULL,
                    ap_widget_filelist_draw, ap_widget_filelist_on_event, NULL);
     ap_array_append_resize(widgets, &filelist, 1);
 

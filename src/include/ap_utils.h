@@ -49,7 +49,7 @@ typedef struct APFile
 char *wchartombs(const wchar_t *strw, int strwlen, int *strlen_out);
 wchar_t *mbstowchar(const char *str, int strlen, int *strwlen_out);
 char *file_read(const char *path, bool byte_mode, int *out_size);
-T(APFile) APArray *read_directory(const char *dir);
+APArrayT(APFile) *read_directory(const char *dir);
 char *path_normalize(const char *path, int *len_out);
 wchar_t *path_normalizew(const wchar_t *path, int *len_out);
 bool path_compare(const char *a, const char *b);

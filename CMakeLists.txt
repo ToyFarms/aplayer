@@ -35,6 +35,7 @@ add_executable(
   src/main.c
   src/ap_array.c
   src/ap_playlist.c
+  src/ap_dict.c
   thirdparty/wcwidth.c
   thirdparty/sds.c
 

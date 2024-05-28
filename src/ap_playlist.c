@@ -23,7 +23,7 @@ static void ap_dynbuf_ensure_free(APDynBuf *buf, int size)
     buf->data = realloc(buf->data, buf->size);
 }
 
-static void ap_playlist_entries_free(T(APFile) APArray *entries);
+static void ap_playlist_entries_free(APArrayT(APFile) * entries);
 
 APPlaylist *ap_playlist_alloc()
 {
@@ -43,7 +43,7 @@ void ap_playlist_init(APPlaylist *p)
     p->sources = ap_array_alloc(16, sizeof(APSource));
 }
 
-static void ap_playlist_entries_free(T(APFile) APArray *entries)
+static void ap_playlist_entries_free(APArrayT(APFile) *entries)
 {
     for (int i = 0; i < entries->len; i++)
     {
@@ -86,7 +86,7 @@ void ap_playlist_free(APPlaylist **p)
 }
 
 #define GET_OFFSET(small_endian, size, i)                                      \
-    ((small_endian) ? (i) * 8 : ((size) - (i)-1) * 8)
+    ((small_endian) ? (i) * 8 : ((size) - (i) - 1) * 8)
 
 static void i64tob(char *buf, int64_t n, bool small_endian)
 {
@@ -124,7 +124,7 @@ void ap_playlist_deserialize(APPlaylist *p, void *_buf, int buf_size)
     uint32_t patch = BUF_READ(buf, uint32_t);
     buf.offset += 4;
 
-    T(APFile) APArray *root = ap_array_alloc(16, sizeof(APFile));
+    APArrayT(APFile) *root = ap_array_alloc(16, sizeof(APFile));
 
     uint32_t source_len = BUF_READ(buf, uint32_t);
     buf.offset += 4;
@@ -155,8 +155,7 @@ void ap_playlist_deserialize(APPlaylist *p, void *_buf, int buf_size)
         {
             uint32_t entry_len = BUF_READ(buf, uint32_t);
             buf.offset += 4;
-            T(APFile)
-            APArray *entries = ap_array_alloc(entry_len, sizeof(APFile));
+            APArrayT(APFile) *entries = ap_array_alloc(entry_len, sizeof(APFile));
             for (int j = 0; j < entry_len; j++)
             {
                 uint32_t entry_size = BUF_READ(buf, uint32_t);
@@ -246,7 +245,7 @@ void *ap_playlist_serialize(APPlaylist *p, bool expand_source, int *out_size)
                     }
                 }
 
-            T(APFile) APArray *entries = NULL;
+            APArrayT(APFile) *entries = NULL;
             if (found < 0)
                 entries = read_directory(source.path);
             else
@@ -290,7 +289,7 @@ void ap_playlist_load(APPlaylist *p)
 {
     if (!p->groups)
         ap_array_init(p->groups, 128, sizeof(APEntryGroup));
-    T(APFile) APArray *root = ap_array_alloc(128, sizeof(APFile));
+    APArrayT(APFile) *root = ap_array_alloc(128, sizeof(APFile));
     for (int i = 0; i < p->sources->len; i++)
     {
         APSource src = ARR_INDEX(p->sources, APSource *, i);
@@ -302,7 +301,7 @@ void ap_playlist_load(APPlaylist *p)
                                    1);
         else
         {
-            T(APFile) APArray *entries = read_directory(src.path);
+            APArrayT(APFile) *entries = read_directory(src.path);
             // TODO: Report error
             if (!entries)
                 continue;

@@ -1,5 +1,6 @@
 #include "ap_dict.h"
 
+#include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -7,13 +8,15 @@ static void ap_bucket_init(APBucket *bucket, const char *key, void *data);
 static APBucket *ap_bucket_alloc(const char *key, void *data);
 static void ap_bucket_linknext(APBucket *item, APBucket *next);
 static APBucket *ap_bucket_get_tail(APBucket *bucket);
-static APBucket *ap_bucket_tail_from_key(APBucket *bucket, const char *key);
+static APBucket *ap_bucket_tail_from_key(APBucket *bucket, const char *key,
+                                         AP_STRCMP_DEF(keycmp_fn));
 
 void ap_dict_init(APDict *dict, int bucket_slot, AP_HASH_DEF(hash_fn))
 {
     dict->bucket_slot = bucket_slot;
     dict->buckets = calloc(dict->bucket_slot, sizeof(*dict->buckets));
     dict->hash_fn = hash_fn;
+    dict->keycmp_fn = strcmp;
 }
 
 APDict *ap_dict_alloc(int bucket_slot, AP_HASH_DEF(hash_fn))
@@ -99,8 +102,9 @@ void ap_dict_insert(APDict *dict, const char *key, void *data)
         ap_bucket_init(bucket, key, data);
     else
     {
-        ap_bucket_linknext(ap_bucket_tail_from_key(bucket, key),
-                           ap_bucket_alloc(key, data));
+        ap_bucket_linknext(
+            ap_bucket_tail_from_key(bucket, key, dict->keycmp_fn),
+            ap_bucket_alloc(key, data));
     }
     dict->len++;
 }
@@ -110,7 +114,9 @@ void *ap_dict_get(APDict *dict, const char *key)
     int index = dict->hash_fn(key) % dict->bucket_slot;
     APBucket *bucket = &dict->buckets[index];
 
-    if (strcmp(bucket->key, key) == 0)
+    if (bucket->key == NULL)
+        return NULL;
+    else if (dict->keycmp_fn(bucket->key, key) == 0)
         return bucket->data;
     else if (bucket->next == NULL)
         return NULL;
@@ -118,7 +124,7 @@ void *ap_dict_get(APDict *dict, const char *key)
     bucket = bucket->next;
     while (bucket)
     {
-        if (strcmp(bucket->key, key) == 0)
+        if (dict->keycmp_fn(bucket->key, key) == 0)
             break;
         bucket = bucket->next;
     }
@@ -156,14 +162,24 @@ static APBucket *ap_bucket_get_tail(APBucket *bucket)
     return bucket;
 }
 
-static APBucket *ap_bucket_tail_from_key(APBucket *bucket, const char *key)
+static APBucket *ap_bucket_tail_from_key(APBucket *bucket, const char *key,
+                                         AP_STRCMP_DEF(keycmp_fn))
 {
     while (bucket->next)
     {
-        if (strcmp(bucket->key, key) == 0)
+        if (keycmp_fn(bucket->key, key) == 0)
             return bucket;
         bucket = bucket->next;
     }
 
     return bucket;
+}
+
+uint64_t ap_hash_djb2(const char *str)
+{
+    uint64_t hash = 5381;
+    int ch;
+    while ((ch = *str++))
+        hash = ((hash << 5) + hash) + ch;
+    return hash;
 }

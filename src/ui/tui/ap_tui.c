@@ -1,6 +1,6 @@
 #include "ap_tui.h"
 
-void ap_tui_widgets_init(APWidgets *ws)
+void ap_tui_widgets_init(APArrayT(APWidget) *ws)
 {
     for (int i = 0; i < ws->len; i++)
     {
@@ -13,7 +13,7 @@ void ap_tui_widgets_init(APWidgets *ws)
     }
 }
 
-void ap_tui_widgets_free(APWidgets *ws)
+void ap_tui_widgets_free(APArrayT(APWidget) *ws)
 {
     for (int i = 0; i < ws->len; i++)
     {
@@ -32,7 +32,7 @@ void ap_tui_widgets_free(APWidgets *ws)
     ap_array_free(&ws);
 }
 
-void ap_tui_propagate_event(APWidgets *ws, APEvent e)
+void ap_tui_propagate_event(APArrayT(APWidget) *ws, APEvent e)
 {
     for (int i = 0; i < ws->len; i++)
     {
@@ -46,7 +46,7 @@ void *ap_tui_render_loop(void *arg)
 {
     APTUIParams *params = arg;
     APTermContext *termctx = params->termctx;
-    APWidgets *widgets = params->widgets;
+    APArrayT(APWidget) *widgets = params->widgets;
     float fps = 60.0f;
 
     while (!termctx->should_close)
@@ -67,11 +67,9 @@ void *ap_tui_render_loop(void *arg)
             {
                 wchar_t c = out[i];
                 if (c == L'\x1b' || c == L'\e' || c == L'\033')
-                {
-                    ap_term_write(termctx->handle_out, "\\x1b", -1);
-                    continue;
-                }
-                ap_term_writew(termctx->handle_out, &c, 1);
+                    ap_term_write(termctx->handle_out, "^[", -1);
+                else
+                    ap_term_writew(termctx->handle_out, &c, 1);
             }
 #else
             ap_term_writew(termctx->handle_out, out, len);
@@ -89,7 +87,7 @@ void *ap_tui_render_loop(void *arg)
     return NULL;
 }
 
-pthread_t ap_tui_render_loop_async(APTermContext *termctx, APWidgets *widgets)
+pthread_t ap_tui_render_loop_async(APTermContext *termctx, APArrayT(APWidget) *widgets)
 {
     APTUIParams *p = malloc(sizeof(*p));
     p->termctx = termctx;

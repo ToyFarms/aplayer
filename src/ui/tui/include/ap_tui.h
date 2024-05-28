@@ -12,13 +12,13 @@
 typedef struct APTUIParams
 {
     APTermContext *termctx;
-    APWidgets *widgets;
+    APArrayT(APWidget) *widgets;
 } APTUIParams;
 
-void ap_tui_widgets_init(APWidgets *ws);
-void ap_tui_widgets_free(APWidgets *ws);
-void ap_tui_propagate_event(APWidgets *ws, APEvent e);
+void ap_tui_widgets_init(APArrayT(APWidget) *ws);
+void ap_tui_widgets_free(APArrayT(APWidget) *ws);
+void ap_tui_propagate_event(APArrayT(APWidget) *ws, APEvent e);
 void *ap_tui_render_loop(void *arg);
-pthread_t ap_tui_render_loop_async(APTermContext *termctx, APWidgets *widgets);
+pthread_t ap_tui_render_loop_async(APTermContext *termctx, APArrayT(APWidget) *widgets);
 
 #endif /* __AP_TUI_H */

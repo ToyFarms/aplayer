@@ -16,3 +16,5 @@ PPIndentWidth: 4
 IndentPPDirectives: AfterHash
 UseTab: Never
 IndentWidth: 4
+PointerAlignment: Right
+SpaceAroundPointerQualifiers: After

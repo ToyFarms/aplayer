@@ -4,8 +4,7 @@
 #include "ap_draw.h"
 #include "wcwidth.h"
 #include "ap_playlist.h"
-
-typedef T(APWidget *) APArray APWidgets;
+#include "ap_dict.h"
 
 typedef enum APWidgetContext
 {
@@ -23,8 +22,7 @@ typedef struct APWidget
 {
     Vec2 pos;
     Vec2 size;
-    APColor fg;
-    APColor bg;
+    APDict *theme;
 
     APWidgetContext ctx;
     union
@@ -39,7 +37,7 @@ typedef struct APWidget
     bool resized;
 } APWidget;
 
-void ap_widget_init(APWidget *w, Vec2 pos, Vec2 size, APColor fg, APColor bg,
+void ap_widget_init(APWidget *w, Vec2 pos, Vec2 size, APDict *theme,
                     void (*init)(APWidget *), void (*draw)(APWidget *),
                     void (*on_event)(APWidget *, APEvent),
                     void (*free)(APWidget *));

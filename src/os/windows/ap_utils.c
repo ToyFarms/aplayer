@@ -56,7 +56,7 @@ wchar_t *mbstowchar(const char *str, int strlen, int *strwlen_out)
     return strw;
 }
 
-T(APFile) APArray *read_directory(const char *dir)
+APArrayT(APFile) *read_directory(const char *dir)
 {
     if (!dir || !strlen(dir))
         return NULL;

@@ -15,7 +15,7 @@ typedef struct APArray
 
 #define ARR_CAST(array, T)     ((T)((array)->data))
 #define ARR_INDEX(array, T, i) (ARR_CAST((array), T)[(i)])
-#define T(...)
+#define APArrayT(...) APArray
 
 /* initialize APArray */
 void ap_array_init(APArray *arr, int capacity, int item_size);

@@ -13,14 +13,12 @@ typedef struct LineDef
     LineType type;
 } LineDef;
 
-typedef T(LineDef) APArray *LineDefs;
-
 typedef struct FileListState
 {
     int offset;
     int cursor;
     APPlaylist *pl;
-    LineDefs lines;
+    APArrayT(LineDef) * lines;
 } FileListState;
 
 void ap_widget_filelist_init(APWidget *w, APPlaylist *pl)
@@ -52,12 +50,12 @@ static int get_current_group_index(int i, int *offsets, int offset_len)
     return -1;
 }
 
-static LineDefs generate_lines(APWidget *w)
+static APArrayT(LineDef) * generate_lines(APWidget *w)
 {
     FileListState *state = w->state.tui->internal;
     APPlaylist *pl = state->pl;
 
-    LineDefs lines = ap_array_alloc(1, sizeof(LineDef));
+    APArrayT(LineDef) *lines = ap_array_alloc(1, sizeof(LineDef));
 
     int current_row = 0;
     for (int i = 0; i < pl->groups->len; i++)
@@ -66,16 +64,13 @@ static LineDefs generate_lines(APWidget *w)
             continue;
 
         APEntryGroup group = ARR_INDEX(pl->groups, APEntryGroup *, i);
-        // TODO: Add colorscheme (dict) for each widget
 
         sds header = sdsempty();
-        header = ap_draw_color(header, APCOLOR(0, 0, 0, 255),
-                               APCOLOR(152, 195, 121, 255));
+        header = ap_draw_str(header, ESC TCMD_BGFG, -1);
         header = ap_draw_hline(header, w->size.x);
         header = ap_draw_strf(header, "%2d", i + 1);
+        header = ap_draw_str(header, ESC TCMD_BGFG, -1);
         header = ap_draw_strf(header, " %s", group.name);
-        header = ap_draw_color(header, APCOLOR(255, 255, 255, 255),
-                               APCOLOR(0, 0, 0, 255));
         ap_array_append_resize(lines, &(LineDef){header, LINE_GROUPNAME}, 1);
 
         for (int j = 0; j < group.entries->len; j++)
@@ -86,14 +81,13 @@ static LineDefs generate_lines(APWidget *w)
             sds file = sdsempty();
             APFile entry = ARR_INDEX(group.entries, APFile *, j);
 
-            file = ap_draw_color(file, w->fg, w->bg);
+            file = ap_draw_str(file, ESC TCMD_BGFG, -1);
 
             int num_len = sdslen(file);
             file = ap_draw_strf(file, "  %3d ", j + 1);
             num_len = sdslen(file) - num_len;
 
-            file =
-                ap_draw_color(file, APCOLOR(200, 200, 200, 255), APCOLOR_ZERO);
+            file = ap_draw_str(file, ESC TCMD_BGFG, -1);
 
             if (is_ascii(entry.filename, -1))
             {
@@ -101,8 +95,7 @@ static LineDefs generate_lines(APWidget *w)
                     file, entry.filename,
                     MATH_MIN(strlen(entry.filename), w->size.x - num_len));
                 file = ap_draw_padding(
-                    file,
-                    w->size.x - strlen(entry.filename) - num_len);
+                    file, w->size.x - strlen(entry.filename) - num_len);
             }
             else
             {
@@ -119,7 +112,7 @@ static LineDefs generate_lines(APWidget *w)
         }
 
         sds footer = sdsempty();
-        footer = ap_draw_color(footer, APCOLOR_ZERO, w->bg);
+        footer = ap_draw_str(footer, ESC TCMD_BGFG, -1);
         footer = ap_draw_hline(footer, w->size.x);
         ap_array_append_resize(lines, &(LineDef){footer, LINE_EMPTY}, 1);
     }
@@ -139,6 +132,8 @@ void ap_widget_filelist_draw(APWidget *w)
     if (!state->lines)
         state->lines = generate_lines(w);
 
+    APArrayT(char *) *query = ap_array_alloc(16, sizeof(char *));
+
     for (int i = 0; i < w->size.y; i++)
     {
         int absline = i + state->offset;
@@ -150,16 +145,61 @@ void ap_widget_filelist_draw(APWidget *w)
             continue;
 
         c = ap_draw_pos(c, VEC(w->pos.x, w->pos.y + i));
+        // c = ap_draw_str(c, line.data, -1);
+
+        query->len = 0;
+#define LIT(str) &(char *){str}
+        ap_array_append_resize(query, LIT("filelist"), 1);
+
+        if (line.type == LINE_ENTRY)
+            ap_array_append_resize(query, LIT("entry"), 1);
+        else if (line.type == LINE_GROUPNAME)
+            ap_array_append_resize(query, LIT("groupname"), 1);
+        else if (line.type == LINE_EMPTY)
+            ap_array_append_resize(query, LIT("empty"), 1);
 
         if (absline == state->cursor)
-        {
-            c = ap_draw_hline(c, w->size.x);
-            c = ap_draw_strf(c, "%d", state->cursor);
-            continue;
-        }
+            ap_array_append_resize(query, LIT("hovered"), 1);
 
-        c = ap_draw_strf(c, "%s", line.data);
+        APColor name_bg = APCOLOR(255, 0, 0, 255);
+        APColor name_fg = APCOLOR(255, 0, 0, 255);
+        APColor num_bg  = APCOLOR(255, 0, 0, 255);
+        APColor num_fg  = APCOLOR(255, 0, 0, 255);
+
+#define GET_COLOR(query, name, temp_str)                                       \
+    for (int i = 0; i < (query)->len; i++)                                     \
+        temp_str =                                                             \
+            sdscatprintf(temp_str, "%s%s", ARR_INDEX(query, char **, i),       \
+                         i == query->len - 1 ? "" : "-");                      \
+    {                                                                          \
+        APColor *__result = ap_dict_get(w->theme, temp_str);                   \
+        if (__result)                                                          \
+            name = *__result;                                                  \
+    }                                                                          \
+    sdsclear(temp_str);
+
+        sds temp = sdsempty();
+        ap_array_append_resize(query, LIT("bg"), 1);
+        ap_array_append_resize(query, LIT("num"), 1);
+        GET_COLOR(query, num_bg, temp);
+
+        query->len = query->len - 1;
+        ap_array_append_resize(query, LIT("name"), 1);
+        GET_COLOR(query, name_bg, temp);
+
+        query->len = query->len - 2;
+        ap_array_append_resize(query, LIT("fg"), 1);
+        ap_array_append_resize(query, LIT("num"), 1);
+        GET_COLOR(query, num_fg, temp);
+
+        query->len = query->len - 1;
+        ap_array_append_resize(query, LIT("name"), 1);
+        GET_COLOR(query, name_fg, temp);
+        sdsfree(temp);
+
+        c = AP_DRAW_STRC(4, c, line.data, num_bg, num_fg, name_bg, name_fg);
     }
+    ap_array_free(&query);
 
     w->state.tui->draw_cmd = c;
 }

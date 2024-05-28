@@ -25,13 +25,13 @@ typedef struct APSource
 typedef struct APEntryGroup
 {
     char *name;
-    T(APFile) APArray *entries;
+    APArrayT(APFile) *entries;
 } APEntryGroup;
 
 typedef struct APPlaylist
 {
-    T(APSource) APArray *sources;
-    T(APEntryGroup) APArray *groups;
+    APArrayT(APSource) *sources;
+    APArrayT(APEntryGroup) *groups;
 } APPlaylist;
 
 APPlaylist *ap_playlist_alloc();

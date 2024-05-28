@@ -4,6 +4,7 @@
 #include <stdint.h>
 
 #define AP_HASH_DEF(name) uint64_t (*name)(const char *)
+#define AP_STRCMP_DEF(name) int (*name)(const char *, const char *)
 #define AP_DICT_LOAD(dict)                                                     \
     ((dict)->bucket_slot == 0                                                  \
          ? 0.0f                                                                \
@@ -22,6 +23,7 @@ typedef struct APDict
     int len;
     APBucket *buckets;
     AP_HASH_DEF(hash_fn);
+    AP_STRCMP_DEF(keycmp_fn);
 } APDict;
 
 uint64_t ap_hash_djb2(const char *str);
