@@ -100,7 +100,7 @@ void ap_dict_insert(APDict *dict, const char *key, void *data)
     int index = dict->hash_fn(key, strlen(key)) % dict->bucket_slot;
     APBucket *bucket = &dict->buckets[index];
 
-    if (bucket->data == NULL && bucket->next == NULL)
+    if (bucket->key == NULL && bucket->next == NULL)
         ap_bucket_init(bucket, key, data);
     else
     {
