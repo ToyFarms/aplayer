@@ -2,6 +2,7 @@
 #include "ap_terminal.h"
 #include "ap_utils.h"
 #include "ap_widgets.h"
+#include "ap_crypto.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -322,7 +323,7 @@ static uint64_t generate_line_signature(APWidget *w, LineDef line,
 {
     FileListState *state = GET_STATE(w);
     int is_hovered = line_index == state->cursor;
-    return ap_hash_djb2(line.data) + is_hovered;
+    return ap_hash_djb2(line.data, strlen(line.data)) + is_hovered;
 }
 
 static void calculate_offset(APWidget *w)

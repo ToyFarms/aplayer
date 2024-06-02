@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 
-#define AP_HASH_DEF(name) uint64_t (*name)(const char *)
+#define AP_HASH_DEF(name) uint64_t (*name)(const char *, int)
 #define AP_STRCMP_DEF(name) int (*name)(const char *, const char *)
 #define AP_DICT_LOAD(dict)                                                     \
     ((dict)->bucket_slot == 0                                                  \
@@ -27,8 +27,6 @@ typedef struct APDict
     AP_STRCMP_DEF(keycmp_fn);
 } APDict;
 
-uint64_t ap_hash_djb2(const char *str);
-
 void ap_dict_init(APDict *dict, int bucket_slot, AP_HASH_DEF(hash_fn));
 APDict *ap_dict_alloc(int bucket_slot, AP_HASH_DEF(hash_fn));
 void ap_dict_free_items(APDict *dict);
@@ -36,5 +34,6 @@ void ap_dict_free(APDict **dict);
 void ap_dict_resize(APDict *dict, int new_size);
 void ap_dict_insert(APDict *dict, const char *key, void *data);
 void *ap_dict_get(APDict *dict, const char *key);
+int ap_dict_get_ncollision(APDict *dict);
 
 #endif /* __AP_DICT_H */

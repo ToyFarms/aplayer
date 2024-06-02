@@ -36,6 +36,8 @@ add_executable(
   src/ap_queue.c
   src/ap_playlist.c
   src/ap_dict.c
+  src/ap_crypto.c
+
   thirdparty/wcwidth.c
   thirdparty/sds.c
 

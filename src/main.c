@@ -8,29 +8,31 @@
 #include "ap_ui.h"
 #include "ap_utils.h"
 #include "ap_widgets.h"
+#include "ap_crypto.h"
 
-static uint64_t hash_theme(const char *key)
+static uint64_t hash_theme(const char *key, int size)
 {
     char c;
     const char *k = key;
     char *seg = calloc(strlen(key), 1);
-    int i = 0;
+    int segsize = 0;
     uint64_t hash = 0;
 
+// TODO: use size
     while ((c = *k++))
     {
         if (c == '-')
         {
-            hash += ap_hash_djb2(seg);
+            hash += ap_hash_djb2(seg, segsize);
             memset(seg, 0, strlen(key));
-            i = 0;
+            segsize = 0;
             continue;
         }
-        seg[i++] = c;
+        seg[segsize++] = c;
     }
 
-    if (i > 0)
-        hash += ap_hash_djb2(seg);
+    if (segsize > 0)
+        hash += ap_hash_djb2(seg, segsize);
 
     free(seg);
 
@@ -39,7 +41,7 @@ static uint64_t hash_theme(const char *key)
 
 static int compare_theme(const char *k1, const char *k2)
 {
-    return !(hash_theme(k1) == hash_theme(k2));
+    return !(hash_theme(k1, strlen(k1)) == hash_theme(k2, strlen(k2)));
 }
 
 static void noop(APWidget *w)
@@ -105,6 +107,17 @@ void log_callback(void *ptr, int level, const char *fmt, va_list vl)
 
     fwrite(buf, sizeof(char), strlen(buf), fd);
     fclose(fd);
+}
+
+char *random_str(int length)
+{
+    static const char *charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890";
+    char *str = (char *)calloc(length + 1, sizeof(char));
+
+    for (int i = 0; i < length; i++)
+        str[i] = charset[rand() % (strlen(charset) - 1)];
+
+    return str;
 }
 
 int main(int argc, char **argv)

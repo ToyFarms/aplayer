@@ -1,4 +1,5 @@
 #include "ap_dict.h"
+#include "ap_crypto.h"
 
 #include <stdbool.h>
 #include <stdlib.h>
@@ -16,7 +17,7 @@ void ap_dict_init(APDict *dict, int bucket_slot, AP_HASH_DEF(hash_fn))
     dict->bucket_slot = bucket_slot;
     dict->buckets = calloc(dict->bucket_slot, sizeof(*dict->buckets));
     dict->default_return = NULL;
-    dict->hash_fn = hash_fn;
+    dict->hash_fn = hash_fn ? hash_fn : ap_hash_djb2;
     dict->keycmp_fn = strcmp;
 }
 
@@ -80,7 +81,7 @@ void ap_dict_resize(APDict *dict, int new_size)
         APBucket bucket = dict->buckets[i];
         if (!bucket.key)
             continue;
-        int index = dict->hash_fn(bucket.key) % new_size;
+        int index = dict->hash_fn(bucket.key, strlen(bucket.key)) % new_size;
         buckets[index].key = bucket.key;
         buckets[index].next = bucket.next;
         buckets[index].data = bucket.data;
@@ -96,7 +97,7 @@ void ap_dict_insert(APDict *dict, const char *key, void *data)
     if (AP_DICT_LOAD(dict) > 0.75f)
         ap_dict_resize(dict, dict->bucket_slot * 2);
 
-    int index = dict->hash_fn(key) % dict->bucket_slot;
+    int index = dict->hash_fn(key, strlen(key)) % dict->bucket_slot;
     APBucket *bucket = &dict->buckets[index];
 
     if (bucket->data == NULL && bucket->next == NULL)
@@ -112,7 +113,7 @@ void ap_dict_insert(APDict *dict, const char *key, void *data)
 
 void *ap_dict_get(APDict *dict, const char *key)
 {
-    int index = dict->hash_fn(key) % dict->bucket_slot;
+    int index = dict->hash_fn(key, strlen(key)) % dict->bucket_slot;
     APBucket *bucket = &dict->buckets[index];
 
     if (bucket->key == NULL)
@@ -176,11 +177,16 @@ static APBucket *ap_bucket_tail_from_key(APBucket *bucket, const char *key,
     return bucket;
 }
 
-uint64_t ap_hash_djb2(const char *str)
+int ap_dict_get_ncollision(APDict *dict)
 {
-    uint64_t hash = 5381;
-    int ch;
-    while ((ch = *str++))
-        hash = ((hash << 5) + hash) + ch;
-    return hash;
+    int ncollision = 0;
+
+    for (int i = 0; i < dict->bucket_slot; i++)
+    {
+        APBucket bucket = dict->buckets[i];
+        if (bucket.next)
+            ncollision++;
+    }
+
+    return ncollision;
 }
