@@ -37,6 +37,7 @@ typedef struct APFile
 
 // not a limitation, just an arbitrary cap
 #define MAX_PATH_LEN 2048
+// TODO: move some of these function to its own file
 
 char *wchartombs(const wchar_t *strw, int strwlen, int *strlen_out);
 wchar_t *mbstowchar(const char *str, int strlen, int *strwlen_out);

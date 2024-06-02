@@ -1,6 +1,4 @@
 #include "ap_audio.h"
-#include "ap_audio_dec.h"
-#include "ap_audio_output.h"
 #include "ap_dict.h"
 #include "ap_flags.h"
 #include "ap_os.h"
@@ -10,8 +8,6 @@
 #include "ap_ui.h"
 #include "ap_utils.h"
 #include "ap_widgets.h"
-
-#include <pthread.h>
 
 static uint64_t hash_theme(const char *key)
 {
