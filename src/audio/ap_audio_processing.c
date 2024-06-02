@@ -1,5 +1,8 @@
 #include "ap_audio_processing.h"
 
+#include <math.h>
+#include <libswresample/swresample.h>
+
 #define DBTOFACTOR(x) (powf(10.0f, (x) / 20.0f))
 #define FACTORTODB(x) (20 * log10f((x)))
 

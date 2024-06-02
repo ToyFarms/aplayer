@@ -15,6 +15,7 @@ void ap_dict_init(APDict *dict, int bucket_slot, AP_HASH_DEF(hash_fn))
 {
     dict->bucket_slot = bucket_slot;
     dict->buckets = calloc(dict->bucket_slot, sizeof(*dict->buckets));
+    dict->default_return = NULL;
     dict->hash_fn = hash_fn;
     dict->keycmp_fn = strcmp;
 }
@@ -115,11 +116,11 @@ void *ap_dict_get(APDict *dict, const char *key)
     APBucket *bucket = &dict->buckets[index];
 
     if (bucket->key == NULL)
-        return NULL;
+        return dict->default_return;
     else if (dict->keycmp_fn(bucket->key, key) == 0)
         return bucket->data;
     else if (bucket->next == NULL)
-        return NULL;
+        return dict->default_return;
 
     bucket = bucket->next;
     while (bucket)
@@ -130,7 +131,7 @@ void *ap_dict_get(APDict *dict, const char *key)
     }
 
     if (bucket == NULL)
-        return NULL;
+        return dict->default_return;
 
     return bucket->data;
 }

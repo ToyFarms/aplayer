@@ -34,6 +34,7 @@ add_executable(
   aplayer
   src/main.c
   src/ap_array.c
+  src/ap_queue.c
   src/ap_playlist.c
   src/ap_dict.c
   thirdparty/wcwidth.c
@@ -41,11 +42,13 @@ add_executable(
 
   src/os/${OS-DIR}/ap_terminal.c
   src/os/${OS-DIR}/ap_utils.c
+  src/os/${OS-DIR}/ap_timing.c
   src/os/common/ap_terminal_common.c
   src/os/common/ap_os_common.c
   src/os/common/ap_utils_common.c
 
   src/audio/ap_audio.c
+  src/audio/ap_audio_dec.c
   src/audio/ap_audio_output.c
   src/audio/ap_audio_processing.c
 

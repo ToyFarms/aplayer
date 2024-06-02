@@ -22,6 +22,7 @@ typedef struct APDict
     int bucket_slot;
     int len;
     APBucket *buckets;
+    void *default_return;
     AP_HASH_DEF(hash_fn);
     AP_STRCMP_DEF(keycmp_fn);
 } APDict;

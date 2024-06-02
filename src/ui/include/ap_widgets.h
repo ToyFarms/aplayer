@@ -23,6 +23,7 @@ typedef struct APWidget
     Vec2 pos;
     Vec2 size;
     APDict *theme;
+    APDict *listeners;
 
     APWidgetContext ctx;
     union

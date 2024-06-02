@@ -2,8 +2,12 @@
 
 typedef struct LineDef LineDef;
 
-static void generate_lines(APWidget *w);
-static uint64_t generate_line_signature(APWidget *w, LineDef line, int line_index);
+static void generate_lines_template(APWidget *w);
+static uint64_t generate_line_signature(APWidget *w, LineDef line,
+                                        int line_index);
+static void calculate_offset(APWidget *w);
+static void scroll_cursor(APWidget *w, int n, bool absolute);
+static void scroll_window(APWidget *w, int n, bool absolute);
 
 typedef enum LineType
 {
@@ -16,6 +20,9 @@ typedef struct LineDef
 {
     sds data;
     LineType type;
+    int index;
+    int rel_index;
+    int group_index;
 } LineDef;
 
 typedef struct FileListState
@@ -24,23 +31,25 @@ typedef struct FileListState
     int cursor;
     APPlaylist *pl;
     APArrayT(LineDef) * lines;
-    APArrayT(uint64_t) *lines_sig;  // line signature
+    APArrayT(uint64_t) * lines_sig;
 } FileListState;
+
+#define GET_STATE(widget) ((FileListState *)(widget)->state.tui->internal)
 
 void ap_widget_filelist_init(APWidget *w, APPlaylist *pl)
 {
     w->state.tui->internal = calloc(1, sizeof(FileListState));
-    FileListState *state = w->state.tui->internal;
+    FileListState *state = GET_STATE(w);
 
     state->pl = pl;
     state->lines = ap_array_alloc(w->size.y, sizeof(LineDef));
     state->lines_sig = ap_array_alloc(w->size.y, sizeof(uint64_t));
-    generate_lines(w);
+    generate_lines_template(w);
 }
 
 void ap_widget_filelist_draw(APWidget *w)
 {
-    FileListState *state = w->state.tui->internal;
+    FileListState *state = GET_STATE(w);
     APPlaylist *pl = state->pl;
     sds c = w->state.tui->draw_cmd;
 
@@ -70,23 +79,12 @@ void ap_widget_filelist_draw(APWidget *w)
         c = ap_draw_pos(c, VEC(w->pos.x, w->pos.y + i));
 
         query->len = 0;
-#define LIT(str) &(char *){str}
-        ap_array_append_resize(query, LIT("filelist"), 1);
 
-        if (line.type == LINE_ENTRY)
-            ap_array_append_resize(query, LIT("entry"), 1);
-        else if (line.type == LINE_GROUPNAME)
-            ap_array_append_resize(query, LIT("groupname"), 1);
-        else if (line.type == LINE_EMPTY)
-            ap_array_append_resize(query, LIT("empty"), 1);
-
-        if (absline == state->cursor)
-            ap_array_append_resize(query, LIT("hovered"), 1);
-
-        APColor name_bg = APCOLOR(255, 0, 0, 255);
-        APColor name_fg = APCOLOR(255, 0, 0, 255);
-        APColor num_bg  = APCOLOR(255, 0, 0, 255);
-        APColor num_fg  = APCOLOR(255, 0, 0, 255);
+#define LIT(str)                                                               \
+    &(char *)                                                                  \
+    {                                                                          \
+        str                                                                    \
+    }
 
 #define GET_COLOR(query, name, temp_str)                                       \
     for (int i = 0; i < (query)->len; i++)                                     \
@@ -100,7 +98,40 @@ void ap_widget_filelist_draw(APWidget *w)
     }                                                                          \
     sdsclear(temp_str);
 
+        ap_array_append_resize(query, LIT("filelist"), 1);
+
+        if (line.type == LINE_ENTRY)
+            ap_array_append_resize(query, LIT("entry"), 1);
+        else if (line.type == LINE_GROUPNAME)
+            ap_array_append_resize(query, LIT("groupname"), 1);
+        else if (line.type == LINE_EMPTY)
+            ap_array_append_resize(query, LIT("empty"), 1);
+
+        if (absline == state->cursor)
+            ap_array_append_resize(query, LIT("hovered"), 1);
+
         sds temp = sdsempty();
+        if (line.type == LINE_EMPTY)
+        {
+            APColor empty_bg = APCOLOR(255, 0, 0, 255);
+            APColor empty_fg = APCOLOR(255, 0, 0, 255);
+
+            ap_array_append_resize(query, LIT("bg"), 1);
+            GET_COLOR(query, empty_bg, temp);
+            query->len = query->len - 1;
+
+            ap_array_append_resize(query, LIT("fg"), 1);
+            GET_COLOR(query, empty_fg, temp);
+
+            c = AP_DRAW_STRC(2, c, line.data, empty_bg, empty_fg);
+            continue;
+        }
+
+        APColor name_bg = APCOLOR(255, 0, 0, 255);
+        APColor name_fg = APCOLOR(255, 0, 0, 255);
+        APColor num_bg = APCOLOR(255, 0, 0, 255);
+        APColor num_fg = APCOLOR(255, 0, 0, 255);
+
         ap_array_append_resize(query, LIT("bg"), 1);
         ap_array_append_resize(query, LIT("num"), 1);
         GET_COLOR(query, num_bg, temp);
@@ -126,27 +157,80 @@ void ap_widget_filelist_draw(APWidget *w)
     w->state.tui->draw_cmd = c;
 }
 
+static int find_next_groupname(APWidget *w)
+{
+    FileListState *state = GET_STATE(w);
+    for (int i = state->cursor; i < state->lines->len; i++)
+    {
+        LineDef line = ARR_INDEX(state->lines, LineDef *, i);
+        if (line.type == LINE_GROUPNAME && i != state->cursor)
+            return i;
+    }
+    return state->cursor;
+}
+
+static int find_prev_groupname(APWidget *w)
+{
+    FileListState *state = GET_STATE(w);
+    for (int i = state->cursor; i >= 0; i--)
+    {
+        LineDef line = ARR_INDEX(state->lines, LineDef *, i);
+        if (line.type == LINE_GROUPNAME && i != state->cursor)
+            return i;
+    }
+    return state->cursor;
+}
+
+static int get_current_group(APWidget *w)
+{
+    FileListState *state = GET_STATE(w);
+    return ARR_INDEX(state->lines, LineDef *, find_prev_groupname(w))
+        .group_index;
+}
+
 void ap_widget_filelist_on_event(APWidget *w, APEvent e)
 {
-    FileListState *state = w->state.tui->internal;
+    FileListState *state = GET_STATE(w);
 
     if (e.type == AP_EVENT_KEY && e.event.key.keydown)
     {
-        if (e.event.key.ascii == 'j')
-            state->cursor += 1;
-        else if (e.event.key.ascii == 'k')
-            state->cursor = MATH_MAX(0, state->cursor - 1);
+        char ascii = e.event.key.ascii;
+        uint32_t virtual = e.event.key.virtual;
+        if (ascii == 'j')
+            scroll_cursor(w, 1, false);
+        else if (ascii == 'k')
+            scroll_cursor(w, -1, false);
+        else if (ascii == '}')
+            scroll_cursor(w, find_next_groupname(w), true);
+        else if (ascii == '{')
+            scroll_cursor(w, find_prev_groupname(w), true);
+        else if (virtual == VK_RETURN) // TODO: Abstract Windows virtual key
+        {
+            if (w->listeners)
+            {
+                APEntryGroup group = ARR_INDEX(
+                    state->pl->groups, APEntryGroup *, get_current_group(w));
+                int cursor_rel =
+                    ARR_INDEX(state->lines, LineDef *, state->cursor).rel_index;
+                if (cursor_rel < 0)
+                    return;
+                APFile file = ARR_INDEX(group.entries, APFile *, cursor_rel);
+                char *temp = calloc(
+                    strlen(file.directory) + strlen(file.filename) + 10, 1);
+                snprintf(temp,
+                         strlen(file.directory) + strlen(file.filename) + 10,
+                         "%s/%s", file.directory, file.filename);
+                ((void (*)(const char *))ap_dict_get(w->listeners,
+                                                     "request_music"))(temp);
+                free(temp);
+            }
+        }
     }
-
-    if (state->cursor - state->offset >= w->size.y - 10)
-        state->offset += 1;
-    else if (state->cursor - state->offset < 10)
-        state->offset = MATH_MAX(0, state->offset - 1);
 }
 
 void ap_widget_filelist_free(APWidget *w)
 {
-    FileListState *state = w->state.tui->internal;
+    FileListState *state = GET_STATE(w);
     for (int i = 0; i < state->lines->len; i++)
     {
         LineDef line = ARR_INDEX(state->lines, LineDef *, i);
@@ -159,17 +243,14 @@ void ap_widget_filelist_free(APWidget *w)
     state = NULL;
 }
 
-static void generate_lines(APWidget *w)
+static void generate_lines_template(APWidget *w)
 {
-    FileListState *state = w->state.tui->internal;
+    FileListState *state = GET_STATE(w);
     APPlaylist *pl = state->pl;
 
-    int current_row = 0;
+    int index = 0;
     for (int i = 0; i < pl->groups->len; i++)
     {
-        if (current_row > w->size.y + state->offset)
-            continue;
-
         APEntryGroup group = ARR_INDEX(pl->groups, APEntryGroup *, i);
 
         sds header = sdsempty();
@@ -178,13 +259,13 @@ static void generate_lines(APWidget *w)
         header = ap_draw_strf(header, "%2d", i + 1);
         header = ap_draw_str(header, ESC TCMD_BGFG, -1);
         header = ap_draw_strf(header, " %s", group.name);
-        ap_array_append_resize(state->lines, &(LineDef){header, LINE_GROUPNAME}, 1);
+        ap_array_append_resize(
+            state->lines, &(LineDef){header, LINE_GROUPNAME, index++, -1, i},
+            1);
 
-        for (int j = 0; j < group.entries->len; j++)
+        int j;
+        for (j = 0; j < group.entries->len; j++)
         {
-            if (current_row > w->size.y + state->offset)
-                continue;
-
             sds file = sdsempty();
             APFile entry = ARR_INDEX(group.entries, APFile *, j);
 
@@ -215,19 +296,50 @@ static void generate_lines(APWidget *w)
             }
 
             file = ap_draw_reset_attr(file);
-            ap_array_append_resize(state->lines, &(LineDef){file, LINE_ENTRY}, 1);
+            ap_array_append_resize(
+                state->lines, &(LineDef){file, LINE_ENTRY, index++, j, i}, 1);
         }
 
         sds footer = sdsempty();
         footer = ap_draw_str(footer, ESC TCMD_BGFG, -1);
         footer = ap_draw_hline(footer, w->size.x);
-        ap_array_append_resize(state->lines, &(LineDef){footer, LINE_EMPTY}, 1);
+        ap_array_append_resize(
+            state->lines, &(LineDef){footer, LINE_EMPTY, index++, -1, i}, 1);
     }
 }
 
-static uint64_t generate_line_signature(APWidget *w, LineDef line, int line_index)
+static uint64_t generate_line_signature(APWidget *w, LineDef line,
+                                        int line_index)
 {
-    FileListState *state = w->state.tui->internal;
+    FileListState *state = GET_STATE(w);
     int is_hovered = line_index == state->cursor;
     return ap_hash_djb2(line.data) + is_hovered;
+}
+
+static void calculate_offset(APWidget *w)
+{
+    FileListState *state = GET_STATE(w);
+
+    int margin = 5;
+    if (state->cursor > (state->offset + w->size.y) - margin)
+        state->offset += state->cursor - (state->offset + w->size.y) + margin;
+    else if (state->cursor < state->offset + margin)
+        state->offset -= state->offset + margin - state->cursor;
+    state->offset = MATH_CLAMP(state->offset, 0, state->lines->len - w->size.y);
+}
+
+static void scroll_cursor(APWidget *w, int n, bool absolute)
+{
+    FileListState *state = GET_STATE(w);
+
+    state->cursor = absolute ? n : state->cursor + n;
+    state->cursor = MATH_CLAMP(state->cursor, 0, state->lines->len);
+    calculate_offset(w);
+}
+
+static void scroll_window(APWidget *w, int n, bool absolute)
+{
+    FileListState *state = GET_STATE(w);
+
+    state->offset = absolute ? n : state->offset + n;
 }
