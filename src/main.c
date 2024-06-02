@@ -119,7 +119,7 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    if (ap_audio_init(&audioctx, 2, 96000,
+    if (ap_audio_init(&audioctx, 2, 48000,
                       AP_AUDIO_SAMPLEFMT_FLT | AP_AUDIO_SAMPLEFMT_PLANAR) < 0)
     {
         av_log(NULL, AV_LOG_FATAL, "Audio initialization failed\n");

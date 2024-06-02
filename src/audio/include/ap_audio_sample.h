@@ -68,11 +68,11 @@ static inline PaSampleFormat ap_samplefmt_to_pa_samplefmt(
 {
     switch ((int)sample_fmt)
     {
-        CASE_PLANAR(AP_AUDIO_SAMPLEFMT_U8, paInt8);
+        CASE_PLANAR(AP_AUDIO_SAMPLEFMT_U8, paUInt8);
         CASE_PLANAR(AP_AUDIO_SAMPLEFMT_S16, paInt16);
         CASE_PLANAR(AP_AUDIO_SAMPLEFMT_S32, paInt32);
         CASE_PLANAR(AP_AUDIO_SAMPLEFMT_FLT, paFloat32);
-        CASE_PLANAR(AP_AUDIO_SAMPLEFMT_DBL, paFloat32);
+        // CASE_PLANAR(AP_AUDIO_SAMPLEFMT_DBL, paFloat32);
         // CASE_PLANAR(AP_AUDIO_SAMPLEFMT_S64, paInt64);
     default:
         return -1;
