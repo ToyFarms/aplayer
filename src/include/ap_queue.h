@@ -1,8 +1,8 @@
 #ifndef __AP_QUEUE_H
 #define __AP_QUEUE_H
 
-#include <stdbool.h>
 #include <pthread.h>
+#include <stdbool.h>
 
 #define AP_QUEUE_IS_EMPTY(q) (q->head == NULL || q->len <= 0)
 

@@ -2,8 +2,8 @@
 #define __AP_EVENT_H
 
 #include <stdbool.h>
-#include <wchar.h>
 #include <stdint.h>
+#include <wchar.h>
 
 #define APEV_MLEFT_CLICK   (1 << 0)
 #define APEV_MMIDDLE_CLICK (1 << 1)
@@ -48,8 +48,7 @@ typedef struct APEventBuffer
 typedef struct APEvent
 {
     APEventType type;
-    union
-    {
+    union {
         APEventKey key;
         APEventMouse mouse;
         APEventBuffer buf;

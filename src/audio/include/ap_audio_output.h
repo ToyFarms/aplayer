@@ -1,15 +1,10 @@
 #ifndef __AP_AUDIO_OUTPUT_H
 #define __AP_AUDIO_OUTPUT_H
 
-#include "ap_audio_processing.h"
+#include "ap_audio_sample.h"
 #include "ap_queue.h"
-#include "ap_utils.h"
-#include "libavutil/log.h"
 #include "libavutil/samplefmt.h"
 #include "portaudio.h"
-#include "ap_audio_sample.h"
-
-#include <stdlib.h>
 
 typedef struct APAudioOutputContext
 {

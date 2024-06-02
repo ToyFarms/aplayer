@@ -2,15 +2,14 @@
 #define __AP_PLAYLIST_H
 
 #include "ap_array.h"
-#include "ap_utils.h"
-#include "sds.h"
+
 #include <stdbool.h>
 
 #define PLAYLIST_VERSION_MAJOR 1
 #define PLAYLIST_VERSION_MINOR 0
 #define PLAYLIST_VERSION_PATCH 0
 
-#define PLAYLIST_FLAG_FILE (1 << 0)
+#define PLAYLIST_FLAG_FILE   (1 << 0)
 #define PLAYLIST_FLAG_EXPAND (1 << 1)
 
 typedef struct APSource
@@ -25,13 +24,13 @@ typedef struct APSource
 typedef struct APEntryGroup
 {
     char *name;
-    APArrayT(APFile) *entries;
+    APArrayT(APFile) * entries;
 } APEntryGroup;
 
 typedef struct APPlaylist
 {
-    APArrayT(APSource) *sources;
-    APArrayT(APEntryGroup) *groups;
+    APArrayT(APSource) * sources;
+    APArrayT(APEntryGroup) * groups;
 } APPlaylist;
 
 APPlaylist *ap_playlist_alloc();

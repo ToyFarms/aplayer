@@ -1,4 +1,8 @@
 #include "ap_audio_dec.h"
+#include "libavutil/time.h"
+#include "libswresample/swresample.h"
+
+#include <stdlib.h>
 
 static void audiodec_fill_prop(APAudioDecoder *audioctx);
 static int audio_decode(APAudioDecoder *audioctx, AVPacket *pkt,
@@ -54,7 +58,8 @@ fail:
 
 void ap_audiodec_free(APAudioDecoder **audiodec)
 {
-    PTR_PTR_CHECK(audiodec, );
+    if (!audiodec || !*audiodec)
+        return;
 
     ap_audiodec_stop(*audiodec);
 

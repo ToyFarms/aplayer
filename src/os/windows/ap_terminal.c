@@ -67,12 +67,14 @@ Vec2 ap_term_get_cursor(APHandle h)
 
 void ap_term_write(APHandle h, const char *str, int str_len)
 {
-    WriteConsole(h.handle, str, str_len > 0 ? str_len : strlen(str), NULL, NULL);
+    WriteConsole(h.handle, str, str_len > 0 ? str_len : strlen(str), NULL,
+                 NULL);
 }
 
 void ap_term_writew(APHandle h, const wchar_t *wstr, int wstr_len)
 {
-    WriteConsoleW(h.handle, wstr, wstr_len > 0 ? wstr_len : wcslen(wstr), NULL, NULL);
+    WriteConsoleW(h.handle, wstr, wstr_len > 0 ? wstr_len : wcslen(wstr), NULL,
+                  NULL);
 }
 
 #define EVENT_RAW_SIZE 128

@@ -1,4 +1,6 @@
 #include "ap_draw.h"
+#include "ap_terminal.h"
+#include "ap_utils.h"
 
 sds ap_draw_pos(sds cmd, Vec2 pos)
 {

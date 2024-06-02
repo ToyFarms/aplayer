@@ -1,5 +1,10 @@
 #include "ap_utils.h"
 
+#include <stdlib.h>
+#include <sys/stat.h>
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+
 char *wchartombs(const wchar_t *strw, int strwlen, int *strlen_out)
 {
     if (!strw)
@@ -56,7 +61,7 @@ wchar_t *mbstowchar(const char *str, int strlen, int *strwlen_out)
     return strw;
 }
 
-APArrayT(APFile) *read_directory(const char *dir)
+APArrayT(APFile) * read_directory(const char *dir)
 {
     if (!dir || !strlen(dir))
         return NULL;

@@ -8,7 +8,6 @@ elseif(CMAKE_BUILD_TYPE STREQUAL "Debug")
 endif()
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-
 set(VCPKG_TARGET_TRIPLET "x64-windows")
 set(CMAKE_TOOLCHAIN_FILE $ENV{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake)
 

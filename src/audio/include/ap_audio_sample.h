@@ -3,6 +3,7 @@
 
 #include "libavutil/samplefmt.h"
 #include "portaudio.h"
+
 #include <stdbool.h>
 
 #define AP_AUDIO_SAMPLEFMT_LIST                                                \

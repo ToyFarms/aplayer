@@ -1,5 +1,8 @@
 #include "ap_array.h"
 
+#include <stdlib.h>
+#include <string.h>
+
 void ap_array_init(APArray *arr, int capacity, int item_size)
 {
     arr->capacity = capacity;

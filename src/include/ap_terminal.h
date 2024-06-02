@@ -3,12 +3,8 @@
 
 #include "ap_event.h"
 #include "ap_math.h"
-#include "ap_os.h"
-#include "ap_utils.h"
 
 #include <stdbool.h>
-#include <stdint.h>
-#include <stdio.h>
 
 #define ESC             "\x1b"
 #define TCMD_POSYX      "[%d;%dH"

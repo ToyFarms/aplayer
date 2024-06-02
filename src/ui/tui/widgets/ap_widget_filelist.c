@@ -1,4 +1,13 @@
+#include "ap_draw.h"
+#include "ap_terminal.h"
+#include "ap_utils.h"
 #include "ap_widgets.h"
+
+#include <stdio.h>
+#include <stdlib.h>
+// TODO: Do the TODO below and remove this windows include
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
 
 typedef struct LineDef LineDef;
 

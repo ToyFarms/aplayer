@@ -1,7 +1,9 @@
 #include "ap_os.h"
 
-#ifdef OS_WINDOWS
-#include <windows.h>
+#include <stdlib.h>
+
+#if OS_TYPE == OS_WINDOWS
+#    include <windows.h>
 
 void prepare_app_arguments(int *argc_ptr, char ***argv_ptr)
 {
@@ -26,8 +28,8 @@ void prepare_app_arguments(int *argc_ptr, char ***argv_ptr)
 
     /* determine the UTF-8 buffer size (including NULL-termination symbols) */
     for (i = 0; i < win32_argc; i++)
-        buffsize += WideCharToMultiByte(CP_UTF8, 0, argv_w[i], -1,
-                                        NULL, 0, NULL, NULL);
+        buffsize +=
+            WideCharToMultiByte(CP_UTF8, 0, argv_w[i], -1, NULL, 0, NULL, NULL);
 
     win32_argv_utf8 = malloc(sizeof(char *) * (win32_argc + 1) + buffsize);
     memset(win32_argv_utf8, 0, sizeof(char *) * (win32_argc + 1) + buffsize);
@@ -41,9 +43,9 @@ void prepare_app_arguments(int *argc_ptr, char ***argv_ptr)
     for (i = 0; i < win32_argc; i++)
     {
         win32_argv_utf8[i] = &argstr_flat[offset];
-        offset += WideCharToMultiByte(CP_UTF8, 0, argv_w[i], -1,
-                                      &argstr_flat[offset],
-                                      buffsize - offset, NULL, NULL);
+        offset +=
+            WideCharToMultiByte(CP_UTF8, 0, argv_w[i], -1, &argstr_flat[offset],
+                                buffsize - offset, NULL, NULL);
     }
     win32_argv_utf8[i] = NULL;
     LocalFree(argv_w);

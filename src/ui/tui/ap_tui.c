@@ -1,6 +1,9 @@
 #include "ap_tui.h"
+#include "ap_utils.h"
+#include "ap_widgets.h"
+#include "libavutil/time.h"
 
-void ap_tui_widgets_init(APArrayT(APWidget) *ws)
+void ap_tui_widgets_init(APArrayT(APWidget) * ws)
 {
     for (int i = 0; i < ws->len; i++)
     {
@@ -13,7 +16,7 @@ void ap_tui_widgets_init(APArrayT(APWidget) *ws)
     }
 }
 
-void ap_tui_widgets_free(APArrayT(APWidget) *ws)
+void ap_tui_widgets_free(APArrayT(APWidget) * ws)
 {
     for (int i = 0; i < ws->len; i++)
     {
@@ -32,7 +35,7 @@ void ap_tui_widgets_free(APArrayT(APWidget) *ws)
     ap_array_free(&ws);
 }
 
-void ap_tui_propagate_event(APArrayT(APWidget) *ws, APEvent e)
+void ap_tui_propagate_event(APArrayT(APWidget) * ws, APEvent e)
 {
     for (int i = 0; i < ws->len; i++)
     {
@@ -90,7 +93,8 @@ void *ap_tui_render_loop(void *arg)
     return NULL;
 }
 
-pthread_t ap_tui_render_loop_async(APTermContext *termctx, APArrayT(APWidget) *widgets)
+pthread_t ap_tui_render_loop_async(APTermContext *termctx,
+                                   APArrayT(APWidget) * widgets)
 {
     APTUIParams *p = malloc(sizeof(*p));
     p->termctx = termctx;
@@ -100,4 +104,3 @@ pthread_t ap_tui_render_loop_async(APTermContext *termctx, APArrayT(APWidget) *w
     pthread_create(&tui_tid, NULL, ap_tui_render_loop, p);
     return tui_tid;
 }
-

@@ -1,8 +1,8 @@
 #include "ap_timing.h"
 
 #define WIN32_LEAN_AND_MEAN
-#include <windows.h>
 #include <stdlib.h>
+#include <windows.h>
 
 typedef struct APClock
 {
@@ -32,5 +32,6 @@ void ap_clock_end(APClock *c)
 
 double ap_clock_get_elapsed(APClock *c)
 {
-    return (double)(c->end.QuadPart - c->start.QuadPart) / c->frequency.QuadPart;
+    return (double)(c->end.QuadPart - c->start.QuadPart) /
+           c->frequency.QuadPart;
 }

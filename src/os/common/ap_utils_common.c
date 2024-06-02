@@ -1,4 +1,9 @@
 #include "ap_utils.h"
+#include "wcwidth.h"
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 char *file_read(const char *path, bool byte_mode, int *out_size)
 {
@@ -19,7 +24,7 @@ char *file_read(const char *path, bool byte_mode, int *out_size)
     fclose(fd);
 
     if (out_size)
-        *out_size =  size;
+        *out_size = size;
 
     return buf;
 }
@@ -32,7 +37,8 @@ bool is_ascii(const char *str, int str_len)
     return true;
 }
 
-int strw_fit_into_column(const wchar_t *strw, int strwlen, int target_column, int *column_out)
+int strw_fit_into_column(const wchar_t *strw, int strwlen, int target_column,
+                         int *column_out)
 {
     int width = 0;
     int i;

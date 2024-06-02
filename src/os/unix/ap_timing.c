@@ -1,7 +1,7 @@
 #include "ap_timing.h"
 
-#include <time.h>
 #include <stdlib.h>
+#include <time.h>
 
 typedef struct APClock
 {
@@ -30,5 +30,6 @@ void ap_clock_end(APClock *c)
 
 double ap_clock_get_elapsed(APClock *c)
 {
-    return (c->end.tv_sec - c->start.tv_sec) + (c->end.tv_nsec - c->start.tv_nsec) / 1e9;
+    return (c->end.tv_sec - c->start.tv_sec) +
+           (c->end.tv_nsec - c->start.tv_nsec) / 1e9;
 }

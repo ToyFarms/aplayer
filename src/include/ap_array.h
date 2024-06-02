@@ -2,8 +2,6 @@
 #define __AP_ARRAY_H
 
 #include <stdbool.h>
-#include <stdlib.h>
-#include <string.h>
 
 typedef struct APArray
 {

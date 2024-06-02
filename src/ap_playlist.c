@@ -1,4 +1,9 @@
 #include "ap_playlist.h"
+#include "ap_utils.h"
+
+#include <assert.h>
+#include <stdlib.h>
+#include <string.h>
 
 typedef struct APDynBuf
 {
@@ -43,7 +48,7 @@ void ap_playlist_init(APPlaylist *p)
     p->sources = ap_array_alloc(16, sizeof(APSource));
 }
 
-static void ap_playlist_entries_free(APArrayT(APFile) *entries)
+static void ap_playlist_entries_free(APArrayT(APFile) * entries)
 {
     for (int i = 0; i < entries->len; i++)
     {
@@ -155,7 +160,8 @@ void ap_playlist_deserialize(APPlaylist *p, void *_buf, int buf_size)
         {
             uint32_t entry_len = BUF_READ(buf, uint32_t);
             buf.offset += 4;
-            APArrayT(APFile) *entries = ap_array_alloc(entry_len, sizeof(APFile));
+            APArrayT(APFile) *entries =
+                ap_array_alloc(entry_len, sizeof(APFile));
             for (int j = 0; j < entry_len; j++)
             {
                 uint32_t entry_size = BUF_READ(buf, uint32_t);

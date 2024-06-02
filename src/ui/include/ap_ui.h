@@ -1,11 +1,7 @@
 #ifndef __AP_UI_H
 #define __AP_UI_H
 
-#include "ap_math.h"
-#include <stdbool.h>
 #include <stdint.h>
-#include <pthread.h>
-#include "ap_terminal.h"
 
 typedef struct Color
 {
@@ -13,7 +9,9 @@ typedef struct Color
 } APColor;
 
 #define APCOLOR(r, g, b, a) ((APColor){(r), (g), (b), (a)})
-#define APCOLOR_HEX(hex)    ((APColor){(uint8_t)(hex >> 24), (uint8_t)(hex >> 16), (uint8_t)(hex >> 8), (uint8_t)(hex >> 0)})
+#define APCOLOR_HEX(hex)                                                       \
+    ((APColor){(uint8_t)(hex >> 24), (uint8_t)(hex >> 16),                     \
+               (uint8_t)(hex >> 8), (uint8_t)(hex >> 0)})
 #define APCOLOR_OP(c1, op, c2)                                                 \
     ((APColor){                                                                \
         MATH_CLAMP((c1).r op(c2).r, 0, 255),                                   \
@@ -22,7 +20,8 @@ typedef struct Color
         MATH_MIN((c1).a, (c2).a),                                              \
     })
 #define APCOLOR_UNPACK(c) (c).r, (c).g, (c).b
-#define APCOLOR_PRINT(c) printf(#c"(%d, %d, %d, %d)\n", (c).r, (c).g, (c).b, (c).a)
+#define APCOLOR_PRINT(c)                                                       \
+    printf(#c "(%d, %d, %d, %d)\n", (c).r, (c).g, (c).b, (c).a)
 
 #define APCOLOR_ZERO    ((APColor){0})
 #define APCOLOR_GRAY(x) ((APColor){(x), (x), (x), 255})

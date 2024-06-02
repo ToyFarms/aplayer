@@ -1,9 +1,10 @@
 #ifndef __AP_MATH_H
 #define __AP_MATH_H
 
-#define MATH_MIN(x, y)            ((x) > (y) ? (y) : (x))
-#define MATH_MAX(x, y)            ((x) > (y) ? (x) : (y))
-#define MATH_CLAMP(x, low, high)  ((x) > (high) ? (high) : (x) < (low) ? low : (x))
+#define MATH_MIN(x, y) ((x) > (y) ? (y) : (x))
+#define MATH_MAX(x, y) ((x) > (y) ? (x) : (y))
+#define MATH_CLAMP(x, low, high)                                               \
+    ((x) > (high) ? (high) : (x) < (low) ? low : (x))
 #define MATH_XYTOIDX(x, y, width) (((y) * (width)) + (x))
 #define MATH_ABS(x)               ((x) >= 0 ? (x) : -(x))
 

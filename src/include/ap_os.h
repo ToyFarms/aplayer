@@ -24,7 +24,9 @@ static const char *os_str_map[] = {
 };
 
 #define OS_TYPE_TOSTR(os_type)                                                 \
-    os_type > (sizeof(os_str_map) / sizeof(os_str_map[0])) ? "Unknown OS type" : os_str_map[os_type]
+    os_type > (sizeof(os_str_map) / sizeof(os_str_map[0]))                     \
+        ? "Unknown OS type"                                                    \
+        : os_str_map[os_type]
 
 void prepare_app_arguments(int *argc_ptr, char ***argv_ptr);
 

@@ -91,7 +91,8 @@ APAudioOutputContext *ap_audio_output_alloc(int nb_channels, int sample_rate,
 
 void ap_audio_output_free(APAudioOutputContext **audio_outctx)
 {
-    PTR_PTR_CHECK(audio_outctx, );
+    if (!audio_outctx || !*audio_outctx)
+        return;
 
     ap_audio_output_stop(*audio_outctx);
 

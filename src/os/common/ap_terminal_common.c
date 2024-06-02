@@ -1,5 +1,7 @@
 #include "ap_terminal.h"
 
+#include <stdio.h>
+
 void ap_term_switch_main_buf(APHandle h)
 {
     ap_term_write(h, ESC TCMD_MAINBUF ESC TCMD_RESETTERM, -1);
@@ -19,4 +21,3 @@ void ap_term_set_cursor(APHandle h, Vec2 pos)
     int len = snprintf(buf, 64, ESC TCMD_POSYX, pos.y + 1, pos.x + 1);
     ap_term_write(h, buf, len);
 }
-

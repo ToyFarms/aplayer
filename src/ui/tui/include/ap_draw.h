@@ -2,10 +2,8 @@
 #define __AP_DRAW_H
 
 #include "ap_math.h"
-#include "ap_terminal.h"
 #include "ap_ui.h"
 #include "sds.h"
-#include "wcwidth.h"
 
 static const wchar_t *blocks_horizontal = L" ▎▎▍▌▋▊▉█";
 static const wchar_t *blocks_vertical = L" ▂▂▄▄▅▆▇█";
@@ -33,17 +31,17 @@ sds ap_draw_vblockf(sds cmd, float x);
 sds ap_draw_strc1(sds cmd, const char *template, APColor c1);
 sds ap_draw_strc2(sds cmd, const char *template, APColor c1, APColor c2);
 sds ap_draw_strc3(sds cmd, const char *template, APColor c1, APColor c2,
-                   APColor c3);
+                  APColor c3);
 sds ap_draw_strc4(sds cmd, const char *template, APColor c1, APColor c2,
-                   APColor c3, APColor c4);
+                  APColor c3, APColor c4);
 sds ap_draw_strc5(sds cmd, const char *template, APColor c1, APColor c2,
-                   APColor c3, APColor c4, APColor c5);
+                  APColor c3, APColor c4, APColor c5);
 sds ap_draw_strc6(sds cmd, const char *template, APColor c1, APColor c2,
-                   APColor c3, APColor c4, APColor c5, APColor c6);
+                  APColor c3, APColor c4, APColor c5, APColor c6);
 sds ap_draw_strc7(sds cmd, const char *template, APColor c1, APColor c2,
-                   APColor c3, APColor c4, APColor c5, APColor c6, APColor c7);
+                  APColor c3, APColor c4, APColor c5, APColor c6, APColor c7);
 sds ap_draw_strc8(sds cmd, const char *template, APColor c1, APColor c2,
-                   APColor c3, APColor c4, APColor c5, APColor c6, APColor c7,
-                   APColor c8);
+                  APColor c3, APColor c4, APColor c5, APColor c6, APColor c7,
+                  APColor c8);
 
 #endif /* __AP_DRAW_H */

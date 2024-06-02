@@ -1,10 +1,11 @@
 #ifndef __AP_WIDGETS_H
 #define __AP_WIDGETS_H
 
-#include "ap_draw.h"
-#include "wcwidth.h"
-#include "ap_playlist.h"
 #include "ap_dict.h"
+#include "ap_event.h"
+#include "ap_math.h"
+#include "ap_playlist.h"
+#include "sds.h"
 
 typedef enum APWidgetContext
 {
@@ -26,10 +27,9 @@ typedef struct APWidget
     APDict *listeners;
 
     APWidgetContext ctx;
-    union
-    {
+    union {
         APTUIWidgetState *tui;
-        // APWidgetGUIState gui_state;
+        // APGUIWidgetState gui_state;
     } state;
     void (*init)(struct APWidget *);
     void (*draw)(struct APWidget *);
