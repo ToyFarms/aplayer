@@ -45,7 +45,7 @@ int ap_audio_output_init(APAudioOutputContext *ctx, int nb_channels,
 
     av_log(NULL, AV_LOG_DEBUG, "Opening PortAudio stream\n");
     pa_err = Pa_OpenStream(&ctx->stream, NULL, &param, sample_rate,
-                           paFramesPerBufferUnspecified, paClipOff, NULL, NULL);
+                           paFramesPerBufferUnspecified, paNoFlag, NULL, NULL);
 
     if (pa_err != paNoError)
     {

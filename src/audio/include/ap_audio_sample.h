@@ -7,14 +7,14 @@
 #include <stdbool.h>
 
 #define AP_AUDIO_SAMPLEFMT_LIST                                                \
-    __X(AP_AUDIO_SAMPLEFMT_U8, 1 << 0)  /* Unsigned 8 bits */                  \
-    __X(AP_AUDIO_SAMPLEFMT_S16, 1 << 1) /* Signed 16 bits  */                  \
-    __X(AP_AUDIO_SAMPLEFMT_S32, 1 << 2) /* Signed 32 bits  */                  \
-    __X(AP_AUDIO_SAMPLEFMT_FLT, 1 << 3) /* Float 32 bits   */                  \
-    __X(AP_AUDIO_SAMPLEFMT_DBL, 1 << 4) /* Float 64 bits   */                  \
-    __X(AP_AUDIO_SAMPLEFMT_S64, 1 << 5) /* Signed 64 bits  */
+    __X(AP_AUDIO_SAMPLEFMT_U8, 1)  /* Unsigned 8 bits */                       \
+    __X(AP_AUDIO_SAMPLEFMT_S16, 2) /* Signed 16 bits  */                       \
+    __X(AP_AUDIO_SAMPLEFMT_S32, 3) /* Signed 32 bits  */                       \
+    __X(AP_AUDIO_SAMPLEFMT_FLT, 4) /* Float 32 bits   */                       \
+    __X(AP_AUDIO_SAMPLEFMT_DBL, 5) /* Float 64 bits   */                       \
+    __X(AP_AUDIO_SAMPLEFMT_S64, 6) /* Signed 64 bits  */
 #define AP_AUDIO_SAMPLEFMT_PLANAR                                              \
-    (1 << 20) /* Planar: each channel get their own buffer */
+    (1 << 17) /* Planar: each channel get their own buffer */
 
 #define __X(name, value) name = value,
 typedef enum APAudioSampleFmt

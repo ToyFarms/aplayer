@@ -9,6 +9,7 @@ endif()
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 set(VCPKG_TARGET_TRIPLET "x64-windows")
+set(VCPKG_INSTALLED_PATH ${CMAKE_CURRENT_BINARY_DIR}/vcpkg_installed/${VCPKG_TARGET_TRIPLET})
 set(CMAKE_TOOLCHAIN_FILE $ENV{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake)
 
 include(${CMAKE_TOOLCHAIN_FILE})

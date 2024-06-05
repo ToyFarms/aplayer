@@ -3,6 +3,9 @@
   "version": "1.0",
   "dependencies": [
     "portaudio",
-    "ffmpeg"
+    {
+      "name": "ffmpeg",
+      "features": []
+    }
   ]
 }

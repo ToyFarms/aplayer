@@ -1,4 +1,5 @@
 #include "ap_audio.h"
+#include "ap_crypto.h"
 #include "ap_dict.h"
 #include "ap_flags.h"
 #include "ap_os.h"
@@ -8,23 +9,22 @@
 #include "ap_ui.h"
 #include "ap_utils.h"
 #include "ap_widgets.h"
-#include "ap_crypto.h"
 
 static uint64_t hash_theme(const char *key, int size)
 {
     char c;
     const char *k = key;
-    char *seg = calloc(strlen(key), 1);
+    char *seg = calloc(size, 1);
     int segsize = 0;
     uint64_t hash = 0;
 
-// TODO: use size
-    while ((c = *k++))
+    for (int i = 0; i < size; i++)
     {
+        c = key[i];
         if (c == '-')
         {
             hash += ap_hash_djb2(seg, segsize);
-            memset(seg, 0, strlen(key));
+            memset(seg, 0, size);
             segsize = 0;
             continue;
         }
@@ -63,7 +63,7 @@ static void request_music(const char *filename)
     ap_audio_unregister_decoder(&audioctx);
     if (!ap_audio_register_decoder(&audioctx, audiodec))
         goto fail;
-    ap_audiodec_decode_async(audiodec, 128);
+    ap_audiodec_decode_async(audiodec, 16);
 
     return;
 fail:
@@ -109,19 +109,9 @@ void log_callback(void *ptr, int level, const char *fmt, va_list vl)
     fclose(fd);
 }
 
-char *random_str(int length)
-{
-    static const char *charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890";
-    char *str = (char *)calloc(length + 1, sizeof(char));
-
-    for (int i = 0; i < length; i++)
-        str[i] = charset[rand() % (strlen(charset) - 1)];
-
-    return str;
-}
-
 int main(int argc, char **argv)
 {
+    // TODO: Better thread management
     prepare_app_arguments(&argc, &argv);
     av_log_set_level(AV_LOG_DEBUG);
     av_log_set_callback(log_callback);
@@ -129,6 +119,13 @@ int main(int argc, char **argv)
     {
         av_log(NULL, AV_LOG_FATAL, "Usage: %s [dir/file, ...]\n", argv[0]);
         return 1;
+    }
+
+    char *debug_audio_path = NULL;
+    for (int i = 1; i < argc; i++)
+    {
+        if (strcmp(argv[i], "--debug-audio") == 0 && i + 1 < argc)
+            debug_audio_path = argv[i + 1];
     }
 
     if (ap_audio_init(&audioctx, 2, 48000,
@@ -139,6 +136,9 @@ int main(int argc, char **argv)
     }
 
     ap_audio_output_start_async(audioctx.outctx, audioctx.audio_queue);
+
+    if (debug_audio_path)
+        request_music(debug_audio_path);
 
     APPlaylist *pl = ap_playlist_alloc();
 
@@ -232,6 +232,10 @@ int main(int argc, char **argv)
             {
                 if (e.event.key.ascii == 'q')
                     termctx->should_close = true;
+                else if (e.event.key.ascii == 'p') // debugging
+                    audioctx.decoder->wanted_sample_rate -= 1000;
+                else if (e.event.key.ascii == 'n')
+                    audioctx.decoder->wanted_sample_rate += 1000;
             }
             else if (e.type == AP_EVENT_MOUSE)
             {

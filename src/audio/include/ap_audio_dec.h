@@ -6,24 +6,30 @@
 #include "libavcodec/avcodec.h"
 #include "libavcodec/codec.h"
 #include "libavformat/avformat.h"
+#include "libswresample/swresample.h"
 #include "portaudio.h"
 
 #include <pthread.h>
 #include <stdbool.h>
 
-typedef struct AudioInternalCtx
+typedef struct AudioInternal
 {
     AVFormatContext *ic;
     const AVCodec *codec;
     AVCodecContext *avctx;
     int audio_stream;
-} AudioInternalCtx;
+
+    SwrContext *swr_ctx;
+    int swr_nb_channels;
+    int swr_sample_rate;
+    enum AVSampleFormat swr_sample_fmt;
+} AudioInternal;
 
 typedef struct APAudioDecoder
 {
     char *filename;
-    AudioInternalCtx *it;
-    int channels;
+    AudioInternal *it;
+    int nb_channels;
     int sample_rate;
     int wanted_nb_channels;
     int wanted_sample_rate;
