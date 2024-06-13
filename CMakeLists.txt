@@ -62,10 +62,6 @@ add_executable(
 find_package(portaudio REQUIRED)
 target_link_libraries(aplayer PRIVATE portaudio)
 
-# pkg_check_modules(libavformat REQUIRED)
-# pkg_check_modules(libavcodec REQUIRED)
-# pkg_check_modules(libavutil REQUIRED)
-# pkg_check_modules(libswresample REQUIRED)
 pkg_check_modules(LIBAV REQUIRED libavformat libavcodec libavutil libswresample)
 target_include_directories(aplayer PRIVATE ${LIBAV_INCLUDE_DIRS})
 target_link_directories(aplayer PRIVATE ${LIBAV_LIBRARY_DIRS})
