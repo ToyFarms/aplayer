@@ -8,11 +8,8 @@ elseif(CMAKE_BUILD_TYPE STREQUAL "Debug")
 endif()
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-set(VCPKG_TARGET_TRIPLET "x64-windows")
-set(VCPKG_INSTALLED_PATH ${CMAKE_CURRENT_BINARY_DIR}/vcpkg_installed/${VCPKG_TARGET_TRIPLET})
-set(CMAKE_TOOLCHAIN_FILE $ENV{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake)
-
-include(${CMAKE_TOOLCHAIN_FILE})
+include(FindPkgConfig)
+find_package(PkgConfig REQUIRED)
 
 set(OS-DIR NOT_SUPPORTED)
 
@@ -65,10 +62,13 @@ add_executable(
 find_package(portaudio REQUIRED)
 target_link_libraries(aplayer PRIVATE portaudio)
 
-find_package(ffmpeg REQUIRED)
+pkg_check_modules(libavformat REQUIRED)
+pkg_check_modules(libavcodec REQUIRED)
+pkg_check_modules(libavutil REQUIRED)
+pkg_check_modules(libswresample REQUIRED)
 target_include_directories(aplayer PRIVATE ${FFMPEG_INCLUDE_DIRS})
 target_link_directories(aplayer PRIVATE ${FFMPEG_LIBRARY_DIRS})
-target_link_libraries(aplayer PRIVATE avformat avcodec avutil swresample)
+target_link_libraries(aplayer PRIVATE ${FFMPEG_LIBRARIES})
 
 target_include_directories(aplayer PUBLIC src/include)
 target_include_directories(aplayer PUBLIC src/audio/include)
