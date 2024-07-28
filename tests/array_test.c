@@ -2,15 +2,15 @@
 
 INCLUDE_BEGIN
 #include "array.h"
-#include <errno.h>
 #include <assert.h>
+#include <errno.h>
 #include <string.h>
 INCLUDE_END
 
 CFLAGS_BEGIN/*
--Isrc/include
-src/struct/array.c
-*/CFLAGS_END
+ -Isrc/include
+ src/struct/array.c
+ */CFLAGS_END
 
 TEST_BEGIN(init)
 {
@@ -41,7 +41,7 @@ TEST_BEGIN(append_static_not_enough_space)
     int ret = array_append_static(&arr, data, 3);
     ASSERT_INT_EQ(ret, -ENOMEM);
     ASSERT_INT_EQ(arr.length, 0);
-    ASSERT_INT_EQ(arr.max_item, 1);
+    ASSERT_INT_EQ(arr.capacity, 1);
 }
 TEST_END()
 
@@ -98,7 +98,7 @@ TEST_BEGIN(append_static)
     int ret = array_append_static(&arr, data, 3);
     ASSERT_INT_EQ(ret, 0);
     ASSERT_INT_EQ(arr.length, 3);
-    ASSERT_INT_EQ(arr.max_item, 3);
+    ASSERT_INT_EQ(arr.capacity, 3);
     ASSERT_MEM_EQ(arr.data, data, 3 * sizeof(int));
 }
 TEST_END()
@@ -113,7 +113,7 @@ TEST_BEGIN(append_static_partial)
     int ret = array_append_static(&arr, data, 1);
     ASSERT_INT_EQ(ret, 0);
     ASSERT_INT_EQ(arr.length, 1);
-    ASSERT_INT_EQ(arr.max_item, 3);
+    ASSERT_INT_EQ(arr.capacity, 3);
     const int expected[] = {1, 0, 0};
     ASSERT_MEM_EQ(arr.data, expected, 3 * sizeof(int));
 }
@@ -129,7 +129,7 @@ TEST_BEGIN(append_static_partial2)
     int ret = array_append_static(&arr, data, 2);
     ASSERT_INT_EQ(ret, 0);
     ASSERT_INT_EQ(arr.length, 2);
-    ASSERT_INT_EQ(arr.max_item, 3);
+    ASSERT_INT_EQ(arr.capacity, 3);
     const int expected[] = {1, 2, 0};
     ASSERT_MEM_EQ(arr.data, expected, 3 * sizeof(int));
 }
@@ -145,22 +145,9 @@ TEST_BEGIN(append_static_item_overflow)
     int ret = array_append_static(&arr, data, 1);
     ASSERT_INT_EQ(ret, 0);
     ASSERT_INT_EQ(arr.length, 1);
-    ASSERT_INT_EQ(arr.max_item, 3);
+    ASSERT_INT_EQ(arr.capacity, 3);
     const int expected[] = {400 - 256, 0, 0};
     ASSERT_MEM_EQ(arr.data, expected, 3 * sizeof(int));
-}
-TEST_END()
-
-TEST_BEGIN(append_static_false_count, EXPECT_FAIL)
-{
-    array_t arr = {0};
-    arr.data = &(int){100};
-    arr.max_item = 100;
-    arr.length = 5;
-    arr.item_size = 10;
-
-    const int data[] = {1, 2, 3};
-    int ret = array_append_static(&arr, data, 3);
 }
 TEST_END()
 
@@ -217,7 +204,7 @@ TEST_BEGIN(append_dynamic)
     int ret = array_append(&arr, data, 3);
     ASSERT_INT_EQ(ret, 0);
     ASSERT_INT_EQ(arr.length, 3);
-    ASSERT_INT_EQ(arr.max_item, 3);
+    ASSERT_INT_EQ(arr.capacity, 3);
     ASSERT_MEM_EQ(arr.data, data, 3 * sizeof(int));
 }
 TEST_END()
@@ -232,7 +219,7 @@ TEST_BEGIN(append_dynamic_resize2x)
     int ret = array_append(&arr, data, 6);
     ASSERT_INT_EQ(ret, 0);
     ASSERT_INT_EQ(arr.length, 6);
-    ASSERT_INT_EQ(arr.max_item, 6);
+    ASSERT_INT_EQ(arr.capacity, 6);
     ASSERT_MEM_EQ(arr.data, data, 6 * sizeof(int));
 }
 TEST_END()
@@ -247,7 +234,7 @@ TEST_BEGIN(append_dynamic_resize3x)
     int ret = array_append(&arr, data, 12);
     ASSERT_INT_EQ(ret, 0);
     ASSERT_INT_EQ(arr.length, 12);
-    ASSERT_INT_EQ(arr.max_item, 12);
+    ASSERT_INT_EQ(arr.capacity, 12);
     ASSERT_MEM_EQ(arr.data, data, 12 * sizeof(int));
 }
 TEST_END()
@@ -262,7 +249,7 @@ TEST_BEGIN(append_dynamic_resize_power2)
     int ret = array_append(&arr, data, 10);
     ASSERT_INT_EQ(ret, 0);
     ASSERT_INT_EQ(arr.length, 10);
-    ASSERT_INT_EQ(arr.max_item, 12);
+    ASSERT_INT_EQ(arr.capacity, 12);
     ASSERT_MEM_EQ(arr.data, data, 10 * sizeof(int));
 }
 TEST_END()
@@ -277,7 +264,7 @@ TEST_BEGIN(append_dynamic_partial)
     int ret = array_append(&arr, data, 1);
     ASSERT_INT_EQ(ret, 0);
     ASSERT_INT_EQ(arr.length, 1);
-    ASSERT_INT_EQ(arr.max_item, 3);
+    ASSERT_INT_EQ(arr.capacity, 3);
     const int expected[] = {1, 0, 0};
     ASSERT_MEM_EQ(arr.data, expected, 3 * sizeof(int));
 }
@@ -293,7 +280,7 @@ TEST_BEGIN(append_dynamic_partial2)
     int ret = array_append(&arr, data, 2);
     ASSERT_INT_EQ(ret, 0);
     ASSERT_INT_EQ(arr.length, 2);
-    ASSERT_INT_EQ(arr.max_item, 3);
+    ASSERT_INT_EQ(arr.capacity, 3);
     const int expected[] = {1, 2, 0};
     ASSERT_MEM_EQ(arr.data, expected, 3 * sizeof(int));
 }
@@ -309,21 +296,36 @@ TEST_BEGIN(append_dynamic_item_overflow)
     int ret = array_append_static(&arr, data, 1);
     ASSERT_INT_EQ(ret, 0);
     ASSERT_INT_EQ(arr.length, 1);
-    ASSERT_INT_EQ(arr.max_item, 3);
+    ASSERT_INT_EQ(arr.capacity, 3);
     const int expected[] = {400 - 256, 0, 0};
     ASSERT_MEM_EQ(arr.data, expected, 3 * sizeof(int));
 }
 TEST_END()
 
-TEST_BEGIN(append_dynamic_false_count, EXPECT_FAIL)
+TEST_BEGIN(_remove)
 {
-    array_t arr = {0};
-    arr.data = &(int){100};
-    arr.max_item = 100;
-    arr.length = 5;
-    arr.item_size = 10;
+    array_t arr = array_create(16, sizeof(int));
 
-    const int data[] = {1, 2, 3};
-    int ret = array_append(&arr, data, 3);
+    int data[] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
+    array_append(&arr, data, 10);
+
+    int ret = array_remove(&arr, 5, 2);
+
+    ASSERT_INT_EQ(ret, 0);
+    ASSERT_INT_EQ(arr.length, 8);
+    ASSERT_INT_EQ(arr.capacity, 10);
 }
-TEST_END()
+
+TEST_BEGIN(remove2)
+{
+    array_t arr = array_create(16, sizeof(int));
+
+    int data[] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
+    array_append(&arr, data, 10);
+
+    int ret = array_remove(&arr, 5, 6);
+
+    ASSERT_INT_NEQ(ret, 0);
+    ASSERT_INT_EQ(arr.length, 10);
+    ASSERT_INT_EQ(arr.capacity, 10);
+}

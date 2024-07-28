@@ -17,7 +17,13 @@ add_executable(aplayer
     ./src/term/term_linux.c
 
     ./src/audio/audio.c
+    ./src/audio/audio_mixer.c
+
     ./src/audio/source/audio_file.c
+
+    ./src/audio/effect/audio_gain.c
+    ./src/audio/effect/audio_pan.c
+    ./src/audio/effect/audio_filter.c
 )
 
 target_link_libraries(aplayer PUBLIC m pthread)

@@ -8,6 +8,7 @@ from pygments import highlight, lexers, formatters
 
 
 class Unit:
+    DEFINED_FLAGS = ["DEBUG", "EXPECT_FAIL"]
     def __init__(
         self,
         filename: str,
@@ -29,6 +30,11 @@ class Unit:
         self.run_status = 0
         self.extra_command = []
 
+    def _check_flags(self) -> None:
+        for flag in self.flags:
+            if flag not in Unit.DEFINED_FLAGS:
+                print(f"\x1b[33mWarning: Unknown flag {flag!r}\x1b[0m")
+
     def test_name(self) -> str:
         return f"{self.filename.stem}:{self.name}"
 
@@ -46,6 +52,7 @@ class Unit:
             str(self.out),
             *self.cflags.splitlines(),
         ]
+        command = list(map(lambda x: x.strip(), command))
         debug_flags: list[str] = []
         if "DEBUG" in self.flags:
             debug_flags.extend(["-O0", "-g3"])
@@ -78,7 +85,11 @@ class Unit:
         content = cache_file.read_text().splitlines()
         for line in content:
             if self.test_name() in line:
-                return int(line.split("@@@")[1]) != hash(self)
+                name, _hash = line.split("@@@")
+                return (
+                    int(_hash) != hash(self)
+                    and Path("tests/build/" + name.replace(":", "_")).exists()
+                )
 
         return True
 
@@ -99,6 +110,7 @@ class Unit:
         cache_file.write_text("\n".join(content))
 
     def build(self, force: bool = False) -> None:
+        self._check_flags()
         if not force and not self.need_rebuild():
             print(f"Using \x1b[1m{self.test_name()}\x1b[0m cached build")
             return
@@ -120,6 +132,7 @@ class Unit:
     def run(self, is_multithreaded: bool = False) -> None:
         if not self.out.exists():
             print(f"Could not find test '{self.test_name()}'")
+            return
         if self.build_status != 0:
             print(f"Skip test {self.test_name()} because build failed")
             return
@@ -140,7 +153,7 @@ class Unit:
         res = subprocess.run(f"./{self.out}", capture_output=True)
         if res.returncode != 0 and not expect_fail:
             print(
-                f"{mp_prefix}[ \x1b[31mFAIL\x1b[0m ] {self.test_name()} ({res.returncode})",
+                f"{mp_prefix} [ \x1b[31mFAIL\x1b[0m ] {self.test_name()} ({res.returncode})",
                 flush=True,
             )
             print(f"@@@ stdout=\x1b[1m{res.stdout}\x1b[0m", flush=True)
@@ -152,7 +165,7 @@ class Unit:
             print(content, flush=True)
             self.run_status = -1
         elif res.returncode == 0 and expect_fail:
-            print(f"{mp_prefix}[ \x1b[31mFAIL\x1b[0m ] {self.test_name()}", flush=True)
+            print(f"{mp_prefix} [ \x1b[31mFAIL\x1b[0m ] {self.test_name()}", flush=True)
             print(f"@@@ Expect to fail", flush=True)
             self.run_status = -1
         else:
@@ -277,6 +290,8 @@ def generate_source(
     source: str,
     flags: list[str],
 ) -> str:
+    _ = flags
+
     base = Path("tests/base_test.h").read_text()
     return f"""{base}
 {includes}
@@ -293,7 +308,6 @@ blocks = " ▏▎▍▌▋▊▉█"
 
 
 def get_block(n: float) -> str:
-
     index = int(n * (len(blocks) - 1))
     if index > len(blocks) - 1:
         return ""
@@ -305,7 +319,7 @@ def print_chart(units: list[Unit]) -> None:
     success = [unit for unit in units if unit.run_status > 0]
     fails = [unit for unit in units if unit.run_status < 0]
     build_failed = [unit for unit in units if unit.build_status < 0]
-    width = os.get_terminal_size().columns
+    width = os.get_terminal_size().columns - 1
 
     percentage = [
         (
@@ -334,8 +348,12 @@ def print_chart(units: list[Unit]) -> None:
         if length == 0:
             continue
         joined_color = col
-        if i + 1 < len(percentage):
-            joined_color = percentage[i + 1][3]
+        j = 1
+        while i + j < len(percentage):
+            if percentage[i + j][2] != 0:
+                joined_color = percentage[i + j][3]
+                break
+            j += 1
 
         w = (n * width) - correction
         int_part = int(w)
@@ -395,7 +413,7 @@ def main():
         testcases = parse_testcases(source)
         print(
             f"Found \x1b[1;36m{len(includes)} \x1b[0;1mincludes\x1b[0m, "
-            f"cflags={cflags!r}, \x1b[1;36m{len(testcases)} "
+            f"cflags={" ".join(cflags.splitlines())!r}, \x1b[1;36m{len(testcases)} "
             f"\x1b[0;1mtestcases\x1b[0m ({list(testcases.keys())})"
         )
 

@@ -28,6 +28,7 @@ void ring_buf_free(ring_buf_t *rbuf)
 
     if (rbuf->buf != NULL)
         free(rbuf->buf);
+    rbuf->buf = NULL;
 
     memset(rbuf, 0, sizeof(*rbuf));
 }

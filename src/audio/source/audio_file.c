@@ -116,6 +116,8 @@ static int audio_file_init(audio_src *audio)
 
 static void audio_file_free(audio_src *audio)
 {
+    audio_common_free(audio);
+
     audio_file *ctx = audio->ctx;
     if (ctx == NULL)
         return;
@@ -247,10 +249,10 @@ fail:
     return -1;
 }
 
-static int audio_update(audio_src *audio)
+static int audio_file_update(audio_src *audio)
 {
     audio_file *ctx = audio->ctx;
-    if (audio->is_finished)
+    if (audio->is_eof)
         return 0;
     if (ctx->audio_buffer.length >= audio->stream_sample_rate * 5)
         return 0;
@@ -264,7 +266,7 @@ static int audio_update(audio_src *audio)
             continue;
         else if (ret == AVERROR_EOF)
         {
-            audio->is_finished = true;
+            audio->is_eof = true;
             return EOF;
         }
         else if (ret < 0)
@@ -305,20 +307,22 @@ error:
     return -1;
 }
 
-static int audio_get_frame(audio_src *audio, int req_sample, float *out)
+static int audio_file_get_frame(audio_src *audio, int req_sample, float *out)
 {
     audio_file *ctx = audio->ctx;
-    char buf[1000];
-    int len = snprintf(buf, 1000, "\rread=%-10d write=%-10d length=%-10d",
-                       ctx->audio_buffer.read_idx, ctx->audio_buffer.write_idx,
-                       ctx->audio_buffer.length);
-    write(STDOUT_FILENO, buf, len);
+
+    if (req_sample < 0)
+        req_sample = ctx->audio_buffer.length;
 
     int ret = ring_buf_read(&ctx->audio_buffer, req_sample, out);
-    if (audio->is_finished && ret == -ENODATA)
+    if (audio->is_eof && ret == -ENODATA)
+    {
+        if (ctx->audio_buffer.length == 0)
+            audio->is_finished = true;
         return EOF;
+    }
 
-    return ret;
+    return req_sample;
 }
 
 int audio_set_metadata(audio_src *audio, int nb_channels, int sample_rate,
@@ -360,7 +364,8 @@ static int audio_set_stream_metadata(audio_src *audio, int nb_channels,
     return 0;
 }
 
-audio_src audio_from_file(const char *filename)
+audio_src audio_from_file(const char *filename, int nb_channels,
+                          int sample_rate, enum audio_format sample_fmt)
 {
     audio_src audio = {0};
 
@@ -378,11 +383,12 @@ audio_src audio_from_file(const char *filename)
     ctx->filename = strdup(filename);
     assert(ctx->filename != NULL);
 
+    audio.is_realtime = false;
     audio.free = audio_file_free;
-    audio.update = (void *)audio_update;
-    audio.get_frame = audio_get_frame;
+    audio.update = (void *)audio_file_update;
+    audio.get_frame = audio_file_get_frame;
 
-    ctx->audio_buffer = ring_buf_create(48000 * 10, sizeof(float));
+    ctx->audio_buffer = ring_buf_create(sample_rate * 10, sizeof(float));
 
     if (audio_file_init(&audio) < 0)
         av_log(NULL, AV_LOG_ERROR, "Failed to initialize audio source: %s\n",
@@ -407,6 +413,23 @@ audio_src audio_from_file(const char *filename)
         goto exit;
     }
     ctx->pkt = pkt;
+
+    if (audio_set_metadata(&audio, nb_channels, sample_rate, sample_fmt) < 0)
+    {
+        av_log(NULL, AV_LOG_ERROR, "Cannot set audio metadata to %d:%d:%s\n",
+               nb_channels, sample_rate, audio_format_str(sample_fmt));
+        errno = -EINVAL;
+        goto exit;
+    }
+
+    int ret;
+    if ((ret = audio_common_init(&audio)) < 0)
+    {
+        av_log(NULL, AV_LOG_ERROR, "audio_common_init() failed with %s\n",
+               strerror(ret));
+        errno = ret;
+        goto exit;
+    }
 
 exit:
     return audio;
