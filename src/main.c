@@ -21,12 +21,14 @@ static float lerp(float v0, float v1, float t)
 static void display_rms(void *ctx, void *userdata)
 {
     analyzer_rms_ctx *rms = ctx;
-    char buf[1024] = {0};
+    char buf[4096] = {0};
+    char fmtbuf[2048] = {0};
     int len;
     static float prev_scale[8] = {0};
     static const wchar_t *blocks_horizontal = L" ▎▎▍▌▋▊▉█";
     static int activity_color[8] = {0};
     static float threshold = 2.0f;
+    static float prev_diff[8] = {0};
     // TODO: ?adjust threshold dynamically
 
     for (int ch = 0; ch < rms->nb_channels; ch++)
@@ -42,27 +44,26 @@ static void display_rms(void *ctx, void *userdata)
         if (activity)
             activity_color[ch] = 255;
         else
-            activity_color[ch] = FFMAX(activity_color[ch] - (diff * 15), 0);
-
-        len = snprintf(buf, 1024,
-                       "  \x1b[%d;2;%d;%d;%dm  \x1b[0m%10.1f dBFS   "
-                       "\x1b[500X\x1b[48;2;255;255;255m\x1b[%dX",
-                       activity_color[ch] == 0 ? 38 : 48, activity_color[ch],
-                       activity_color[ch], activity_color[ch], db,
-                       (int)lin_scale);
-        write(STDOUT_FILENO, buf, len);
+            activity_color[ch] =
+                FFMAX(activity_color[ch] - (prev_diff[ch] * 5), 0);
 
         int index = (lin_scale - (int)lin_scale) * (9.0f - 1.0f);
         wchar_t block = blocks_horizontal[index];
 
-        len = snprintf(buf, 1024, "%lc\x1b[0m\n", block);
-        write(STDOUT_FILENO, buf, len);
+        snprintf(fmtbuf, 2048,
+                 "  \x1b[%d;2;%d;%d;%dm  \x1b[0m%10.1f dBFS   "
+                 "\x1b[500X\x1b[48;2;255;255;255m\x1b[%dX%lc\x1b[0m\n",
+                 activity_color[ch] == 0 ? 38 : 48, activity_color[ch],
+                 activity_color[ch], activity_color[ch], db, (int)lin_scale,
+                 block);
+        strcat(buf, fmtbuf);
 
         prev_scale[ch] = lin_scale;
+        prev_diff[ch] = diff;
     }
 
-    len = snprintf(buf, 1024, "\x1b[2A");
-    write(STDOUT_FILENO, buf, len);
+    strcat(buf, "\x1b[2A");
+    write(STDOUT_FILENO, buf, strlen(buf));
 }
 
 int main(int argc, char **argv)
@@ -82,12 +83,13 @@ int main(int argc, char **argv)
                                         mixer.sample_rate, mixer.sample_fmt);
 
         // audio_effect lowpass =
-        //     audio_eff_filter(AUDIO_FILT_LOWPASS, 3000, mixer.sample_rate,
+        //     audio_eff_filter(AUDIO_FILT_LOWPASS, 1000, mixer.sample_rate,
         //     NULL);
         // array_append(&src.effects, &lowpass, 1);
         //
-        // audio_effect highpass = audio_eff_filter(AUDIO_FILT_HIGHPASS, 1000,
-        //                                          mixer.sample_rate, NULL);
+        // audio_effect highpass =
+        //     audio_eff_filter(AUDIO_FILT_HIGHPASS, 500, mixer.sample_rate,
+        //     NULL);
         // array_append(&src.effects, &highpass, 1);
         //
         // audio_effect bell =
