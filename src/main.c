@@ -42,7 +42,7 @@ static void display_rms(void *ctx, void *userdata)
         if (activity)
             activity_color[ch] = 255;
         else
-            activity_color[ch] = FFMAX(activity_color[ch] - 15, 0);
+            activity_color[ch] = FFMAX(activity_color[ch] - (diff * 15), 0);
 
         len = snprintf(buf, 1024,
                        "  \x1b[%d;2;%d;%d;%dm  \x1b[0m%10.1f dBFS   "
