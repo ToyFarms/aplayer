@@ -18,12 +18,15 @@ add_executable(aplayer
 
     ./src/audio/audio.c
     ./src/audio/audio_mixer.c
+    ./src/audio/audio_effect.c
 
     ./src/audio/source/audio_file.c
 
     ./src/audio/effect/audio_gain.c
     ./src/audio/effect/audio_pan.c
     ./src/audio/effect/audio_filter.c
+
+    ./src/audio/analyzer/audio_rms.c
 )
 
 target_link_libraries(aplayer PUBLIC m pthread)

@@ -4,35 +4,32 @@
 #include <stdlib.h>
 #include <errno.h>
 
-typedef struct audio_pan
+typedef struct effect_pan
 {
     float angle;
-} audio_pan;
+    float gain[2];
+} effect_pan;
 
-static void eff_pan_process(audio_effect *eff, float *buf, int size)
+static void eff_pan_process(audio_effect *eff, float *buf, int size, int nb_channels)
 {
-    static const float mult = 1.0f / 1.4142135623730951f;
+    if (nb_channels == 1 || nb_channels > 2)
+        return;
 
-    audio_pan *ctx = eff->ctx;
-    float rad = ctx->angle * (M_PI / 180.0f);
-    const float l_scale = mult * (cosf(rad) + sinf(rad));
-    const float r_scale = mult * (cosf(rad) - sinf(rad));
+    effect_pan *ctx = eff->ctx;
 
-    for (int i = 0; i < size; i += 2)
+    for (int i = 0; i < size; i += nb_channels)
     {
-        buf[i] *= r_scale;
-        buf[i+1] *= l_scale;
+        buf[i] *= ctx->gain[0];
+        buf[i+1] *= ctx->gain[1];
     }
 }
 
-static void eff_pan_free(audio_effect *eff)
+static void update_param(effect_pan *ctx)
 {
-    if (!eff)
-        return;
-
-    if (eff->ctx != NULL)
-        free(eff->ctx);
-    eff->ctx = NULL;
+    static const float mult = 1.4142135623730951f / 2.0f;
+    float rad = ctx->angle * (M_PI / 180.0f);
+    ctx->gain[0] = mult * (cosf(rad) + sinf(rad));
+    ctx->gain[1] = mult * (cosf(rad) - sinf(rad));
 }
 
 audio_effect audio_eff_pan(float angle)
@@ -40,17 +37,18 @@ audio_effect audio_eff_pan(float angle)
     audio_effect eff = {0};
 
     eff.process = eff_pan_process;
-    eff.free = eff_pan_free;
+    eff.free = _audio_eff_free_default;
     eff.type = AUDIO_EFF_PAN;
-    eff.ctx = calloc(1, sizeof(audio_pan));
+    eff.ctx = calloc(1, sizeof(effect_pan));
     if (!eff.ctx)
     {
         errno = -ENOMEM;
         goto exit;
     }
 
-    audio_pan *ctx = eff.ctx;
+    effect_pan *ctx = eff.ctx;
     ctx->angle = angle;
+    update_param(ctx);
 
 exit:
     return eff;
@@ -58,6 +56,7 @@ exit:
 
 void audio_eff_pan_set(audio_effect *eff, float angle)
 {
-    audio_pan *ctx = eff->ctx;
+    effect_pan *ctx = eff->ctx;
     ctx->angle = angle;
+    update_param(ctx);
 }

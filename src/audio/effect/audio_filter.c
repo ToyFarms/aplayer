@@ -3,9 +3,9 @@
 #include <assert.h>
 #include <errno.h>
 #include <math.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 
 typedef struct bell_filter
 {
@@ -13,83 +13,100 @@ typedef struct bell_filter
     float x1, x2, y1, y2;
 } bell_filter;
 
-typedef struct audio_filter
+typedef struct pass_filter
+{
+    float prev_filtered[8];
+    float prev_sample[8];
+    bool initialized;
+} pass_filter;
+
+typedef struct effect_filter
 {
     enum audio_filt_type type;
     float freq;
-    int nb_channels;
     int sample_rate;
 
     float alpha;
     bell_filter bell;
-} audio_filter;
+    pass_filter pass;
+} effect_filter;
 
-static void filter_lowpass(audio_filter *filter, float *buf, int size)
+static void filter_lowpass(effect_filter *filter, float *buf, int size,
+                           int nb_channels)
 {
-    float filtered[8] = {0};
+    pass_filter *pass = &filter->pass;
 
-    for (int ch = 0; ch < filter->nb_channels; ch++)
-        filtered[ch] = buf[ch];
-
-    for (int i = filter->nb_channels; i < size; i += filter->nb_channels)
+    if (!pass->initialized)
     {
-        for (int ch = 0; ch < filter->nb_channels; ch++)
+        for (int ch = 0; ch < nb_channels; ch++)
+            pass->prev_filtered[ch] = buf[ch];
+        pass->initialized = true;
+    }
+
+    for (int i = 0; i < size; i += nb_channels)
+    {
+        for (int ch = 0; ch < nb_channels; ch++)
         {
             buf[i + ch] =
-                filtered[ch] + (filter->alpha * (buf[i + ch] - filtered[ch]));
-            filtered[ch] = buf[i + ch];
+                pass->prev_filtered[ch] +
+                (filter->alpha * (buf[i + ch] - pass->prev_filtered[ch]));
+            pass->prev_filtered[ch] = buf[i + ch];
         }
     }
 }
 
-static void filter_highpass(audio_filter *filter, float *buf, int size)
+static void filter_highpass(effect_filter *filter, float *buf, int size,
+                            int nb_channels)
 {
-    float filtered[8] = {0};
-    float prev_sample[8] = {0};
-    float sample[8] = {0};
+    pass_filter *pass = &filter->pass;
 
-    for (int ch = 0; ch < filter->nb_channels; ch++)
+    if (!pass->initialized)
     {
-        filtered[ch] = buf[ch];
-        prev_sample[ch] = buf[ch];
-    }
-
-    for (int i = filter->nb_channels; i < size; i += filter->nb_channels)
-    {
-        for (int ch = 0; ch < filter->nb_channels; ch++)
+        for (int ch = 0; ch < nb_channels; ch++)
         {
-            sample[ch] = buf[i + ch];
-            buf[i + ch] = filter->alpha * filtered[ch] +
-                          filter->alpha * (sample[ch] - prev_sample[ch]);
-            filtered[ch] = buf[i + ch];
-            prev_sample[ch] = sample[ch];
+            pass->prev_filtered[ch] = buf[ch];
+            pass->prev_sample[ch] = buf[ch];
         }
+        pass->initialized = true;
     }
-}
 
-static void _filter_bell(audio_filter *filter, float *buf, int size)
-{
-    bell_filter bell = filter->bell;
-
-    for (int i = 0; i < size; i += filter->nb_channels)
+    for (int i = 0; i < size; i += nb_channels)
     {
-        for (int ch = 0; ch < filter->nb_channels; ch++)
+        for (int ch = 0; ch < nb_channels; ch++)
         {
             float sample = buf[i + ch];
-            float sample_out = bell.b0 * sample + bell.b1 * bell.x1 +
-                               bell.b2 * bell.x2 - bell.a1 * bell.y1 -
-                               bell.a2 * bell.y2;
-            bell.x2 = bell.x1;
-            bell.x1 = sample;
-            bell.y2 = bell.y1;
-            bell.y1 = sample_out;
+            buf[i + ch] = filter->alpha * pass->prev_filtered[ch] +
+                          filter->alpha * (sample - pass->prev_sample[ch]);
+            pass->prev_filtered[ch] = buf[i + ch];
+            pass->prev_sample[ch] = sample;
+        }
+    }
+}
+
+static void _filter_bell(effect_filter *filter, float *buf, int size,
+                         int nb_channels)
+{
+    bell_filter *bell = &filter->bell;
+
+    for (int i = 0; i < size; i += nb_channels)
+    {
+        for (int ch = 0; ch < nb_channels; ch++)
+        {
+            float sample = buf[i + ch];
+            float sample_out = bell->b0 * sample + bell->b1 * bell->x1 +
+                               bell->b2 * bell->x2 - bell->a1 * bell->y1 -
+                               bell->a2 * bell->y2;
+            bell->x2 = bell->x1;
+            bell->x1 = sample;
+            bell->y2 = bell->y1;
+            bell->y1 = sample_out;
 
             buf[i + ch] = sample_out;
         }
     }
 }
 
-static void update_param(audio_filter *filter, filter_param *param)
+static void update_param(effect_filter *filter, filter_param *param)
 {
     if (filter->type == AUDIO_FILT_LOWPASS)
     {
@@ -129,50 +146,39 @@ static void update_param(audio_filter *filter, filter_param *param)
     }
 }
 
-void eff_filter_proccess(audio_effect *eff, float *buf, int size)
+void eff_filter_proccess(audio_effect *eff, float *buf, int size,
+                         int nb_channels)
 {
-    audio_filter *ctx = eff->ctx;
+    effect_filter *ctx = eff->ctx;
     enum audio_filt_type type = ctx->type;
     if (type == AUDIO_FILT_LOWPASS)
-        filter_lowpass(eff->ctx, buf, size);
+        filter_lowpass(eff->ctx, buf, size, nb_channels);
     else if (type == AUDIO_FILT_HIGHPASS)
-        filter_highpass(eff->ctx, buf, size);
+        filter_highpass(eff->ctx, buf, size, nb_channels);
     else if (type == AUDIO_FILT_BELL)
-        _filter_bell(eff->ctx, buf, size);
+        _filter_bell(eff->ctx, buf, size, nb_channels);
     else
         fprintf(stderr, "Unknown filter type: %d\n", type);
 }
 
-void eff_filter_free(audio_effect *eff)
-{
-    if (!eff)
-        return;
-
-    if (eff->ctx != NULL)
-        free(eff->ctx);
-    eff->ctx = NULL;
-}
-
 audio_effect audio_eff_filter(enum audio_filt_type type, float freq,
-                              int nb_channels, int sample_rate,
-                              filter_param *param)
+                              int sample_rate, filter_param *param)
 {
     audio_effect eff = {0};
 
     eff.process = eff_filter_proccess;
-    eff.free = eff_filter_free;
+    eff.free = _audio_eff_free_default;
     eff.type = AUDIO_EFF_FILTER;
-    eff.ctx = calloc(1, sizeof(audio_filter));
+    eff.ctx = calloc(1, sizeof(effect_filter));
     if (!eff.ctx)
     {
         errno = -ENOMEM;
         goto exit;
     }
 
-    audio_filter *ctx = eff.ctx;
+    effect_filter *ctx = eff.ctx;
     ctx->type = type;
     ctx->freq = freq;
-    ctx->nb_channels = nb_channels;
     ctx->sample_rate = sample_rate;
 
     update_param(ctx, param);
@@ -182,13 +188,11 @@ exit:
 }
 
 void audio_eff_filter_set(audio_effect *eff, enum audio_filt_type type,
-                          float freq, int nb_channels, int sample_rate,
-                          filter_param *param)
+                          float freq, int sample_rate, filter_param *param)
 {
-    audio_filter *ctx = eff->ctx;
+    effect_filter *ctx = eff->ctx;
     ctx->type = type;
     ctx->freq = freq;
-    ctx->nb_channels = nb_channels;
     ctx->sample_rate = sample_rate;
 
     update_param(ctx, param);

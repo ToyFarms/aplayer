@@ -20,7 +20,7 @@ enum audio_format
     AUDIO_FORMAT_LIST(DO_DEFINE_ENUM)
 };
 
-#define AUDIO_IS_PLANAR(fmt) ((fmt) & AUDIO_PLANAR != 0)
+#define AUDIO_IS_PLANAR(fmt) (((fmt) & AUDIO_PLANAR) != 0)
 
 #define DO_STRINGIFY(name, value)                                              \
 case name:                                                                     \

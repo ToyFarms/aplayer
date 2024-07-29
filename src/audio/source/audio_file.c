@@ -304,7 +304,7 @@ static int audio_file_update(audio_src *audio)
 error:
     av_frame_unref(ctx->frame);
     av_packet_unref(ctx->pkt);
-    return -1;
+    return -2;
 }
 
 static int audio_file_get_frame(audio_src *audio, int req_sample, float *out)
@@ -316,11 +316,9 @@ static int audio_file_get_frame(audio_src *audio, int req_sample, float *out)
 
     int ret = ring_buf_read(&ctx->audio_buffer, req_sample, out);
     if (audio->is_eof && ret == -ENODATA)
-    {
-        if (ctx->audio_buffer.length == 0)
-            audio->is_finished = true;
         return EOF;
-    }
+    else if (!audio->is_eof && ret == -ENODATA)
+        return -ENODATA;
 
     return req_sample;
 }
