@@ -68,7 +68,7 @@ void mixer_free(audio_mixer *mixer)
 int mixer_get_frame(audio_mixer *mixer, float *out)
 {
     float src_buf[48000] = {0};
-    int frame_size = 1024;
+    int frame_size = 512;
     int ret;
     int len;
     bool finished = true;

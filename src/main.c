@@ -25,6 +25,9 @@ static void display_rms(void *ctx, void *userdata)
     int len;
     static float prev_scale[8] = {0};
     static const wchar_t *blocks_horizontal = L" ▎▎▍▌▋▊▉█";
+    static int activity_color[8] = {0};
+    static float threshold = 2.0f;
+    // TODO: ?adjust threshold dynamically
 
     for (int ch = 0; ch < rms->nb_channels; ch++)
     {
@@ -33,23 +36,32 @@ static void display_rms(void *ctx, void *userdata)
         float lin_scale = powf(10.0, db / 20.0) * 100.0f;
         lin_scale = lerp(prev_scale[ch], lin_scale, 0.5f);
 
-        len = snprintf(
-            buf, 1024,
-            "\x1b[0m%15f   \x1b[500X\x1b[48;2;255;255;255m\x1b[%dX",
-            lin_scale, (int)lin_scale);
+        float diff = fabs(prev_scale[ch] - lin_scale);
+        bool activity = diff > threshold;
+
+        if (activity)
+            activity_color[ch] = 255;
+        else
+            activity_color[ch] = FFMAX(activity_color[ch] - 15, 0);
+
+        len = snprintf(buf, 1024,
+                       "  \x1b[%d;2;%d;%d;%dm  \x1b[0m%10.1f dBFS   "
+                       "\x1b[500X\x1b[48;2;255;255;255m\x1b[%dX",
+                       activity_color[ch] == 0 ? 38 : 48, activity_color[ch],
+                       activity_color[ch], activity_color[ch], db,
+                       (int)lin_scale);
         write(STDOUT_FILENO, buf, len);
 
         int index = (lin_scale - (int)lin_scale) * (9.0f - 1.0f);
         wchar_t block = blocks_horizontal[index];
 
-        memset(buf, 0, sizeof(buf));
         len = snprintf(buf, 1024, "%lc\x1b[0m\n", block);
         write(STDOUT_FILENO, buf, len);
 
         prev_scale[ch] = lin_scale;
     }
 
-    len = snprintf(buf, 1024, "\x1b[%dA", 2);
+    len = snprintf(buf, 1024, "\x1b[2A");
     write(STDOUT_FILENO, buf, len);
 }
 
@@ -69,20 +81,21 @@ int main(int argc, char **argv)
         audio_src src = audio_from_file(argv[1], mixer.nb_channels,
                                         mixer.sample_rate, mixer.sample_fmt);
 
-        audio_effect lowpass =
-            audio_eff_filter(AUDIO_FILT_LOWPASS, 3000, mixer.sample_rate, NULL);
-        array_append(&src.effects, &lowpass, 1);
-
-        audio_effect highpass = audio_eff_filter(AUDIO_FILT_HIGHPASS, 1000,
-                                                 mixer.sample_rate, NULL);
-        array_append(&src.effects, &highpass, 1);
-
-        audio_effect bell =
-            audio_eff_filter(AUDIO_FILT_BELL, 2000, mixer.sample_rate,
-                             &(filter_param){
-                                 .bell = (filter_bell){.gain = 20, .Q = 1}
-        });
-        array_append(&src.effects, &bell, 1);
+        // audio_effect lowpass =
+        //     audio_eff_filter(AUDIO_FILT_LOWPASS, 3000, mixer.sample_rate,
+        //     NULL);
+        // array_append(&src.effects, &lowpass, 1);
+        //
+        // audio_effect highpass = audio_eff_filter(AUDIO_FILT_HIGHPASS, 1000,
+        //                                          mixer.sample_rate, NULL);
+        // array_append(&src.effects, &highpass, 1);
+        //
+        // audio_effect bell =
+        //     audio_eff_filter(AUDIO_FILT_BELL, 2000, mixer.sample_rate,
+        //                      &(filter_param){
+        //                          .bell = (filter_bell){.gain = 10, .Q = 1}
+        // });
+        // array_append(&src.effects, &bell, 1);
 
         array_append(&mixer.sources, &src, 1);
     }
