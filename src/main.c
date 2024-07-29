@@ -27,34 +27,34 @@ static void display_rms(void *ctx, void *userdata)
     static float prev_scale[8] = {0};
     static const wchar_t *blocks_horizontal = L" ▎▎▍▌▋▊▉█";
     static int activity_color[8] = {0};
-    static float threshold = 2.0f;
+    static float threshold = 1.0f;
     static float prev_diff[8] = {0};
     // TODO: ?adjust threshold dynamically
 
     for (int ch = 0; ch < rms->nb_channels; ch++)
     {
-        float db =
+        float dbfs =
             rms->rms[ch] == 0 ? -70.0f : -0.691f + 10.0f * log10f(rms->rms[ch]);
-        float lin_scale = powf(10.0, db / 20.0) * 100.0f;
+        float lin_scale = powf(10.0, dbfs / 20.0) * 100.0f;
         lin_scale = lerp(prev_scale[ch], lin_scale, 0.5f);
 
         float diff = fabs(prev_scale[ch] - lin_scale);
         bool activity = diff > threshold;
 
         if (activity)
-            activity_color[ch] = 255;
+            activity_color[ch] = FFMIN(activity_color[ch] + (prev_diff[ch] * 15), 255);
         else
             activity_color[ch] =
-                FFMAX(activity_color[ch] - (prev_diff[ch] * 5), 0);
+                FFMAX(activity_color[ch] - (prev_diff[ch] * 17), 0);
 
         int index = (lin_scale - (int)lin_scale) * (9.0f - 1.0f);
         wchar_t block = blocks_horizontal[index];
 
         snprintf(fmtbuf, 2048,
-                 "  \x1b[%d;2;%d;%d;%dm  \x1b[0m%10.1f dBFS   "
+                 "%10.1f dBFS  \x1b[%d;2;%d;%d;%dm  \x1b[0m  "
                  "\x1b[500X\x1b[48;2;255;255;255m\x1b[%dX%lc\x1b[0m\n",
-                 activity_color[ch] == 0 ? 38 : 48, activity_color[ch],
-                 activity_color[ch], activity_color[ch], db, (int)lin_scale,
+                 dbfs, activity_color[ch] <= 10 ? 38 : 48, activity_color[ch],
+                 activity_color[ch], activity_color[ch], (int)lin_scale,
                  block);
         strcat(buf, fmtbuf);
 
