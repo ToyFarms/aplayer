@@ -1,6 +1,8 @@
 #ifndef __AUDIO_EFFECT_H
 #define __AUDIO_EFFECT_H
 
+#include "audio_callback.h"
+
 enum audio_eff_type
 {
     AUDIO_EFF_GAIN,
@@ -18,7 +20,7 @@ enum audio_filt_type
 typedef struct audio_effect
 {
     void *ctx;
-    void (*process)(struct audio_effect *, float *buf, int size, int nb_channels);
+    void (*process)(struct audio_effect *, audio_callback_param);
     void (*free)(struct audio_effect *);
 
     enum audio_eff_type type;

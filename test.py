@@ -1,14 +1,28 @@
+#!/usr/bin/python
+
 from pathlib import Path
 import os
 import subprocess
 import argparse
 from concurrent.futures import ThreadPoolExecutor
 from typing import Optional
-from pygments import highlight, lexers, formatters
+
+try:
+    from pygments import highlight, lexers, formatters
+
+    lexer = lexers.get_lexer_by_name("C")
+    formatter = formatters.TerminalTrueColorFormatter(style="monokai")
+except ModuleNotFoundError:
+    lexer = None
+    formatter = None
+
+    def highlight(code, lexer, formatter, outfile=None):
+        return code
 
 
 class Unit:
     DEFINED_FLAGS = ["DEBUG", "EXPECT_FAIL"]
+
     def __init__(
         self,
         filename: str,
@@ -158,6 +172,7 @@ class Unit:
             )
             print(f"@@@ stdout=\x1b[1m{res.stdout}\x1b[0m", flush=True)
             print(f"@@@ stderr=\x1b[1m{res.stderr}\x1b[0m", flush=True)
+            # TODO: Source mapping
             content = find_path_and_read(res.stderr.decode())
             if not content:
                 return
@@ -200,9 +215,6 @@ def find_path_and_read(string: str) -> Optional[str]:
         start = max(0, row - margin)
         end = min(len(lines), row + margin + 1)
         result = []
-
-        lexer = lexers.get_lexer_by_name("C")
-        formatter = formatters.TerminalTrueColorFormatter(style="monokai")
 
         max_length = len(max(lines[start:end], key=lambda x: len(x)))
         for i, line in enumerate(lines[start:end], start + 1):
@@ -254,12 +266,26 @@ def parse_testcases(source: list[str]) -> dict[str, tuple[str, list[str]]]:
     testcases_str: list[list[str]] = []
     mark_start, mark_end = "TEST_BEGIN", "TEST_END"
 
-    start_index = 0
+    start_index = -1
+    first = True
     for i, line in enumerate(source):
         if mark_start in line:
+            if start_index > 0 and not first:
+                print(
+                    f"\x1b[31m    From line {source[start_index]} "
+                    "have no corresponding TEST_END()\x1b[0m"
+                )
             start_index = i
         elif mark_end in line:
             testcases_str.append(source[start_index:i])
+            start_index = -1
+        first = False
+
+    if start_index > 0:
+        print(
+            f"\x1b[31m    From line {source[start_index]} have "
+            "no corresponding TEST_END()\x1b[0m"
+        )
 
     testcases: dict[str, tuple[str, list[str]]] = {}
     for testcase in testcases_str:

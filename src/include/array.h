@@ -9,9 +9,6 @@ typedef struct array_t
     int length;
     int capacity;
     int item_size;
-
-    FREE_DEF(free);
-    FREEP_DEF(freep);
 } array_t;
 
 #define array(...)           array_t
@@ -42,6 +39,6 @@ array_t array_create(int max_item, int item_size);
 void array_free(array_t *arr);
 int array_append_static(array_t *arr, const void *mem, int item_count);
 int array_append(array_t *arr, const void *mem, int item_count);
-int array_remove(array_t *arr, int offset, int item_count);
+int array_remove(array_t *arr, int index, int item_count);
 
 #endif /* __ARRAY_H */

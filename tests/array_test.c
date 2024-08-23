@@ -8,9 +8,9 @@ INCLUDE_BEGIN
 INCLUDE_END
 
 CFLAGS_BEGIN/*
- -Isrc/include
- src/struct/array.c
- */CFLAGS_END
+-Isrc/include
+src/struct/array.c
+*/CFLAGS_END
 
 TEST_BEGIN(init)
 {
@@ -313,19 +313,27 @@ TEST_BEGIN(_remove)
 
     ASSERT_INT_EQ(ret, 0);
     ASSERT_INT_EQ(arr.length, 8);
-    ASSERT_INT_EQ(arr.capacity, 10);
+    ASSERT_INT_EQ(arr.capacity, 16);
+
+    int expected[] = {1, 2, 3, 4, 5, 8, 9, 10};
+    ASSERT_MEM_EQ(arr.data, expected, sizeof(expected));
 }
+TEST_END()
 
 TEST_BEGIN(remove2)
 {
-    array_t arr = array_create(16, sizeof(int));
+    array_t arr = array_create(10, sizeof(int));
 
     int data[] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
     array_append(&arr, data, 10);
 
     int ret = array_remove(&arr, 5, 6);
 
-    ASSERT_INT_NEQ(ret, 0);
-    ASSERT_INT_EQ(arr.length, 10);
+    ASSERT_INT_EQ(ret, 0);
+    ASSERT_INT_EQ(arr.length, 5);
     ASSERT_INT_EQ(arr.capacity, 10);
+
+    int expected[] = {1, 2, 3, 4, 5, 6};
+    ASSERT_MEM_EQ(arr.data, expected, sizeof(expected));
 }
+TEST_END()

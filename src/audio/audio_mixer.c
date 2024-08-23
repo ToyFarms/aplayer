@@ -1,11 +1,15 @@
 #include "audio_mixer.h"
-#include "audio.h"
-#include "audio_analyzer.h"
 #include "audio_effect.h"
+#include "audio_source.h"
+#include "exception.h"
+#include "logger.h"
+#include "plugin.h"
+#include <omp.h>
 
 #include <assert.h>
 #include <errno.h>
 #include <stdio.h>
+#include <string.h>
 
 audio_mixer mixer_create(int nb_channels, int sample_rate,
                          enum audio_format sample_fmt)
@@ -17,18 +21,15 @@ audio_mixer mixer_create(int nb_channels, int sample_rate,
     mixer.nb_channels = nb_channels;
     mixer.sample_rate = sample_rate;
     mixer.sample_fmt = sample_fmt;
+    pthread_mutex_init(&mixer.source_mutex, NULL);
 
-    mixer.sources = array_create(16, sizeof(audio_src));
+    mixer.sources = array_create(16, sizeof(audio_source));
     if (errno != 0)
-        fprintf(stderr, "Cannot allocate mixer sources\n");
+        log_error("Cannot allocate mixer sources: %s\n", strerror(errno));
 
-    mixer.master_effect = array_create(16, sizeof(audio_effect));
+    mixer.master_plugins = array_create(16, sizeof(plugin_module));
     if (errno != 0)
-        fprintf(stderr, "Cannot allocate master effect\n");
-
-    mixer.master_analyzer = array_create(16, sizeof(audio_analyzer));
-    if (errno != 0)
-        fprintf(stderr, "Cannot allocate master analyzer\n");
+        log_error("Cannot allocate mixer sources: %s\n", strerror(errno));
 
     return mixer;
 }
@@ -38,9 +39,10 @@ void mixer_free(audio_mixer *mixer)
     if (mixer == NULL)
         return;
 
+    pthread_mutex_lock(&mixer->source_mutex);
     for (int i = 0; i < mixer->sources.length; i++)
     {
-        audio_src src = AUDIOSRC_IDX(mixer->sources, i);
+        audio_source src = AUDIOSRC_IDX(mixer->sources, i);
         for (int j = 0; j < src.effects.length; j++)
         {
             audio_effect eff = AUDIOEFF_IDX(src.effects, j);
@@ -49,33 +51,32 @@ void mixer_free(audio_mixer *mixer)
         src.free(&src);
     }
     array_free(&mixer->sources);
+    pthread_mutex_unlock(&mixer->source_mutex);
 
-    for (int i = 0; i < mixer->master_effect.length; i++)
+    for (int i = 0; i < mixer->master_plugins.length; i++)
     {
-        audio_effect eff = AUDIOEFF_IDX(mixer->master_effect, i);
-        eff.free(&eff);
+        plugin_module plugin = PLUGIN_IDX(mixer->master_plugins, i);
+        plugin.unload(plugin.ctx);
+        plugin.ctx = NULL;
     }
-    array_free(&mixer->master_effect);
+    array_free(&mixer->master_plugins);
 
-    for (int i = 0; i < mixer->master_analyzer.length; i++)
-    {
-        audio_analyzer analyzer = AUDIOANALYZER_IDX(mixer->master_analyzer, i);
-        analyzer.free(&analyzer);
-    }
-    array_free(&mixer->master_analyzer);
+    pthread_mutex_destroy(&mixer->source_mutex);
 }
 
-int mixer_get_frame(audio_mixer *mixer, float *out)
+int mixer_get_frame(audio_mixer *mixer, int req_sample, float *out)
 {
-    float src_buf[48000] = {0};
-    int frame_size = 512;
+    float src_buf[req_sample];
+    memset(src_buf, 0, req_sample * sizeof(*src_buf));
+
     int ret;
     int len;
-    bool finished = true;
+    bool finished = mixer->sources.length != 0;
 
+    pthread_mutex_lock(&mixer->source_mutex);
     for (int i = 0; i < mixer->sources.length; i++)
     {
-        audio_src *src = &AUDIOSRC_IDX(mixer->sources, i);
+        audio_source *src = &AUDIOSRC_IDX(mixer->sources, i);
         if (src->is_finished)
             continue;
 
@@ -83,46 +84,45 @@ int mixer_get_frame(audio_mixer *mixer, float *out)
         if (ret != EOF && ret < 0)
             continue;
 
-        ret = len = src->get_frame(src, frame_size, src_buf);
+        ret = len = src->get_frame(src, req_sample, src_buf);
         if (ret == -ENODATA)
         {
-            fprintf(stderr,
-                    "Frame size too big, not enough data in the "
-                    "buffer. Call update() again or lower the frame size\n");
+            log_error("Frame size too big, not enough data in the "
+                      "buffer. Call update() again or lower the frame size\n");
             continue;
         }
         else if (ret == EOF)
         {
             src->is_finished = true;
             ret = len = src->get_frame(src, -1, src_buf);
+            src->free(src);
+            array_remove(&mixer->sources, i, 1);
         }
 
-        for (int j = 0; j < src->effects.length; j++)
-        {
-            audio_effect eff = AUDIOEFF_IDX(src->effects, j);
-            eff.process(&eff, src_buf, len, src->target_nb_channels);
-        }
-
-        for (int sample = 0; sample < len; sample++)
-            out[sample] += src_buf[sample];
+        if (i == 0)
+            memcpy(out, src_buf, len * sizeof(float));
+        else
+            for (int sample = 0; sample < len; sample++)
+                out[sample] += src_buf[sample];
 
         finished = false;
     }
+    pthread_mutex_unlock(&mixer->source_mutex);
 
-    for (int i = 0; i < mixer->master_effect.length; i++)
+    for (int i = 0; i < mixer->master_plugins.length; i++)
     {
-        audio_effect eff = AUDIOEFF_IDX(mixer->master_effect, i);
-        eff.process(&eff, out, frame_size, mixer->nb_channels);
-    }
+        plugin_module plugin = PLUGIN_IDX(mixer->master_plugins, i);
 
-    for (int i = 0; i < mixer->master_analyzer.length; i++)
-    {
-        audio_analyzer analyzer = AUDIOANALYZER_IDX(mixer->master_analyzer, i);
-        analyzer.process(&analyzer, out, frame_size, mixer->nb_channels);
+        plugin_process_param p = {.samples = out,
+                                  .size = req_sample,
+                                  .nb_channels = mixer->nb_channels,
+                                  .sample_rate = mixer->sample_rate};
+        PLUGIN_SAFECALL(&plugin, plugin.process(plugin.ctx, p),
+                        plugin.unload(plugin.ctx), &mixer->master_plugins, i);
     }
 
     if (finished)
         return EOF;
 
-    return frame_size;
+    return 0;
 }

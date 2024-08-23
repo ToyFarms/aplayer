@@ -1,14 +1,19 @@
 #include "array.h"
+#include "logger.h"
 
 #include <assert.h>
 #include <errno.h>
 #include <stdlib.h>
 #include <string.h>
 
+static void *offset(array_t *arr)
+{
+    return arr->data + (arr->length * arr->item_size);
+}
+
 static void array_copy_buffer(array_t *arr, const void *mem, int item_count)
 {
-    memcpy(arr->data + (arr->length * arr->item_size), mem,
-           item_count * arr->item_size);
+    memcpy(offset(arr), mem, item_count * arr->item_size);
     arr->length += item_count;
 }
 
@@ -20,8 +25,6 @@ array_t array_create(int max_item, int item_size)
     arr.length = 0;
     arr.capacity = max_item;
     arr.item_size = item_size;
-    arr.free = NULL;
-    arr.freep = NULL;
 
     arr.data = malloc(max_item * item_size);
     if (arr.data == NULL)
@@ -80,14 +83,20 @@ int array_append(array_t *arr, const void *mem, int item_count)
     return 0;
 }
 
-int array_remove(array_t *arr, int offset, int item_count)
+int array_remove(array_t *arr, int index, int item_count)
 {
-    assert(arr != NULL && arr->data != NULL);
-    if (offset + item_count > arr->capacity)
-        return -1;
+    assert(arr && arr->data);
 
-    int leftover = arr->length - (offset + item_count);
-    arr->length = offset + leftover;
+    if (index + item_count > arr->capacity)
+        item_count = arr->capacity - index;
+
+    int move_size = (arr->length - (index + item_count)) * arr->item_size;
+
+    if (move_size > 0)
+        memmove(arr->data + index * arr->item_size,
+                arr->data + (index + item_count) * arr->item_size, move_size);
+
+    arr->length -= item_count;
 
     return 0;
 }

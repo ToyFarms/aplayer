@@ -1,7 +1,6 @@
 #include "audio_effect.h"
 
 #include <assert.h>
-#include <errno.h>
 #include <math.h>
 #include <stdlib.h>
 
@@ -10,13 +9,12 @@ typedef struct effect_gain
     float gain;
 } effect_gain;
 
-static void eff_gain_process(audio_effect *eff, float *buf, int size, int nb_channels)
+static void eff_gain_process(audio_effect *eff, audio_callback_param p)
 {
     effect_gain *ctx = eff->ctx;
-    float lin_scale = powf(10.0, ctx->gain / 20.0);
 
-    for (int i = 0; i < size; i++)
-        buf[i] *= lin_scale;
+    for (int i = 0; i < p.size; i++)
+        p.out[i] *= ctx->gain;
 }
 
 audio_effect audio_eff_gain(float db)
@@ -27,21 +25,16 @@ audio_effect audio_eff_gain(float db)
     eff.free = _audio_eff_free_default;
     eff.type = AUDIO_EFF_GAIN;
     eff.ctx = calloc(1, sizeof(effect_gain));
-    if (!eff.ctx)
-    {
-        errno = -ENOMEM;
-        goto exit;
-    }
+    assert(eff.ctx != NULL);
 
     effect_gain *ctx = eff.ctx;
-    ctx->gain = db;
+    ctx->gain = powf(10.0, db / 20.0);
 
-exit:
     return eff;
 }
 
 void audio_eff_gain_set(audio_effect *eff, float db)
 {
     effect_gain *ctx = eff->ctx;
-    ctx->gain = db;
+    ctx->gain = powf(10.0, db / 20.0);
 }

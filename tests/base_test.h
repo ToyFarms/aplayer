@@ -40,7 +40,7 @@ void print_memory(const void *addr, size_t n)
 #define _ASSERT_INT(a, b, op, nop, name)                                       \
     if ((a)nop(b))                                                             \
     {                                                                          \
-        fprintf(stderr, name "(" #a "[%d] " #op " " #b "[%d]) %s:%d", (a),     \
+        fprintf(stderr, name "(" #a "[%d] " #nop " " #b "[%d]) %s:%d", (a),     \
                 (b), __FILE__, __LINE__);                                      \
         exit(1);                                                               \
     }
