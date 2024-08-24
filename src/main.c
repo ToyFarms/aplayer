@@ -291,16 +291,6 @@ int main(int argc, char **argv)
             case TERM_EVENT_KEY:
                 if (e.as.key.ascii == 'q')
                     goto exit;
-                if (e.as.key.ascii == 'r')
-                {
-                    audio_source src = audio_from_file(
-                        "/home/andra/Music/JP/"
-                        "ずっと真夜中でいいのに。『あいつら全員同窓会』MV "
-                        "(ZUTOMAYO - Inside Joke) [ZUwaudw8ht0].m4a",
-                        audio->nb_channels, audio->sample_rate,
-                        audio->sample_fmt);
-                    array_append(&audio->mixer.sources, &src, 1);
-                }
                 break;
             case TERM_EVENT_MOUSE:
                 mouse = VEC(e.as.mouse.x, e.as.mouse.y);
