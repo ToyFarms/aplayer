@@ -2,6 +2,8 @@
 #define __TERM_H
 
 #include "_math.h"
+#include "ds.h"
+
 #include <stdbool.h>
 #include <stdint.h>
 
@@ -19,6 +21,9 @@
 #define TBG           "[48;2;%d;%d;%dm"
 #define TFG           "[38;2;%d;%d;%dm"
 #define TBGFG         "[48;2;%d;%d;%d;38;2;%d;%d;%dm"
+#define TBG8          "[48;5;%dm"
+#define TFG8          "[38;5;%dm"
+#define TBGFG8        "[48;5;%d;38;5;%dm"
 #define TRESET        "[0m"
 #define TRESETBG      "[49m"
 #define TRESETFG      "[39m"
@@ -120,7 +125,7 @@ typedef struct term_event
         term_event_key key;
         term_event_mouse mouse;
         term_event_buffer resize;
-    } as;
+    };
 } term_event;
 
 typedef struct handle_t
@@ -134,6 +139,14 @@ enum handle_type
     HANDLE_STDIN,
     HANDLE_STDERR,
 };
+
+typedef struct term_status
+{
+    int width, height;
+    int mouse_x, mouse_y;
+    bool resized;
+    string_t *buf;
+} term_status;
 
 handle_t term_handle(enum handle_type type);
 void term_write(char *str, int size);

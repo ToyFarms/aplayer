@@ -7,22 +7,27 @@ add_definitions("-DLOGGER_BASEPATH_LENGTH=${SOURCE_PATH_SIZE}")
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 include(${CMAKE_CURRENT_SOURCE_DIR}/src/audio/plugins/build_plugins.cmake)
+include(${CMAKE_CURRENT_SOURCE_DIR}/src/ui/widgets/build_widgets.cmake)
 
 include(FindPkgConfig)
 find_package(PkgConfig REQUIRED)
-# string(APPEND CMAKE_C_FLAGS "-Wall -Werror -pg")
+string(APPEND CMAKE_C_FLAGS "-Wall -Werror -pg")
 
 add_executable(aplayer
     ./src/main.c
     ./src/fs_linux.c
     ./src/logger.c
     ./src/exception_linux.c
+    ./src/plugin.c
+    ./src/app.c
+    ./src/utils.c
 
     ./src/struct/array.c
     ./src/struct/dict.c
     ./src/struct/queue.c
     ./src/struct/ring_buf.c
     ./src/struct/ds.c
+    ./src/struct/arena_allocator.c
 
     ./src/term/term_linux.c
     ./src/term/term_draw.c
@@ -31,7 +36,7 @@ add_executable(aplayer
     ./src/audio/audio_source.c
     ./src/audio/audio_mixer.c
     ./src/audio/audio_effect.c
-    ./src/audio/plugin.c
+    ./src/audio/apl.c
 
     ./src/audio/source/audio_file.c
 
@@ -41,26 +46,28 @@ add_executable(aplayer
 
     ./src/audio/analyzer/audio_rms.c
     ./src/audio/analyzer/audio_fft.c
+
+    ./src/ui/color.c
+    ./src/ui/wpl.c
+    ./src/ui/ui_manager.c
+    ./src/ui/ui_parser.c
 )
 
-target_link_libraries(aplayer PUBLIC m pthread)
+target_link_libraries(aplayer PRIVATE m pthread fftw3 portaudio)
 
-pkg_check_modules(ncurses REQUIRED)
-target_link_libraries(aplayer PRIVATE ncurses)
-
-pkg_check_modules(fftw3 REQUIRED)
-target_link_libraries(aplayer PRIVATE fftw3)
-
-pkg_check_modules(portaudio REQUIRED)
-target_link_libraries(aplayer PRIVATE portaudio)
+if (NOT WIN32)
+  target_link_libraries(aplayer PRIVATE ncurses)
+endif()
 
 pkg_check_modules(LIBAV REQUIRED libavformat libavcodec libavutil libswresample)
 target_include_directories(aplayer PRIVATE ${LIBAV_INCLUDE_DIRS})
 target_link_directories(aplayer PRIVATE ${LIBAV_LIBRARY_DIRS})
 target_link_libraries(aplayer PRIVATE ${LIBAV_LIBRARIES})
 
-target_include_directories(aplayer PRIVATE ./src/include)
-target_include_directories(aplayer PRIVATE ./thirdparty/include/)
+target_include_directories(aplayer PRIVATE
+  ./src/include
+  ./thirdparty/include
+)
 
 execute_process(
   COMMAND ${CMAKE_COMMAND} -E copy

@@ -21,7 +21,7 @@ typedef struct audio_source
     int target_sample_rate;
     enum AVSampleFormat target_sample_fmt;
 
-    array(audio_effect) effects;
+    array(audio_effect) pipeline;
 
     // is source realtime (e.g. microphone source)
     bool is_realtime;
@@ -32,8 +32,6 @@ typedef struct audio_source
 
     ring_buf_t buffer;
 } audio_source;
-
-#define AUDIOSRC_IDX(arr, index) (((audio_source *)(arr).data)[index])
 
 int audio_common_init(audio_source *audio);
 void audio_common_free(audio_source *audio);

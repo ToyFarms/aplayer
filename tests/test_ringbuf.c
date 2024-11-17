@@ -4,10 +4,11 @@ INCLUDE_BEGIN
 #include "ring_buf.h"
 INCLUDE_END
 
-CFLAGS_BEGIN/*
--Isrc/include
-src/struct/ring_buf.c
-*/CFLAGS_END
+CFLAGS_BEGIN /*
+ -Isrc/include
+ src/struct/ring_buf.c
+ src/logger.c
+ */ CFLAGS_END
 
 TEST_BEGIN(init)
 {
@@ -252,7 +253,8 @@ TEST_BEGIN(read_write_overflow)
 {
     ring_buf_t rbuf = ring_buf_create(8, sizeof(int));
 
-    int data[] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20};
+    int data[] = {1,  2,  3,  4,  5,  6,  7,  8,  9,  10,
+                  11, 12, 13, 14, 15, 16, 17, 18, 19, 20};
     int out[8] = {0};
 
     ring_buf_write(&rbuf, data, 5);

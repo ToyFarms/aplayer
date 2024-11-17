@@ -25,7 +25,6 @@ typedef struct audio_effect
 
     enum audio_eff_type type;
 } audio_effect;
-#define AUDIOEFF_IDX(arr, index) (((audio_effect *)(arr.data))[index])
 
 void _audio_eff_free_default(audio_effect *eff);
 

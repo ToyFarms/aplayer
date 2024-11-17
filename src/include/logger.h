@@ -16,7 +16,7 @@
 #define LOG_DEFER_CLOSE   (1 << 1)
 
 #ifndef LOGGER_BASEPATH_LENGTH
-#    define LOGGER_BASEPATH_LENGTH 0
+#  define LOGGER_BASEPATH_LENGTH 0
 #endif // LOGGER_BASEPATH_LENGTH
 
 #define __FILENAME__ (&__FILE__[LOGGER_BASEPATH_LENGTH])
@@ -43,7 +43,7 @@ void logger_set_level(int level);
 void logger_add_output(int level, FILE *fd, int flags);
 void logger_use_color(bool enable);
 void logger_log(int level, const char *filename, const char *fn_name, int line,
-                const char *fmt, ...);
+                const char *fmt, ...) __attribute__((format(printf, 5, 6)));
 void logger_logv(int level, const char *filename, const char *fn_name, int line,
                  const char *fmt, va_list args);
 

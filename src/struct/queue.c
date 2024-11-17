@@ -1,11 +1,13 @@
 #include "queue.h"
 
+#include <assert.h>
+#include <errno.h>
 #include <stdlib.h>
 #include <string.h>
-#include <assert.h>
 
 queue_t queue_create()
 {
+    errno = 0;
     queue_t q = {0};
 
     pthread_mutex_init(&q.mutex, NULL);

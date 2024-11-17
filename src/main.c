@@ -1,18 +1,24 @@
+#include "apl.h"
+#include "app.h"
+#include "arena_allocator.h"
 #include "audio.h"
 #include "audio_mixer.h"
 #include "audio_source.h"
 #include "ds.h"
 #include "exception.h"
-#include "fs.h"
 #include "libavutil/log.h"
 #include "logger.h"
-#include "plugin.h"
 #include "term.h"
+#include "term_draw.h"
+#include "ui_manager.h"
+#include "ui_parser.h"
+#include "wpl.h"
 
 #include <assert.h>
 #include <errno.h>
 #include <locale.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 
@@ -156,144 +162,118 @@
 //     sdsfree(cmd);
 // }
 
-int callback(const void *input, void *output, unsigned long frameCount,
-             const PaStreamCallbackTimeInfo *timeInfo,
-             PaStreamCallbackFlags statusFlags, void *userData)
-{
-    audio_mixer *mixer = userData;
-
-    float buffer[mixer->sample_rate];
-    memset(buffer, 0, sizeof(buffer));
-
-    int ret = mixer_get_frame(mixer, frameCount * mixer->nb_channels, buffer);
-    if (ret == EOF)
-    {
-        log_debug("Audio finished\n");
-        return paComplete;
-    }
-    else if (ret < 0)
-    {
-        log_error("Failed to get frame from mixer: code=%d\n", ret);
-        return paAbort;
-    }
-
-    memcpy(output, buffer, frameCount * mixer->nb_channels * sizeof(float));
-
-    return paContinue;
-}
-
-static inline void log_av_callback(void *avcl, int level, const char *fmt,
-                                   va_list args)
-{
-    if (level > av_log_get_level())
-        return;
-    logger_logv(level, "", "ffmpeg", 0, fmt, args);
-}
+// static void reload_plugins(array_t *audio, array_t *widget)
+// {
+//     apl_class_unloads(audio);
+//     wpl_class_unloads(widget);
+//
+//     apl_class_loads(APL_PATH, audio);
+//     wpl_class_loads(WPL_PATH, widget);
+// }
 
 int main(int argc, char **argv)
 {
-    errno = 0;
-    setlocale(LC_ALL, "");
     logger_set_level(LOG_DEBUG);
-    logger_add_output(LOG_FATAL, stdout, LOG_USE_COLOR);
-    logger_add_output(-1, fopen("out.log", "a"), LOG_DEFER_CLOSE);
-    av_log_set_level(AV_LOG_DEBUG);
-    av_log_set_callback(log_av_callback);
-    exception_unrecoverable(term_mainbuf);
+    logger_add_output(-1, stdout, LOG_USE_COLOR);
+    logger_add_output(-1, fopen("out.log", "r"), LOG_DEFER_CLOSE);
 
+    if (app_init() < 0)
+        return 1;
+
+    char *source;
+    {
+        FILE *f = fopen("input.txt", "r");
+
+        fseek(f, 0, SEEK_END);
+        size_t size = ftell(f);
+        fseek(f, 0, SEEK_SET);
+
+        source = malloc(size + 1);
+        source[size] = '\0';
+        fread(source, 1, size, f);
+
+        fclose(f);
+    }
+
+    arena_allocator arena = arena_create(4096);
+
+    array_t tokens = ui_tokenize(source, &arena);
+    // ui_tokens_print(&tokens);
+    ui_scene scene = ui_scene_from_tokens(&tokens, &arena);
+    array_free(&tokens);
+
+    ui_element_print(&scene.body);
+
+    ui_element_free(&scene.body);
+    arena_free(&arena);
+    free(source);
+
+    return 0;
     if (argc < 2)
     {
         log_fatal("Usage: %s <file_with_audio>\n", argv[0]);
         return 1;
     }
 
-    exception_init();
+    if (app_init() < 0)
+        return 1;
+    // TODO: figure out how to get wpl instance
 
-    audio_ctx *audio = audio_create(callback, -1, 2, 48000, AUDIO_FLT);
-    // TODO: Implement an ui system
-    // TODO: Refactor hard coded value (e.g. audio buffer size)
-    // TODO: Refactor mixer & source update logic
-    // TODO: Add tests for term_draw, ds
-    // TODO: Log error on all function
+    app_instance *app = app_get();
 
-    // for (int i = 0; i < 20; i++)
-    // {
-    //     audio_source src = audio_from_file(argv[1], audio->nb_channels,
-    //                                        audio->sample_rate,
-    //                                        audio->sample_fmt);
-    //     array_append(&audio->mixer.sources, &src, 1);
-    // }
-    audio_source src = audio_from_file(argv[1], audio->nb_channels,
-                                       audio->sample_rate, audio->sample_fmt);
-    array_append(&audio->mixer.sources, &src, 1);
+    audio_source src =
+        audio_from_file(argv[1], app->audio->nb_channels,
+                        app->audio->sample_rate, app->audio->sample_fmt);
+    array_append(&app->audio->mixer.sources, &src, 1);
 
-    array(plugin_module) plugins = array_create(16, sizeof(plugin_module));
+    apl_instance apl_inst =
+        apl_new_instance(&ARR_AS(app->audio_classes, apl_class)[0]);
+    array_append(&app->audio->mixer.master_plugins, &apl_inst, 1);
 
-    fs_root plugindir = fs_readdir(PLUGIN_PATH, FS_FILTER_DIR);
-    for (int i = 0; i < plugindir.len; i++)
-    {
-        entry_t plugin = plugindir.entries[i];
-        int max = plugindir.baselen + plugin.namelen + 2;
-        char path[max];
-        snprintf(path, max, "%s/%s", plugindir.base, plugin.name);
+    array(wpl_instance) widgets = array_create(16, sizeof(wpl_instance));
+    wpl_instance wpl_inst =
+        wpl_new_instance(&ARR_AS(app->widget_classes, wpl_class)[0]);
+    array_append(&widgets, &wpl_inst, 1);
 
-        plugin_module mod = plugin_load(path);
-        if (errno == -ELIBBAD)
-            continue;
-        PLUGIN_SAFECALL(&mod, mod.ctx = mod.load(), mod.unload(mod.ctx),
-                        &audio->mixer.master_plugins, i);
+    string_t scrbuf = string_alloc(1024);
+    term_status term = {
+        .buf = &scrbuf,
+    };
 
-        array_append(&plugins, &mod, 1);
-    }
-    fs_root_free(&plugindir);
-
-    array_append(&audio->mixer.master_plugins, plugins.data, 1);
-
-    term_altbuf();
     term_event events[128];
-    vec2 mouse = VEC_ZERO;
-    string_t strbuf = string_alloc(1024);
-
     while (true)
     {
         int len = term_get_events(events, 128);
         vec2 size = term_size();
 
-        plugin_widget_ctx widget_ctx = {.term_width = size.x,
-                                        .term_height = size.y,
-                                        .x = 0,
-                                        .y = 0,
-                                        .width = size.x,
-                                        .height = 1,
-                                        .mouse_x = mouse.x,
-                                        .mouse_y = mouse.y,
-                                        .is_hovered =
-                                            mouse.x > 0 && mouse.x <= size.x &&
-                                            mouse.y > 0 && mouse.y <= 1,
-                                        .buf = &strbuf};
+        term.width = size.x;
+        term.height = size.y;
 
         for (int i = 0; i < len; i++)
         {
             term_event e = events[i];
 
-            for (int i = 0; i < audio->mixer.master_plugins.length; i++)
+            apl_instance apl_inst;
+            ARR_FOREACH(app->audio->mixer.master_plugins, apl_inst, i)
             {
-                plugin_module plugin =
-                    PLUGIN_IDX(audio->mixer.master_plugins, i);
-
-                PLUGIN_SAFECALL(
-                    &plugin, plugin.on_event(plugin.ctx, widget_ctx, e),
-                    plugin.unload(plugin.ctx), &audio->mixer.master_plugins, i);
+                try apl_inst.super->on_event(apl_inst.ctx, &term, &e);
+                except
+                {
+                    apl_crashed(apl_inst);
+                    array_remove(&app->audio->mixer.master_plugins, i, 1);
+                    i--;
+                }
             }
 
             switch (e.type)
             {
             case TERM_EVENT_KEY:
-                if (e.as.key.ascii == 'q')
+                if (e.key.ascii == 'q')
                     goto exit;
                 break;
             case TERM_EVENT_MOUSE:
-                mouse = VEC(e.as.mouse.x, e.as.mouse.y);
+                term.mouse_x = e.mouse.x;
+                term.mouse_y = e.mouse.y;
                 break;
             case TERM_EVENT_RESIZE:
             case TERM_EVENT_UNKNOWN:
@@ -301,24 +281,48 @@ int main(int argc, char **argv)
             }
         }
 
-        for (int i = 0; i < audio->mixer.master_plugins.length; i++)
+        apl_instance apl_inst;
+        ARR_FOREACH(app->audio->mixer.master_plugins, apl_inst, i)
         {
-            plugin_module plugin = PLUGIN_IDX(audio->mixer.master_plugins, i);
-
-            PLUGIN_SAFECALL(&plugin, plugin.render(plugin.ctx, widget_ctx),
-                            plugin.unload(plugin.ctx),
-                            &audio->mixer.master_plugins, i);
+            try apl_inst.super->render(apl_inst.ctx, &term);
+            except
+            {
+                apl_crashed(apl_inst);
+                array_remove(&app->audio->mixer.master_plugins, i, 1);
+                i--;
+            }
         }
 
-        term_write(strbuf.buf, strbuf.len);
-        strbuf.len = 0;
+        wpl_instance wpl_inst;
+        ARR_FOREACH(widgets, wpl_inst, i)
+        {
+            wpl_definition def = {
+                .x = 0,
+                .y = 5,
+                .w = 50,
+                .h = 10,
+                .attr = NULL,
+                .theme = NULL,
+            };
+
+            try wpl_inst.super->render(wpl_inst.ctx, &term, &def);
+            except
+            {
+                wpl_crashed(wpl_inst);
+                array_remove(&widgets, i, 1);
+                i--;
+            };
+
+            term_draw_str(&scrbuf, TESC TRESET, -1);
+        }
+
+        term_write(scrbuf.buf, scrbuf.len);
+        scrbuf.len = 0;
 
         usleep(1000 * 10);
     }
 
 exit:
-    string_free(&strbuf);
-    term_mainbuf();
-    audio_free(audio);
-    exception_cleanup();
+    string_free(&scrbuf);
+    app_cleanup();
 }

@@ -26,8 +26,6 @@ typedef struct audio_analyzer
     enum audio_analyzer_type type;
 } audio_analyzer;
 
-#define AUDIOANALYZER_IDX(arr, index) (((audio_analyzer *)(arr.data))[index])
-
 typedef struct analyzer_rms_ctx
 {
     float *rms;

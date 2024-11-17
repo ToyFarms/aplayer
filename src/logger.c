@@ -11,7 +11,7 @@ static const char *log_level_str[] = {
 };
 
 static const char *log_level_col[] = {
-    // None, Yellow, Red, Magenta, Green, Cyan
+    // None, Yellow,  Red,          Magenta,      Green,        Cyan
     "", "\x1b[1;33m", "\x1b[1;31m", "\x1b[1;35m", "\x1b[1;32m", "\x1b[1;34m"};
 
 typedef struct logger_output
@@ -29,7 +29,7 @@ typedef struct logger_ctx
     bool use_color;
 } logger_ctx;
 
-static logger_ctx gctx = {
+static logger_ctx g_ctx = {
     .level = LOG_INFO,
     .nb_outputs = 0,
     .use_color = true,
@@ -37,28 +37,28 @@ static logger_ctx gctx = {
 
 void logger_set_level(int level)
 {
-    gctx.level = level;
+    g_ctx.level = level;
 }
 
 static bool atexit_registered = false;
 
 static void close_output()
 {
-    for (int i = 0; i < gctx.nb_outputs; i++)
+    for (int i = 0; i < g_ctx.nb_outputs; i++)
     {
-        if (gctx.out[i].flags & LOG_DEFER_CLOSE && gctx.out[i].fd != NULL)
-            fclose(gctx.out[i].fd);
+        if (g_ctx.out[i].flags & LOG_DEFER_CLOSE && g_ctx.out[i].fd != NULL)
+            fclose(g_ctx.out[i].fd);
     }
 }
 
 void logger_add_output(int level, FILE *fd, int flags)
 {
     assert(fd);
-    if (gctx.nb_outputs >= LOGGER_MAX_OUTPUT)
+    if (g_ctx.nb_outputs >= LOGGER_MAX_OUTPUT)
         return;
 
-    gctx.out[gctx.nb_outputs++] =
-        (logger_output){.level = level >= 0 ? level : gctx.level, .fd = fd, .flags = flags};
+    g_ctx.out[g_ctx.nb_outputs++] = (logger_output){
+        .level = level >= 0 ? level : g_ctx.level, .fd = fd, .flags = flags};
 
     if (!atexit_registered)
     {
@@ -69,7 +69,7 @@ void logger_add_output(int level, FILE *fd, int flags)
 
 void logger_use_color(bool enable)
 {
-    gctx.use_color = enable;
+    g_ctx.use_color = enable;
 }
 
 void logger_log(int level, const char *filename, const char *fn_name, int line,
@@ -87,7 +87,7 @@ void logger_logv(int level, const char *filename, const char *fn_name, int line,
     if (level > LOG_DEBUG)
         level = LOG_DEBUG;
 
-    if (level <= LOG_QUIET || level > gctx.level)
+    if (level <= LOG_QUIET || level > g_ctx.level)
         return;
 
     time_t t = time(NULL);
@@ -95,15 +95,15 @@ void logger_logv(int level, const char *filename, const char *fn_name, int line,
     strftime(timestr, sizeof(timestr), "%F %T", localtime(&t));
 
     va_list args_copy;
-    for (int i = 0; i < gctx.nb_outputs; i++)
+    for (int i = 0; i < g_ctx.nb_outputs; i++)
     {
-        logger_output out = gctx.out[i];
+        logger_output out = g_ctx.out[i];
         if (level > out.level)
             continue;
 
         va_copy(args_copy, args);
 
-        bool use_color = gctx.use_color && (out.flags & LOG_USE_COLOR);
+        bool use_color = g_ctx.use_color && (out.flags & LOG_USE_COLOR);
 
         fprintf(out.fd, "%s %s%-7s%s [%s] %s:%d: ", timestr,
                 use_color ? log_level_col[level] : "", log_level_str[level],

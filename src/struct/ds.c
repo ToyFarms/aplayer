@@ -7,6 +7,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#define offset(str) ((str)->buf + (str)->len)
+
 static size_t get_avail(string_t *str)
 {
     return str->capacity - str->len;
@@ -24,11 +26,6 @@ static void ensure_size(string_t *str, size_t required)
     string_resize(str, capacity);
 }
 
-static char *offset(string_t *str)
-{
-    return str->buf + str->len;
-}
-
 static void append_null(string_t *str)
 {
     ensure_size(str, 1);
@@ -37,11 +34,26 @@ static void append_null(string_t *str)
 
 string_t string_create()
 {
+    errno = 0;
     string_t str = {0};
 
     str.len = 0;
     str.capacity = 256;
     str.buf = calloc(1, str.capacity);
+    if (str.buf == NULL)
+        errno = -ENOMEM;
+
+    return str;
+}
+
+string_t string_new(const char *s)
+{
+    errno = 0;
+    string_t str = {0};
+
+    str.len = 0;
+    str.capacity = strlen(s);
+    str.buf = strdup(s);
     if (str.buf == NULL)
         errno = -ENOMEM;
 
@@ -101,6 +113,15 @@ string_t *string_cat(string_t *str, const char *s)
     return str;
 }
 
+string_t *string_catch(string_t *str, char ch)
+{
+    assert(str);
+
+    str = string_catlen(str, "/", 1);
+
+    return str;
+}
+
 string_t *string_catlen(string_t *str, const char *s, size_t len)
 {
     assert(str && s);
@@ -114,17 +135,17 @@ string_t *string_catlen(string_t *str, const char *s, size_t len)
     return str;
 }
 
-string_t *string_cat_str(string_t *str, string_t *s)
+string_t *string_cat_str(string_t *dst, const string_t *src)
 {
-    assert(str && s);
+    assert(dst);
 
-    ensure_size(str, s->len + 1);
-    memcpy(offset(str), s->buf, s->len);
+    ensure_size(dst, src->len + 1);
+    memcpy(offset(dst), src->buf, src->len);
 
-    str->len += s->len;
-    append_null(str);
+    dst->len += src->len;
+    append_null(dst);
 
-    return str;
+    return dst;
 }
 
 string_t *string_catf(string_t *str, const char *fmt, ...)
@@ -236,18 +257,25 @@ string_t *string_catf_d(string_t *str, const char *fmt, ...)
 
 string_t *string_catw(string_t *str, wchar_t *ws)
 {
-    size_t required_len = wcstombs(NULL, ws, 0);
-    if (required_len == (size_t)-1)
+    size_t len = wcstombs(NULL, ws, 0);
+    if (len == (size_t)-1)
     {
-        log_error("Failed to get the required length for a mbs\n");
+        log_error("Failed to get the required length for an mbs\n");
+        errno = -EINVAL;
         return str;
     }
 
-    ensure_size(str, required_len + 1);
+    ensure_size(str, len + 1);
 
-    size_t length = wcstombs(offset(str), ws, wcslen(ws));
+    size_t length = wcstombs(offset(str), ws, len + 1);
     if (length == (size_t)-1)
+    {
         log_error("Failed to convert wide string to mbs\n");
+        errno = -EINVAL;
+        return str;
+    }
+
+    str->len += length;
 
     return str;
 }
@@ -258,8 +286,13 @@ string_t *string_catwch(string_t *str, wchar_t wc)
 
     size_t length = wctomb(offset(str), wc);
     if (length < 0)
+    {
         log_error("Failed to convert wide char to mbs\n");
+        errno = -EINVAL;
+        return str;
+    }
 
+    str->len += length;
     append_null(str);
 
     return str;

@@ -1,8 +1,8 @@
 #ifndef __STRUCT_H
 #define __STRUCT_H
 
-#define FREE_DEF(name)  void (*name)(void *mem)
-#define FREEP_DEF(name) void (*name)(void **mem)
+typedef void (*free_fn)(void *mem);
+typedef void (*freep_fn)(void **mem);
 #define FREE_EITHER(obj, mem)                                                  \
     ((obj)->free ? (obj)->free(mem) : (obj)->freep ? (obj)->freep(&(mem)) : 0)
 #define FREE_EITHER_NP(obj, mem)                                               \

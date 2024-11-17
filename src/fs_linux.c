@@ -3,33 +3,35 @@
 
 #include <assert.h>
 #include <dirent.h>
+#include <errno.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
 #include <wordexp.h>
 
 fs_root fs_readdir(const char *_path, int flags)
 {
+    errno = 0;
     const char *path = _path;
-#ifdef _WIN32
-#  error wordexp() alt not implemented
-#else
+
     wordexp_t exp;
     wordexp(_path, &exp, 0);
 
     path = exp.we_wordv[0];
-#endif // _WIN32
 
     int initcap = 32;
-    fs_root root;
+    fs_root root = {0};
     root.entries = calloc(sizeof(*root.entries), initcap);
     root.len = 0;
     root.capacity = initcap;
     root.base = strdup(path);
     root.baselen = strlen(path);
     DIR *dir = NULL;
+    int errnb = 0;
 
     if (path == NULL)
     {
+        errnb = errno;
         log_error("path is NULL\n");
         goto exit;
     }
@@ -37,6 +39,7 @@ fs_root fs_readdir(const char *_path, int flags)
     dir = opendir(path);
     if (dir == NULL)
     {
+        errnb = errno;
         log_error("Failed to open path '%s'\n", path);
         goto exit;
     }
@@ -72,13 +75,12 @@ fs_root fs_readdir(const char *_path, int flags)
     }
 
 exit:
+    errno = errnb;
     if (dir != NULL)
         closedir(dir);
-#ifdef _WIN32
-#  error wordexp() alt not implemented
-#else
+
     wordfree(&exp);
-#endif // _WIN32
+
     return root;
 }
 
@@ -94,4 +96,36 @@ void fs_root_free(fs_root *root)
     root->entries = NULL;
 
     memset(root, 0, sizeof(*root));
+}
+
+int fs_normpath(const char *path, char *output, size_t max)
+{
+    wordexp_t exp;
+    wordexp(path, &exp, 0);
+
+    strncpy(output, exp.we_wordv[0], max);
+    int len = strlen(exp.we_wordv[0]);
+
+    wordfree(&exp);
+
+    return len;
+}
+
+int fs_cmppath(const char *a, const char *b)
+{
+    struct stat stat1, stat2;
+
+    if (stat(a, &stat1) == -1)
+    {
+        log_error("Failed getting stat() for '%s'", a);
+        return -1;
+    }
+
+    if (stat(b, &stat2) == -1)
+    {
+        log_error("Failed getting stat() for '%s'", b);
+        return -1;
+    }
+
+    return stat1.st_ino == stat2.st_ino && stat1.st_dev == stat2.st_dev;
 }

@@ -47,18 +47,15 @@ static void signal_handler(int sig)
 
 void exception_init()
 {
-    signal(SIGSEGV, signal_handler);
-    signal(SIGFPE, signal_handler);
-    signal(SIGILL, signal_handler);
-    signal(SIGBUS, signal_handler);
-}
+    struct sigaction act;
+    act.sa_handler = signal_handler;
+    sigemptyset(&act.sa_mask);
+    act.sa_flags = 0;
 
-void exception_cleanup()
-{
-    signal(SIGSEGV, SIG_DFL);
-    signal(SIGFPE, SIG_DFL);
-    signal(SIGILL, SIG_DFL);
-    signal(SIGBUS, SIG_DFL);
+    sigaction(SIGSEGV, &act, NULL);
+    sigaction(SIGFPE, &act, NULL);
+    sigaction(SIGILL, &act, NULL);
+    sigaction(SIGBUS, &act, NULL);
 }
 
 void exception_unrecoverable(void (*handler)())

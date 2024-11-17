@@ -14,7 +14,7 @@ typedef struct audio_mixer
 
     pthread_mutex_t source_mutex;
     array(audio_source) sources;
-    array(plugin_module) master_plugins;
+    array(apl_instance) master_plugins;
 } audio_mixer;
 
 audio_mixer mixer_create(int nb_channels, int sample_rate,

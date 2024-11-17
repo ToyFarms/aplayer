@@ -15,11 +15,11 @@
     DO(AUDIO_DBL, 4)                                                           \
     DO(AUDIO_S64, 5)
 
-#define DO_DEFINE_ENUM(name, value)                                            \
+#define DO_DEFINE_AUDIOFMT(name, value)                                        \
     name = value * 2 + 0, name##P = value * 2 + 1,
 enum audio_format
 {
-    AUDIO_FORMAT_LIST(DO_DEFINE_ENUM)
+    AUDIO_FORMAT_LIST(DO_DEFINE_AUDIOFMT)
 };
 
 #define AUDIO_IS_PLANAR(fmt) ((int)(fmt) % 2 != 0)

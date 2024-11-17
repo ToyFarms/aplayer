@@ -356,6 +356,7 @@ static int audio_set_stream_metadata(audio_source *audio, int nb_channels,
 audio_source audio_from_file(const char *filename, int nb_channels,
                              int sample_rate, enum audio_format sample_fmt)
 {
+    errno = 0;
     audio_source audio = {0};
 
     if (filename == NULL)
@@ -367,9 +368,18 @@ audio_source audio_from_file(const char *filename, int nb_channels,
 
     audio.ctx = calloc(1, sizeof(audio_file));
     audio_file *ctx = audio.ctx;
+    if (ctx == NULL)
+    {
+        errno = -ENOMEM;
+        goto exit;
+    }
 
     ctx->filename = strdup(filename);
-    assert(ctx->filename != NULL);
+    if (ctx->filename == NULL)
+    {
+        errno = -EINVAL;
+        goto exit;
+    }
 
     audio.is_realtime = false;
     audio.free = audio_file_free;

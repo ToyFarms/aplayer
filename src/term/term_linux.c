@@ -82,6 +82,7 @@ int term_get_events(term_event *out, int max)
     static uint64_t button_last_pressed[TERM_MAX_MOUSEKEY] = {0};
     static int prev_size[2] = {0, 0};
 
+    // TODO: dont assert this bruh
 #define INCR_LENGTH(l)                                                         \
     assert(l + 1 <= max);                                                      \
     l++;
@@ -105,8 +106,8 @@ int term_get_events(term_event *out, int max)
 
             MEVENT m = {0};
             getmouse(&m);
-            ev->as.mouse.x = m.x;
-            ev->as.mouse.y = m.y;
+            ev->mouse.x = m.x;
+            ev->mouse.y = m.y;
 
             const uint64_t current_time = get_time_ms();
 
@@ -117,31 +118,31 @@ int term_get_events(term_event *out, int max)
     {                                                                          \
         button_state[n - 1] = true;                                            \
         if (current_time - button_last_pressed[n - 1] < 200)                   \
-            ev->as.mouse.double_clicked = true;                                \
+            ev->mouse.double_clicked = true;                                   \
         button_last_pressed[n - 1] = current_time;                             \
     }                                                                          \
     else if (CHECK_STATE(m, BUTTON##n##_RELEASED))                             \
         button_state[n - 1] = false;                                           \
-    ev->as.mouse.state[n - 1] = button_state[n - 1]
+    ev->mouse.state[n - 1] = button_state[n - 1]
 
             CHECK_BUTTON(1);
             CHECK_BUTTON(2);
             CHECK_BUTTON(3);
 
             if (CHECK_STATE(m, BUTTON4_PRESSED))
-                ev->as.mouse.state[3] = true;
+                ev->mouse.state[3] = true;
             if (CHECK_STATE(m, BUTTON5_PRESSED))
-                ev->as.mouse.state[3] = true;
+                ev->mouse.state[3] = true;
 
             if (CHECK_STATE(m, BUTTON_SHIFT))
-                ev->as.mouse.mod |= TERM_KMOD_SHIFT;
+                ev->mouse.mod |= TERM_KMOD_SHIFT;
             if (CHECK_STATE(m, BUTTON_CTRL))
-                ev->as.mouse.mod |= TERM_KMOD_CTRL;
+                ev->mouse.mod |= TERM_KMOD_CTRL;
             if (CHECK_STATE(m, BUTTON_ALT))
-                ev->as.mouse.mod |= TERM_KMOD_ALT;
+                ev->mouse.mod |= TERM_KMOD_ALT;
 
             if (prev_mouse_pos[0] != m.x || prev_mouse_pos[1] != m.y)
-                ev->as.mouse.moved = true;
+                ev->mouse.moved = true;
 
             prev_mouse_pos[0] = m.x;
             prev_mouse_pos[1] = m.y;
@@ -151,43 +152,43 @@ int term_get_events(term_event *out, int max)
 
 #define CASE_KEY(k)                                                            \
     case KEY_##k:                                                              \
-        ev->as.key.virtual = TERM_KEY_##k;                                     \
+        ev->key.virtual = TERM_KEY_##k;                                        \
         break
 #define CASE_KEYX(k, x)                                                        \
     case KEY_##k:                                                              \
-        ev->as.key.virtual = TERM_KEY_##x;                                     \
+        ev->key.virtual = TERM_KEY_##x;                                        \
         break
 
 #define CASE_KEY_SHIFT(k)                                                      \
     case KEY_##k:                                                              \
-        ev->as.key.virtual = TERM_KEY_##k;                                     \
+        ev->key.virtual = TERM_KEY_##k;                                        \
         break;                                                                 \
     case KEY_S##k:                                                             \
-        ev->as.key.virtual = TERM_KEY_##k;                                     \
-        ev->as.key.mod |= TERM_KMOD_SHIFT;                                     \
+        ev->key.virtual = TERM_KEY_##k;                                        \
+        ev->key.mod |= TERM_KMOD_SHIFT;                                        \
         break
 #define CASE_KEYX_SHIFT(k, x)                                                  \
     case KEY_##k:                                                              \
-        ev->as.key.virtual = TERM_KEY_##x;                                     \
+        ev->key.virtual = TERM_KEY_##x;                                        \
         break;                                                                 \
     case KEY_S##k:                                                             \
-        ev->as.key.virtual = TERM_KEY_##x;                                     \
-        ev->as.key.mod |= TERM_KMOD_SHIFT;                                     \
+        ev->key.virtual = TERM_KEY_##x;                                        \
+        ev->key.mod |= TERM_KMOD_SHIFT;                                        \
         break
 
             switch (c)
             {
             case '\n':
-                ev->as.key.virtual = TERM_KEY_ENTER;
-                ev->as.key.ascii = '\n';
+                ev->key.virtual = TERM_KEY_ENTER;
+                ev->key.ascii = '\n';
                 break;
             case '\t':
-                ev->as.key.virtual = TERM_KEY_TAB;
-                ev->as.key.ascii = '\t';
+                ev->key.virtual = TERM_KEY_TAB;
+                ev->key.ascii = '\t';
                 break;
             case TERM_KEY_ESC:
-                ev->as.key.virtual = TERM_KEY_ESC;
-                ev->as.key.ascii = '';
+                ev->key.virtual = TERM_KEY_ESC;
+                ev->key.ascii = '';
                 break;
                 CASE_KEY(F(1));
                 CASE_KEY(F(2));
@@ -225,17 +226,17 @@ int term_get_events(term_event *out, int max)
         continue_check:
             if (c >= 1 && c <= 26)
             {
-                ev->as.key.ascii = c + 'a' - 1;
-                ev->as.key.mod |= TERM_KMOD_CTRL;
+                ev->key.ascii = c + 'a' - 1;
+                ev->key.mod |= TERM_KMOD_CTRL;
             }
             else if (c >= 'A' && c <= 'Z')
             {
-                ev->as.key.ascii = c;
-                ev->as.key.mod |= TERM_KMOD_SHIFT;
+                ev->key.ascii = c;
+                ev->key.mod |= TERM_KMOD_SHIFT;
             }
             else
             {
-                ev->as.key.ascii = c;
+                ev->key.ascii = c;
             }
         }
     }
@@ -246,8 +247,8 @@ int term_get_events(term_event *out, int max)
     {
         ev = SHIFT_EVENT(ev_length);
         ev->type = TERM_EVENT_RESIZE;
-        ev->as.resize.width = size.x;
-        ev->as.resize.height = size.y;
+        ev->resize.width = size.x;
+        ev->resize.height = size.y;
     }
 
     prev_size[0] = size.x;

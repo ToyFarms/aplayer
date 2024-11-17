@@ -17,8 +17,8 @@ typedef struct queue_t
     queue_entry_t *tail;
     int len;
     pthread_mutex_t mutex;
-    FREE_DEF(free);
-    FREEP_DEF(freep);
+    free_fn free;
+    freep_fn freep;
 } queue_t;
 
 #define QUEUE_IS_EMPTY(q) ((q)->head == NULL || (q)->len <= 0)

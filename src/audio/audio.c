@@ -7,6 +7,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+// TODO: abstract audio output, so its possible to have multiple backend
+
 static int audio_init_output(audio_ctx *audio)
 {
     PaError err = Pa_Initialize();
@@ -50,7 +52,12 @@ audio_ctx *audio_create(PaStreamCallback *callback, PaDeviceIndex dev,
                         int nb_channels, int sample_rate,
                         enum audio_format sample_fmt)
 {
-    audio_ctx *audio = malloc(sizeof(*audio));
+    audio_ctx *audio = calloc(1, sizeof(*audio));
+    if (audio == NULL)
+    {
+        errno = -ENOMEM;
+        return NULL;
+    }
 
     audio->callback = callback;
     audio->dev = dev;

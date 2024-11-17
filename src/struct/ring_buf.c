@@ -10,6 +10,7 @@ ring_buf_t ring_buf_create(int capacity, int item_size)
 {
     assert(capacity > 0 && item_size > 0);
 
+    errno = 0;
     ring_buf_t rbuf = {0};
     rbuf.capacity = capacity;
     rbuf.item_size = item_size;
@@ -45,9 +46,11 @@ int ring_buf_write(ring_buf_t *rbuf, void *mem, int item)
     while (items_to_write > 0)
     {
         int space_left = rbuf->capacity - rbuf->write_idx;
-        int items_now = (items_to_write < space_left) ? items_to_write : space_left;
+        int items_now =
+            (items_to_write < space_left) ? items_to_write : space_left;
 
-        memcpy(rbuf->buf + (rbuf->write_idx * rbuf->item_size), src, items_now * rbuf->item_size);
+        memcpy(rbuf->buf + (rbuf->write_idx * rbuf->item_size), src,
+               items_now * rbuf->item_size);
 
         items_to_write -= items_now;
         src += items_now * rbuf->item_size;

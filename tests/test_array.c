@@ -7,15 +7,16 @@ INCLUDE_BEGIN
 #include <string.h>
 INCLUDE_END
 
-CFLAGS_BEGIN/*
--Isrc/include
-src/struct/array.c
-*/CFLAGS_END
+CFLAGS_BEGIN /*
+ -Isrc/include
+ src/struct/array.c
+ src/logger.c
+ */ CFLAGS_END
 
 TEST_BEGIN(init)
 {
     array_t arr = array_create(1, 1);
-    ASSERT_COND(arr.data);
+    ASSERT_TRUE(arr.data);
 }
 TEST_END()
 
@@ -34,7 +35,7 @@ TEST_END()
 TEST_BEGIN(append_static_not_enough_space)
 {
     array_t arr = array_create(1, sizeof(int));
-    ASSERT_COND(arr.data);
+    ASSERT_TRUE(arr.data);
     ASSERT_INT_EQ(errno, 0);
 
     const int data[] = {1, 2, 3};
@@ -48,7 +49,7 @@ TEST_END()
 TEST_BEGIN(append_static_illegal_size, EXPECT_FAIL)
 {
     array_t arr = array_create(1, sizeof(int));
-    ASSERT_COND(arr.data);
+    ASSERT_TRUE(arr.data);
     ASSERT_INT_EQ(errno, 0);
 
     const int data[] = {1, 2, 3};
@@ -59,7 +60,7 @@ TEST_END()
 TEST_BEGIN(append_static_null_data, EXPECT_FAIL)
 {
     array_t arr = array_create(1, sizeof(int));
-    ASSERT_COND(arr.data);
+    ASSERT_TRUE(arr.data);
     ASSERT_INT_EQ(errno, 0);
 
     const int data[] = {1, 2, 3};
@@ -70,7 +71,7 @@ TEST_END()
 TEST_BEGIN(append_static_null_data2, EXPECT_FAIL)
 {
     array_t arr = array_create(1, sizeof(int));
-    ASSERT_COND(arr.data);
+    ASSERT_TRUE(arr.data);
     ASSERT_INT_EQ(errno, 0);
 
     const int data[] = {1, 2, 3};
@@ -91,7 +92,7 @@ TEST_END()
 TEST_BEGIN(append_static)
 {
     array_t arr = array_create(3, sizeof(int));
-    ASSERT_COND(arr.data);
+    ASSERT_TRUE(arr.data);
     ASSERT_INT_EQ(errno, 0);
 
     const int data[] = {1, 2, 3};
@@ -106,7 +107,7 @@ TEST_END()
 TEST_BEGIN(append_static_partial)
 {
     array_t arr = array_create(3, sizeof(int));
-    ASSERT_COND(arr.data);
+    ASSERT_TRUE(arr.data);
     ASSERT_INT_EQ(errno, 0);
 
     const int data[] = {1, 2, 3};
@@ -122,7 +123,7 @@ TEST_END()
 TEST_BEGIN(append_static_partial2)
 {
     array_t arr = array_create(3, sizeof(int));
-    ASSERT_COND(arr.data);
+    ASSERT_TRUE(arr.data);
     ASSERT_INT_EQ(errno, 0);
 
     const int data[] = {1, 2, 3};
@@ -138,7 +139,7 @@ TEST_END()
 TEST_BEGIN(append_static_item_overflow)
 {
     array_t arr = array_create(3, 1);
-    ASSERT_COND(arr.data);
+    ASSERT_TRUE(arr.data);
     ASSERT_INT_EQ(errno, 0);
 
     const int data[] = {400, 2, 3};
@@ -154,7 +155,7 @@ TEST_END()
 TEST_BEGIN(append_dynamic_illegal_size, EXPECT_FAIL)
 {
     array_t arr = array_create(1, sizeof(int));
-    ASSERT_COND(arr.data);
+    ASSERT_TRUE(arr.data);
     ASSERT_INT_EQ(errno, 0);
 
     const int data[] = {1, 2, 3};
@@ -165,7 +166,7 @@ TEST_END()
 TEST_BEGIN(append_dynamic_null_data, EXPECT_FAIL)
 {
     array_t arr = array_create(1, sizeof(int));
-    ASSERT_COND(arr.data);
+    ASSERT_TRUE(arr.data);
     ASSERT_INT_EQ(errno, 0);
 
     const int data[] = {1, 2, 3};
@@ -176,7 +177,7 @@ TEST_END()
 TEST_BEGIN(append_dynamic_null_data2, EXPECT_FAIL)
 {
     array_t arr = array_create(1, sizeof(int));
-    ASSERT_COND(arr.data);
+    ASSERT_TRUE(arr.data);
     ASSERT_INT_EQ(errno, 0);
 
     const int data[] = {1, 2, 3};
@@ -197,7 +198,7 @@ TEST_END()
 TEST_BEGIN(append_dynamic)
 {
     array_t arr = array_create(3, sizeof(int));
-    ASSERT_COND(arr.data);
+    ASSERT_TRUE(arr.data);
     ASSERT_INT_EQ(errno, 0);
 
     const int data[] = {1, 2, 3};
@@ -212,7 +213,7 @@ TEST_END()
 TEST_BEGIN(append_dynamic_resize2x)
 {
     array_t arr = array_create(3, sizeof(int));
-    ASSERT_COND(arr.data);
+    ASSERT_TRUE(arr.data);
     ASSERT_INT_EQ(errno, 0);
 
     const int data[] = {1, 2, 3, 4, 5, 6};
@@ -227,7 +228,7 @@ TEST_END()
 TEST_BEGIN(append_dynamic_resize3x)
 {
     array_t arr = array_create(3, sizeof(int));
-    ASSERT_COND(arr.data);
+    ASSERT_TRUE(arr.data);
     ASSERT_INT_EQ(errno, 0);
 
     const int data[] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12};
@@ -242,7 +243,7 @@ TEST_END()
 TEST_BEGIN(append_dynamic_resize_power2)
 {
     array_t arr = array_create(3, sizeof(int));
-    ASSERT_COND(arr.data);
+    ASSERT_TRUE(arr.data);
     ASSERT_INT_EQ(errno, 0);
 
     const int data[] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
@@ -257,7 +258,7 @@ TEST_END()
 TEST_BEGIN(append_dynamic_partial)
 {
     array_t arr = array_create(3, sizeof(int));
-    ASSERT_COND(arr.data);
+    ASSERT_TRUE(arr.data);
     ASSERT_INT_EQ(errno, 0);
 
     const int data[] = {1, 2, 3};
@@ -273,7 +274,7 @@ TEST_END()
 TEST_BEGIN(append_dynamic_partial2)
 {
     array_t arr = array_create(3, sizeof(int));
-    ASSERT_COND(arr.data);
+    ASSERT_TRUE(arr.data);
     ASSERT_INT_EQ(errno, 0);
 
     const int data[] = {1, 2, 3};
@@ -289,7 +290,7 @@ TEST_END()
 TEST_BEGIN(append_dynamic_item_overflow)
 {
     array_t arr = array_create(3, 1);
-    ASSERT_COND(arr.data);
+    ASSERT_TRUE(arr.data);
     ASSERT_INT_EQ(errno, 0);
 
     const int data[] = {400, 2, 3};
@@ -302,7 +303,7 @@ TEST_BEGIN(append_dynamic_item_overflow)
 }
 TEST_END()
 
-TEST_BEGIN(_remove)
+TEST_BEGIN(remove)
 {
     array_t arr = array_create(16, sizeof(int));
 
@@ -334,6 +335,22 @@ TEST_BEGIN(remove2)
     ASSERT_INT_EQ(arr.capacity, 10);
 
     int expected[] = {1, 2, 3, 4, 5, 6};
+    ASSERT_MEM_EQ(arr.data, expected, sizeof(expected));
+}
+TEST_END()
+
+TEST_BEGIN(insert)
+{
+    array_t arr = array_create(8, sizeof(int));
+    int data[] = {1, 2, 3, 4, 5, 6, 7, 8};
+
+    array_append(&arr, data, 6);
+    array_insert(&arr, data, 2, 3);
+
+    ASSERT_INT_EQ(arr.length, 8);
+    ASSERT_INT_EQ(arr.capacity, 8);
+
+    int expected[] = {1, 2, 3, 1, 2, 4, 5, 6};
     ASSERT_MEM_EQ(arr.data, expected, sizeof(expected));
 }
 TEST_END()

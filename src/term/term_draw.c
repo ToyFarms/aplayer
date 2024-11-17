@@ -1,14 +1,23 @@
 #include "term_draw.h"
 #include "term.h"
 
-#include <stdatomic.h>
-#include <stdlib.h>
-#include <wchar.h>
 #include <string.h>
+#include <wchar.h>
 
-static const wchar_t *blocks_horizontal = L" ▎▎▍▌▋▊▉█";
-static const wchar_t *blocks_vertical = L" ▂▂▄▄▅▆▇█";
-static const int blocks_len = 9;
+static const wchar_t *blocks_horizontal = L" ▏▎▍▌▋▊▉█";
+static const wchar_t *blocks_vertical = L" ▁▂▃▄▅▆▇█";
+static const int blocks_len = 10;
+static enum term_color_mode color_mode = TERM_COLOR_24BIT;
+
+void term_color_mode(enum term_color_mode mode)
+{
+    color_mode = mode;
+}
+
+enum term_color_mode term_get_color_mode()
+{
+    return color_mode;
+}
 
 string_t *term_draw_pos(string_t *buf, vec2 pos)
 {
@@ -18,27 +27,42 @@ string_t *term_draw_pos(string_t *buf, vec2 pos)
 string_t *term_draw_move(string_t *buf, vec2 pos)
 {
     if (pos.y > 0)
-        buf = string_catf_d(buf, TESC TNDOWN, pos.y);
+        string_catf_d(buf, TESC TNDOWN, pos.y);
     else if (pos.y < 0)
-        buf = string_catf_d(buf, TESC TNUP, pos.y * -1);
+        string_catf_d(buf, TESC TNUP, pos.y * -1);
     if (pos.x > 0)
-        buf = string_catf_d(buf, TESC TNRIGHT, pos.x);
+        string_catf_d(buf, TESC TNRIGHT, pos.x);
     else if (pos.x < 0)
-        buf = string_catf_d(buf, TESC TNLEFT, pos.x * -1);
+        string_catf_d(buf, TESC TNLEFT, pos.x * -1);
     return buf;
 }
 
 string_t *term_draw_color(string_t *buf, color_t bg, color_t fg)
 {
-    if (bg.a != 0 && fg.a != 0)
-        return string_catf_d(buf, TESC TBGFG, bg.r, bg.g, bg.b, fg.r, fg.g,
-                            fg.b);
-    else if (bg.a != 0)
-        return string_catf_d(buf, TESC TBG, bg.r, bg.g, bg.b);
-    else if (fg.a != 0)
-        return string_catf_d(buf, TESC TFG, fg.r, fg.g, fg.b);
+    if (color_mode == TERM_COLOR_24BIT)
+    {
+        if (bg.a != 0 && fg.a != 0)
+            return string_catf_d(buf, TESC TBGFG, bg.r, bg.g, bg.b, fg.r, fg.g,
+                                 fg.b);
+        else if (bg.a != 0)
+            return string_catf_d(buf, TESC TBG, bg.r, bg.g, bg.b);
+        else if (fg.a != 0)
+            return string_catf_d(buf, TESC TFG, fg.r, fg.g, fg.b);
+        else
+            return buf;
+    }
     else
-        return buf;
+    {
+        if (bg.a != 0 && fg.a != 0)
+            return string_catf_d(buf, TESC TBGFG8, color_term_pallete(bg),
+                                 color_term_pallete(fg));
+        else if (bg.a != 0)
+            return string_catf_d(buf, TESC TBG8, color_term_pallete(bg));
+        else if (fg.a != 0)
+            return string_catf_d(buf, TESC TFG8, color_term_pallete(fg));
+        else
+            return buf;
+    }
 }
 
 string_t *term_draw_str(string_t *buf, const char *str, int len)
@@ -50,7 +74,7 @@ string_t *term_draw_strf(string_t *buf, const char *fmt, ...)
 {
     va_list args;
     va_start(args, fmt);
-    buf = string_catfv(buf, fmt, args);
+    string_catfv(buf, fmt, args);
     va_end(args);
     return buf;
 }
@@ -72,7 +96,7 @@ string_t *term_draw_padding(string_t *buf, int length)
     while (length > 0)
     {
         int chunk = length < MAX_PADDING ? length : MAX_PADDING;
-        buf = string_catlen(buf, padding, chunk);
+        string_catlen(buf, padding, chunk);
         length -= chunk;
     }
 
@@ -86,12 +110,22 @@ string_t *term_draw_hline(string_t *buf, int length)
     return string_catf_d(buf, TESC THLINE, length);
 }
 
-string_t *term_draw_vline(string_t *buf, int length)
+string_t *term_draw_vline(string_t *buf, int length, color_t bg, color_t fg)
 {
+    // NOTE: will crash if color length exceed 128; it shouldn't, but who knows
+    char c[128];
+    string_t cs = {.buf = c, .len = 0, .capacity = 128};
+    term_draw_color(&cs, bg, fg);
+
     for (int i = 0; i < length; i++)
-        buf = string_cat(buf, " " TESC TDOWN TESC TLEFT);
+    {
+        string_catlen(buf, c, cs.len);
+        string_cat(buf, " " TESC TDOWN TESC TLEFT TESC TRESET);
+    }
     return buf;
 }
+
+// TODO: implement hlinef and vlinef
 
 string_t *term_draw_hblockf(string_t *buf, float x)
 {
@@ -111,10 +145,11 @@ string_t *term_draw_vblockf(string_t *buf, float x)
 
 string_t *term_draw_rect(string_t *buf, vec2 size, color_t bg, color_t fg)
 {
+    // TODO: compute color only once
     for (int i = 0; i < size.y; i++)
     {
-        buf = term_draw_color(buf, bg, fg);
-        buf = string_catf_d(buf, TESC THLINE TESC TDOWN, size.x);
+        term_draw_color(buf, bg, fg);
+        string_catf_d(buf, TESC THLINE TESC TDOWN, size.x);
     }
     return buf;
 }

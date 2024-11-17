@@ -1,3 +1,7 @@
 *.cache
 build/
 compile_commands.json
+a.py
+a.c
+*.exe
+logs/

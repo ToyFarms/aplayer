@@ -4,10 +4,11 @@ INCLUDE_BEGIN
 #include "queue.h"
 INCLUDE_END
 
-CFLAGS_BEGIN/*
--Isrc/include
-src/struct/queue.c
-*/CFLAGS_END
+CFLAGS_BEGIN /*
+ -Isrc/include
+ src/struct/queue.c
+ src/logger.c
+ */ CFLAGS_END
 
 TEST_BEGIN(init)
 {
@@ -18,7 +19,7 @@ TEST_BEGIN(init)
 }
 TEST_END()
 
-TEST_BEGIN(_free)
+TEST_BEGIN(free)
 {
     queue_t q = queue_create();
     queue_free(&q);
