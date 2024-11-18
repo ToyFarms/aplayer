@@ -74,9 +74,16 @@ path_t *path_resolve(path_t *path)
         else if (strview->len == 2 && strview->buf[0] == '.' &&
                  strview->buf[1] == '.')
         {
-            // TODO: bound check
-            array_remove(&path->segments, i - 1, 2);
-            i -= 2;
+            if (i == 0)
+            {
+                array_remove(&path->segments, i, 1);
+                i -= 1;
+            }
+            else
+            {
+                array_remove(&path->segments, i - 1, 2);
+                i -= 2;
+            }
         }
     }
 
