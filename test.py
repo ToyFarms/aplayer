@@ -483,6 +483,7 @@ def generate_source(
     test: str,
     source: str,
     flags: list[str],
+    cflags: list[str],
     start: tuple[str, int],
 ) -> str:
     _ = flags
@@ -508,16 +509,19 @@ def generate_source(
 
         break
 
+    logger = """#ifdef test_init_initlogger
+#  include "logger.h"
+    test_init_initlogger;
+#endif /* test_init_initlogger */
+"""
+
     return f"""{base}
 {includes}
 void _{group}_{test}()
 {source}
 int main()
 {{
-#ifdef test_init_initlogger
-#  include "logger.h"
-    test_init_initlogger;
-#endif /* test_init_initlogger */
+{logger if "logger.c" in cflags else ""}
     {init}
     _{group}_{test}();
     return 0;
@@ -848,6 +852,7 @@ def main() -> None:
                         name,
                         source.source,
                         source.flags,
+                        cflags,
                         (str(file), source.start),
                     ),
                     cflags,

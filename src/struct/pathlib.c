@@ -44,7 +44,15 @@ path_t *path_normalize(path_t *path)
             array_remove(&path->segments, i--, 1);
     }
 
-    concat_segment(path, path_is_absolute(path));
+    if (path->segments.length == 0)
+    {
+        path->back.len = 0;
+        string_cat(&path->back, path_is_absolute(path) ? "/./" : "./");
+        swap_buffer(path);
+    }
+    else
+        concat_segment(path, path_is_absolute(path));
+
     return path;
 }
 
@@ -135,96 +143,6 @@ void path_segments(char *str, array_t *out, int index)
     }
 exit:;
 }
-
-// static void normalize(path_t *path)
-// {
-//     assert(path != NULL);
-//     path->str.len = 0;
-//
-//     array_t segments = array_create(16, sizeof(stringview_t));
-//
-//     char *str = path->str.buf;
-//     char c;
-//     stringview_t cur_seg = {.buf = str, .len = 0};
-//     int is_abs = path->str.buf[0] == '/' || path->str.buf[0] == '~';
-//
-//     enum state_type
-//     {
-//         STATE_READ,
-//         STATE_FLUSH,
-//         STATE_END,
-//     } state = STATE_READ;
-//
-//     for (;;)
-//     {
-//         switch (state)
-//         {
-//         case STATE_READ:
-//             c = *str++;
-//             if (c == '/' || c == '\\' || c == '\0')
-//                 state = (c == '\0') ? STATE_END : STATE_FLUSH;
-//             else
-//                 cur_seg.len++;
-//             break;
-//         case STATE_FLUSH:
-//             if (cur_seg.len > 0)
-//             {
-//                 array_append(&segments, &cur_seg, 1);
-//                 cur_seg.buf += cur_seg.len;
-//                 cur_seg.len = 0;
-//             }
-//
-//             cur_seg.buf++;
-//             state = STATE_READ;
-//             break;
-//         case STATE_END:
-//             if (cur_seg.len > 0)
-//                 state = STATE_FLUSH;
-//             else
-//                 goto exit;
-//             break;
-//         }
-//     }
-// exit:;
-//
-//     stringview_t *strvw;
-//     ARR_FOREACH_BYREF(segments, strvw, i)
-//     {
-//         if (strvw->len > 2)
-//             continue;
-//
-//         if (strvw->len == 1 && strvw->buf[0] == '.')
-//         {
-//             array_remove(&segments, i, 1);
-//             i -= 1;
-//         }
-//         else if (strvw->len == 2 && strvw->buf[0] == '.' &&
-//                  strvw->buf[1] == '.')
-//         {
-//             if (i == 0)
-//             {
-//                 array_remove(&segments, i, 1);
-//                 i -= 1;
-//             }
-//             else
-//             {
-//                 array_remove(&segments, i - 1, 2);
-//                 i -= 2;
-//             }
-//         }
-//     }
-//
-//     if (is_abs)
-//         string_catlen(&path->str, "/", 1);
-//
-//     ARR_FOREACH_BYREF(segments, strvw, i)
-//     {
-//         string_catlen(&path->str, strvw->buf, strvw->len);
-//         string_catlen(&path->str, "/", 1);
-//     }
-//
-//     array_free(&segments);
-// }
 
 static void swap_buffer(path_t *path)
 {

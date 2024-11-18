@@ -31,6 +31,7 @@
     logger_add_output(-1, fopen("tests/logs/" __FILE_NAME__ ".log", "a"),      \
                       LOG_DEFER_CLOSE);
 
+#include "logger.h"
 #include <ctype.h>
 #include <errno.h>
 #include <locale.h>
@@ -38,7 +39,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "logger.h"
 
 void print_memory(const void *addr, size_t n)
 {
