@@ -51,8 +51,8 @@ string_t string_new(const char *s)
     errno = 0;
     string_t str = {0};
 
-    str.len = 0;
-    str.capacity = strlen(s);
+    str.len = strlen(s);
+    str.capacity = str.len * 2;
     str.buf = strdup(s);
     if (str.buf == NULL)
         errno = -ENOMEM;
@@ -117,7 +117,9 @@ string_t *string_catch(string_t *str, char ch)
 {
     assert(str);
 
-    str = string_catlen(str, "/", 1);
+    ensure_size(str, 2);
+    str->buf[str->len++] = ch;
+    str->buf[str->len] = '\0';
 
     return str;
 }

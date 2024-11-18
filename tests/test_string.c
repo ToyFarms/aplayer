@@ -194,6 +194,66 @@ TEST_BEGIN(catlen)
 }
 TEST_END()
 
+TEST_BEGIN(catch)
+{
+    string_t str = string_create();
+    const char string[] = "1234567890";
+
+    string_catch(&str, string[0]);
+    ASSERT_NOTNULL(str.buf);
+    ASSERT_INT_EQ(str.buf[0], '1');
+    ASSERT_MEM_EQ(str.buf + str.len, "\0", 1);
+
+    string_catch(&str, string[1]);
+    ASSERT_NOTNULL(str.buf);
+    ASSERT_INT_EQ(str.buf[1], '2');
+    ASSERT_MEM_EQ(str.buf + str.len, "\0", 1);
+
+    string_catch(&str, string[2]);
+    ASSERT_NOTNULL(str.buf);
+    ASSERT_INT_EQ(str.buf[2], '3');
+    ASSERT_MEM_EQ(str.buf + str.len, "\0", 1);
+
+    string_catch(&str, string[3]);
+    ASSERT_NOTNULL(str.buf);
+    ASSERT_INT_EQ(str.buf[3], '4');
+    ASSERT_MEM_EQ(str.buf + str.len, "\0", 1);
+
+    string_catch(&str, string[4]);
+    ASSERT_NOTNULL(str.buf);
+    ASSERT_INT_EQ(str.buf[4], '5');
+    ASSERT_MEM_EQ(str.buf + str.len, "\0", 1);
+
+    string_catch(&str, string[5]);
+    ASSERT_NOTNULL(str.buf);
+    ASSERT_INT_EQ(str.buf[5], '6');
+    ASSERT_MEM_EQ(str.buf + str.len, "\0", 1);
+
+    string_catch(&str, string[6]);
+    ASSERT_NOTNULL(str.buf);
+    ASSERT_INT_EQ(str.buf[6], '7');
+    ASSERT_MEM_EQ(str.buf + str.len, "\0", 1);
+
+    string_catch(&str, string[7]);
+    ASSERT_NOTNULL(str.buf);
+    ASSERT_INT_EQ(str.buf[7], '8');
+    ASSERT_MEM_EQ(str.buf + str.len, "\0", 1);
+
+    string_catch(&str, string[8]);
+    ASSERT_NOTNULL(str.buf);
+    ASSERT_INT_EQ(str.buf[8], '9');
+    ASSERT_MEM_EQ(str.buf + str.len, "\0", 1);
+
+    string_catch(&str, string[9]);
+    ASSERT_NOTNULL(str.buf);
+    ASSERT_INT_EQ(str.buf[9], '0');
+    ASSERT_MEM_EQ(str.buf + str.len, "\0", 1);
+
+    ASSERT_INT_EQ((int)str.len, 10);
+    ASSERT_MEM_EQ(str.buf, string, sizeof(string));
+}
+TEST_END()
+
 TEST_BEGIN(cat_str)
 {
     string_t str = string_create();
@@ -202,7 +262,7 @@ TEST_BEGIN(cat_str)
     string_cat(&str, "Hello World 1!");
     string_cat(&str2, "Hello World 2!");
 
-    string_cat_str(&str, str2);
+    string_cat_str(&str, &str2);
     ASSERT_NOTNULL(str.buf);
     ASSERT_MEM_EQ(str.buf + str.len, "\0", 1);
 
@@ -219,19 +279,19 @@ TEST_BEGIN(cat_str_many)
     string_cat(&str, "Hello World 1!");
     string_cat(&str2, "Hello World 2!");
 
-    string_cat_str(&str, str2);
+    string_cat_str(&str, &str2);
     ASSERT_NOTNULL(str.buf);
     ASSERT_MEM_EQ(str.buf + str.len, "\0", 1);
-    string_cat_str(&str, str2);
+    string_cat_str(&str, &str2);
     ASSERT_NOTNULL(str.buf);
     ASSERT_MEM_EQ(str.buf + str.len, "\0", 1);
-    string_cat_str(&str, str2);
+    string_cat_str(&str, &str2);
     ASSERT_NOTNULL(str.buf);
     ASSERT_MEM_EQ(str.buf + str.len, "\0", 1);
-    string_cat_str(&str, str2);
+    string_cat_str(&str, &str2);
     ASSERT_NOTNULL(str.buf);
     ASSERT_MEM_EQ(str.buf + str.len, "\0", 1);
-    string_cat_str(&str, str2);
+    string_cat_str(&str, &str2);
     ASSERT_NOTNULL(str.buf);
     ASSERT_MEM_EQ(str.buf + str.len, "\0", 1);
 
@@ -470,7 +530,7 @@ TEST_BEGIN(stress, INIT : setlocale)
         string_catf_d(&str, "%d%d%%%%%d!", 100, -100, -6969);
         string_catwch(&str, L'空');
         string_catw(&str, L"HELLO 世界!");
-        string_cat_str(&str, temp);
+        string_cat_str(&str, &temp);
 
         // ------------------------------
 
