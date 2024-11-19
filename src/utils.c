@@ -21,7 +21,7 @@ void print_raw(const char *str)
             break;
         default:
             if (isprint(c))
-                string_catlen(&s, &c, 1);
+                string_catch(&s, c);
             else
                 string_catf(&s, "\\x%02x", c);
             break;

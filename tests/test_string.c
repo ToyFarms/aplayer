@@ -525,7 +525,7 @@ TEST_BEGIN(stress, INIT : setlocale)
         string_catf(&temp, "%lc %ls %d!", L'時', L"あの時は。。。", -10000);
 
         string_cat(&str, a);
-        string_catlen(&str, b, 1);
+        string_catch(&str, b[0]);
         string_catf(&str, "%d%d %f %p %%!", -120, 69, 0.3f + 0.2f, NULL);
         string_catf_d(&str, "%d%d%%%%%d!", 100, -100, -6969);
         string_catwch(&str, L'空');
