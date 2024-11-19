@@ -132,3 +132,33 @@ TEST_BEGIN(normalize_stress2)
     ASSERT_STR_EQ(path.front.buf, expected, strlen(expected));
 }
 TEST_END()
+
+TEST_BEGIN(resolve)
+{
+    char cwd[1024];
+#ifdef __linux__
+#  include <unistd.h>
+    getcwd(cwd, 1024);
+#else
+#  error "getcwd() not implemented"
+#endif // __linux__
+
+    struct
+    {
+        char *input;
+        char *expected;
+    } test_cases[] = {
+        {"", cwd},
+        {"...", "awda"},
+    };
+
+    for (size_t i = 0; i < sizeof(test_cases) / sizeof(test_cases[0]); i++)
+    {
+        path_t path = path_create(test_cases[i].input);
+        path_resolve(&path);
+        ASSERT_STR_EQ(path.front.buf, test_cases[i].expected,
+                      strlen(test_cases[i].expected));
+        path_free(&path);
+    }
+}
+TEST_END()

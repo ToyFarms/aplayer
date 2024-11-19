@@ -352,10 +352,11 @@ def find_path_and_read(string: str) -> Optional[str]:
         original_file = file
         original_row = row
         for i, line in enumerate(lines[start:end], start):
-            mapping: list[str] = re.findall(r"// SM: & .*\.c & \d+$", line)
+            mapping: list[str] = re.findall(r"// SM: \^ .*\.c:\d+ \$$", line)
             if mapping:
-                _, file, lineno = mapping[0].split("&")
-                file = file.strip()
+                _, file, lineno = mapping[-1].split(":")
+                file = file.strip().removeprefix("^ ")
+                lineno = lineno.removesuffix(" $")
                 lineno = int(lineno) - 1
 
                 if not Path(file).exists():
@@ -483,7 +484,7 @@ def generate_source(
     test: str,
     source: str,
     flags: list[str],
-    cflags: list[str],
+    cflags: str,
     start: tuple[str, int],
 ) -> str:
     _ = flags
@@ -492,10 +493,10 @@ def generate_source(
 
     source_map = []
     for i, line in enumerate(source.split("\n"), 1):
-        align_on_col = 0
+        align_on_col = 80
         padding = max(align_on_col - len(line), 0)
 
-        source_map.append(f"{line}{' ' * padding} // SM: & {start[0]} & {start[1] + i}")
+        source_map.append(f"{line}{' ' * padding} // SM: ^ {start[0]}:{start[1] + i} $")
     source = "\n".join(source_map)
 
     init = ""

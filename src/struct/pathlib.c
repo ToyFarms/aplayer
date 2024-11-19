@@ -60,18 +60,20 @@ path_t *path_normalize(path_t *path)
  * NOTE: resolving an absolute path would just collapse double dots
  * resolving a relative path would join with cwd first
  * */
+// TODO: resolve path link & junction
 path_t *path_resolve(path_t *path)
 {
     path->segments.length = 0;
     path_segments(path->front.buf, &path->segments, 0);
     bool is_absolute = true;
 
+    // TODO: figure out how to determine this absolute path thingy
     if (!path_is_absolute(path))
     {
         char cwd[1024];
         getcwd(cwd, 1024);
         path_segments(cwd, &path->segments, 0);
-        is_absolute = false;
+        is_absolute = true;
     }
 
     stringview_t *strview;
