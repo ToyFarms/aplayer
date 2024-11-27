@@ -581,7 +581,7 @@ static int parse_element(parser_ctx *ctx, ui_element *parent)
 
 static int parse_header(parser_ctx *ctx)
 {
-    str_t link_target = string_alloc(32);
+    str_t link_target = str_alloc(32);
 
     if (ctx->cur_tok->type != TOKEN_CURLY_OPEN)
     {
@@ -654,7 +654,7 @@ static int parse_header(parser_ctx *ctx)
                 break;
             }
 
-            string_cat(&link_target, ctx->cur_tok->v_str);
+            str_cat(&link_target, ctx->cur_tok->v_str);
         }
 
         parser_advance(ctx);
@@ -664,7 +664,7 @@ static int parse_header(parser_ctx *ctx)
         link_target.len = 0;
     }
 
-    string_free(&link_target);
+    str_free(&link_target);
     return 0;
 }
 

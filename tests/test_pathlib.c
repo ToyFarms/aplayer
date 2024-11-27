@@ -102,11 +102,11 @@ TEST_END()
 
 TEST_BEGIN(normalize_stress)
 {
-    str_t s = string_create();
+    str_t s = str_create();
     const int iter = 1000;
     for (int i = 0; i < iter; i++)
     {
-        string_cat(&s, "./\\///\\///\\\\.\\");
+        str_cat(&s, "./\\///\\///\\\\.\\");
     }
 
     path_t path = path_create(s.buf);
@@ -121,11 +121,11 @@ TEST_END()
 
 TEST_BEGIN(normalize_stress2)
 {
-    str_t s = string_create();
+    str_t s = str_create();
     const int iter = 1000;
     for (int i = 0; i < iter; i++)
     {
-        string_cat(&s, "/\\/\\./");
+        str_cat(&s, "/\\/\\./");
     }
 
     path_t path = path_create(s.buf);

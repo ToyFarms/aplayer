@@ -6,7 +6,7 @@
 
 void print_raw(const char *str)
 {
-    str_t s = string_alloc(strlen(str));
+    str_t s = str_alloc(strlen(str));
 
     char c = 0;
     while ((c = *str++))
@@ -14,20 +14,20 @@ void print_raw(const char *str)
         switch ((int)c)
         {
         case '\t':
-            string_catlen(&s, "\\t", 2);
+            str_catlen(&s, "\\t", 2);
             break;
         case '\n':
-            string_catlen(&s, "\\n", 2);
+            str_catlen(&s, "\\n", 2);
             break;
         default:
             if (isprint(c))
-                string_catch(&s, c);
+                str_catch(&s, c);
             else
-                string_catf(&s, "\\x%02x", c);
+                str_catf(&s, "\\x%02x", c);
             break;
         }
     }
 
     printf("%s", s.buf);
-    string_free(&s);
+    str_free(&s);
 }

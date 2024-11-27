@@ -42,11 +42,11 @@ void wpl_render(wpl_ctx *ctx, const term_status *term,
             hsl2.h = fmodf(hsl2.h + ctx->hue, 360);
             term_draw_color(term->buf, color_hsl(hsl), color_hsl(hsl2));
             // term_draw_str(term->buf, " ", 1);
-            // string_catwch(term->buf, L'▌');
+            // str_catwch(term->buf, L'▌');
             if ((i + j) % 2 == 0)
-                string_catwch(term->buf, L'▞');
+                str_catwch(term->buf, L'▞');
             else
-                string_catwch(term->buf, L'▚');
+                str_catwch(term->buf, L'▚');
         }
     }
 }

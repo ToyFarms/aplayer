@@ -17,12 +17,12 @@ static void visualize_tree(ui_element *node, str_t *prefix, int is_last)
     if (node == NULL)
         return;
 
-    str_t new_prefix = string_create();
+    str_t new_prefix = str_create();
     if (prefix)
     {
         printf("%s%s── ", prefix->buf, is_last ? "└" : "├");
-        string_cat_str(&new_prefix, prefix);
-        string_cat(&new_prefix, is_last ? "    " : "│   ");
+        str_cat_str(&new_prefix, prefix);
+        str_cat(&new_prefix, is_last ? "    " : "│   ");
     }
 
     printf("%s%s(children=%d, attr={",
@@ -63,7 +63,7 @@ static void visualize_tree(ui_element *node, str_t *prefix, int is_last)
         visualize_tree(element, &new_prefix, i == node->children.length - 1);
     }
 
-    string_free(&new_prefix);
+    str_free(&new_prefix);
 }
 
 void ui_element_print(ui_element *root)

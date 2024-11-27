@@ -235,7 +235,7 @@ int main(int argc, char **argv)
         wpl_new_instance(&ARR_AS(app->widget_classes, wpl_class)[0]);
     array_append(&widgets, &wpl_inst, 1);
 
-    str_t scrbuf = string_alloc(1024);
+    str_t scrbuf = str_alloc(1024);
     term_status term = {
         .buf = &scrbuf,
     };
@@ -323,6 +323,6 @@ int main(int argc, char **argv)
     }
 
 exit:
-    string_free(&scrbuf);
+    str_free(&scrbuf);
     app_cleanup();
 }

@@ -10,8 +10,8 @@
 path_t path_create(const char *path_str)
 {
     path_t path = {0};
-    path.front = string_new(path_str);
-    path.back = string_create();
+    path.front = str_new(path_str);
+    path.back = str_create();
     path.segments = array_create(16, sizeof(strview_t));
 
     path.is_abs =
@@ -27,8 +27,8 @@ void path_free(path_t *path)
     if (path == NULL)
         return;
 
-    string_free(&path->front);
-    string_free(&path->back);
+    str_free(&path->front);
+    str_free(&path->back);
     array_free(&path->segments);
 }
 
@@ -122,14 +122,14 @@ str_t *path_render(path_t *path)
 {
     path->back.len = 0;
     if (path->is_abs)
-        string_catch(&path->back, '/');
+        str_catch(&path->back, '/');
 
     strview_t *seg;
     ARR_FOREACH_BYREF(path->segments, seg, i)
     {
-        string_catlen(&path->back, seg->buf, seg->len);
+        str_catlen(&path->back, seg->buf, seg->len);
         if (i != path->segments.length - 1)
-            string_catch(&path->back, '/');
+            str_catch(&path->back, '/');
     }
 
     str_t temp = path->front;
