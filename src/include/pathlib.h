@@ -20,5 +20,6 @@ path_t *path_normalize(path_t *path);
 // double dots
 path_t *path_resolve(path_t *path);
 bool path_is_absolute(const path_t *path);
+void path_segments(char *str, array_t *out, int index);
 
 #endif /* __PATHLIB_H */

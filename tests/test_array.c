@@ -20,15 +20,41 @@ TEST_BEGIN(init)
 }
 TEST_END()
 
+TEST_BEGIN(init_check_zero_alloc)
+{
+    array_t arr = array_create(4096, 1);
+
+    char b;
+    ARR_FOREACH(arr, b, i)
+    {
+        ASSERT_INT_EQ((int)b, 0);
+    }
+}
+TEST_END()
+
+TEST_BEGIN(init_check_zero_alloc2)
+{
+    array_t arr = array_create(2048, sizeof(int));
+
+    int b;
+    ARR_FOREACH(arr, b, i)
+    {
+        ASSERT_INT_EQ(b, 0);
+    }
+}
+TEST_END()
+
 TEST_BEGIN(init_illegal_size, EXPECT_FAIL)
 {
     array_t arr = array_create(-1, 1);
+    (void)arr;
 }
 TEST_END()
 
 TEST_BEGIN(init_illegal_size2, EXPECT_FAIL)
 {
     array_t arr = array_create(1, -1);
+    (void)arr;
 }
 TEST_END()
 
@@ -54,6 +80,7 @@ TEST_BEGIN(append_static_illegal_size, EXPECT_FAIL)
 
     const int data[] = {1, 2, 3};
     int ret = array_append_static(&arr, data, -1);
+    ASSERT_INT_EQ(ret, -EINVAL);
 }
 TEST_END()
 
@@ -63,8 +90,8 @@ TEST_BEGIN(append_static_null_data, EXPECT_FAIL)
     ASSERT_TRUE(arr.data);
     ASSERT_INT_EQ(errno, 0);
 
-    const int data[] = {1, 2, 3};
     int ret = array_append_static(&arr, NULL, 3);
+    ASSERT_INT_EQ(ret, -EINVAL)
 }
 TEST_END()
 
@@ -76,6 +103,7 @@ TEST_BEGIN(append_static_null_data2, EXPECT_FAIL)
 
     const int data[] = {1, 2, 3};
     int ret = array_append_static(NULL, data, 3);
+    ASSERT_INT_EQ(ret, -EINVAL)
 }
 TEST_END()
 
@@ -160,6 +188,7 @@ TEST_BEGIN(append_dynamic_illegal_size, EXPECT_FAIL)
 
     const int data[] = {1, 2, 3};
     int ret = array_append(&arr, data, -1);
+    ASSERT_INT_EQ(ret, -EINVAL)
 }
 TEST_END()
 
@@ -169,8 +198,8 @@ TEST_BEGIN(append_dynamic_null_data, EXPECT_FAIL)
     ASSERT_TRUE(arr.data);
     ASSERT_INT_EQ(errno, 0);
 
-    const int data[] = {1, 2, 3};
     int ret = array_append(&arr, NULL, 3);
+    ASSERT_INT_EQ(ret, -EINVAL)
 }
 TEST_END()
 
@@ -182,6 +211,7 @@ TEST_BEGIN(append_dynamic_null_data2, EXPECT_FAIL)
 
     const int data[] = {1, 2, 3};
     int ret = array_append(NULL, data, 3);
+    ASSERT_INT_EQ(ret, -EINVAL)
 }
 TEST_END()
 
@@ -351,6 +381,173 @@ TEST_BEGIN(insert)
     ASSERT_INT_EQ(arr.capacity, 8);
 
     int expected[] = {1, 2, 3, 1, 2, 4, 5, 6};
+    ASSERT_MEM_EQ(arr.data, expected, sizeof(expected));
+}
+TEST_END()
+
+TEST_BEGIN(insert2)
+{
+    array_t arr = array_create(8, sizeof(int));
+    int data[] = {1, 2, 3, 4, 5, 6, 7, 8};
+    int index = 0;
+
+    array_insert(&arr, data + 0, 1, index++);
+    array_insert(&arr, data + 1, 1, index++);
+    array_insert(&arr, data + 2, 1, index++);
+    array_insert(&arr, data + 3, 1, index++);
+    array_insert(&arr, data + 4, 1, index++);
+    array_insert(&arr, data + 5, 1, index++);
+    array_insert(&arr, data + 6, 1, index++);
+    array_insert(&arr, data + 7, 1, index++);
+
+    ASSERT_INT_EQ(arr.length, 8);
+    ASSERT_INT_EQ(arr.capacity, 8);
+
+    int expected[] = {1, 2, 3, 4, 5, 6, 7, 8};
+    ASSERT_MEM_EQ(arr.data, expected, sizeof(expected));
+}
+TEST_END()
+
+TEST_BEGIN(insert_full)
+{
+    array_t arr = array_create(8, sizeof(int));
+    int data[] = {1, 2, 3, 4, 5, 6, 7, 8};
+
+    array_append(&arr, data, 8);
+    array_insert(&arr, data, 3, 0);
+
+    ASSERT_INT_EQ(arr.length, 11);
+    ASSERT_INT_EQ(arr.capacity, 16);
+
+    int expected[] = {1, 2, 3, 1, 2, 3, 4, 5, 6, 7, 8};
+    ASSERT_MEM_EQ(arr.data, expected, sizeof(expected));
+}
+TEST_END()
+
+TEST_BEGIN(insert_full2)
+{
+    array_t arr = array_create(8, sizeof(int));
+    int data[] = {1, 2, 3, 4, 5, 6, 7, 8};
+
+    array_append(&arr, data, 8);
+    array_insert(&arr, data, 1, 0);
+
+    ASSERT_INT_EQ(arr.length, 9);
+    ASSERT_INT_EQ(arr.capacity, 16);
+
+    int expected[] = {1, 1, 2, 3, 4, 5, 6, 7, 8};
+    ASSERT_MEM_EQ(arr.data, expected, sizeof(expected));
+}
+TEST_END()
+
+TEST_BEGIN(insert_at_length)
+{
+    array_t arr = array_create(8, sizeof(int));
+    int data[] = {1, 2, 3, 4, 5, 6, 7, 8};
+
+    array_append(&arr, data, 4);
+    array_insert(&arr, data, 2, arr.length);
+
+    ASSERT_INT_EQ(arr.length, 6);
+    ASSERT_INT_EQ(arr.capacity, 8);
+
+    int expected[] = {1, 2, 3, 4, 1, 2};
+    ASSERT_MEM_EQ(arr.data, expected, sizeof(expected));
+}
+TEST_END()
+
+TEST_BEGIN(insert_at_end)
+{
+    array_t arr = array_create(8, sizeof(int));
+    int data[] = {1, 2, 3, 4, 5, 6, 7, 8};
+
+    array_append(&arr, data, 8);
+    array_insert(&arr, data, 1, 8);
+
+    ASSERT_INT_EQ(arr.length, 9);
+    ASSERT_INT_EQ(arr.capacity, 16);
+
+    int expected[] = {1, 2, 3, 4, 5, 6, 7, 8, 1};
+    ASSERT_MEM_EQ(arr.data, expected, sizeof(expected));
+}
+TEST_END()
+
+TEST_BEGIN(insert_at_end2)
+{
+    array_t arr = array_create(8, sizeof(int));
+    int data[] = {1, 2, 3, 4, 5, 6, 7, 8};
+
+    array_append(&arr, data, 8);
+    array_insert(&arr, data, 8, 8);
+
+    ASSERT_INT_EQ(arr.length, 16);
+    ASSERT_INT_EQ(arr.capacity, 16);
+
+    int expected[] = {1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8};
+    ASSERT_MEM_EQ(arr.data, expected, sizeof(expected));
+}
+TEST_END()
+
+TEST_BEGIN(insert_at_end_min1)
+{
+    array_t arr = array_create(8, sizeof(int));
+    int data[] = {1, 2, 3, 4, 5, 6, 7, 8};
+
+    array_append(&arr, data, 8);
+    array_insert(&arr, data, 1, 7);
+
+    ASSERT_INT_EQ(arr.length, 9);
+    ASSERT_INT_EQ(arr.capacity, 16);
+
+    int expected[] = {1, 2, 3, 4, 5, 6, 7, 1, 8};
+    ASSERT_MEM_EQ(arr.data, expected, sizeof(expected));
+}
+TEST_END()
+
+TEST_BEGIN(insert_at_end2_min1)
+{
+    array_t arr = array_create(8, sizeof(int));
+    int data[] = {1, 2, 3, 4, 5, 6, 7, 8};
+
+    array_append(&arr, data, 8);
+    array_insert(&arr, data, 2, 7);
+
+    ASSERT_INT_EQ(arr.length, 10);
+    ASSERT_INT_EQ(arr.capacity, 16);
+
+    int expected[] = {1, 2, 3, 4, 5, 6, 7, 1, 2, 8};
+    ASSERT_MEM_EQ(arr.data, expected, sizeof(expected));
+}
+TEST_END()
+
+TEST_BEGIN(insert_far)
+{
+    array_t arr = array_create(8, sizeof(int));
+    int data[] = {1, 2, 3, 4, 5, 6, 7, 8};
+
+    array_append(&arr, data, 8);
+    array_insert(&arr, data, 2, 16);
+
+    ASSERT_INT_EQ(arr.length, 10);
+    ASSERT_INT_EQ(arr.capacity, 32);
+
+    int expected[] = {1, 2, 3, 4, 5, 6, 7, 8, 0, 0, 0, 0, 0, 0, 0, 0,
+                      1, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+    ASSERT_MEM_EQ(arr.data, expected, sizeof(expected));
+}
+TEST_END()
+
+TEST_BEGIN(check_zero_realloc)
+{
+    array_t arr = array_create(4, sizeof(int));
+    int data[] = {1, 2, 3, 4};
+
+    array_insert(&arr, data, 4, 8);
+
+    ASSERT_INT_EQ(arr.length, 4);
+    ASSERT_INT_EQ(arr.capacity, 16);
+
+    int expected[] = {0, 0, 0, 0, 0, 0, 0, 0, 1, 2, 3, 4, 0, 0, 0, 0};
     ASSERT_MEM_EQ(arr.data, expected, sizeof(expected));
 }
 TEST_END()

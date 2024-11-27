@@ -124,4 +124,7 @@ void print_memory(const void *addr, size_t n)
         exit(EXIT_FAILURE);                                                    \
     }
 
+#define _MMIN(a, b) ((a) > (b) ? (b) : (a))
+#define _MMAX(a, b) ((a) > (b) ? (a) : (b))
+
 #endif /* __BASE_H */

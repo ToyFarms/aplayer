@@ -36,8 +36,8 @@ path_t *path_normalize(path_t *path)
 {
     path->segments.length = 0;
     path_segments(path->front.buf, &path->segments, 0);
-    stringview_t *strview;
 
+    stringview_t *strview;
     ARR_FOREACH_BYREF(path->segments, strview, i)
     {
         if (strview->len == 1 && strview->buf[0] == '.')
@@ -47,7 +47,7 @@ path_t *path_normalize(path_t *path)
     if (path->segments.length == 0)
     {
         path->back.len = 0;
-        string_cat(&path->back, path_is_absolute(path) ? "/./" : "./");
+        string_cat(&path->back, path_is_absolute(path) ? "/." : ".");
         swap_buffer(path);
     }
     else
@@ -56,24 +56,17 @@ path_t *path_normalize(path_t *path)
     return path;
 }
 
-/*
- * NOTE: resolving an absolute path would just collapse double dots
- * resolving a relative path would join with cwd first
- * */
 // TODO: resolve path link & junction
 path_t *path_resolve(path_t *path)
 {
     path->segments.length = 0;
     path_segments(path->front.buf, &path->segments, 0);
-    bool is_absolute = true;
 
-    // TODO: figure out how to determine this absolute path thingy
     if (!path_is_absolute(path))
     {
         char cwd[1024];
         getcwd(cwd, 1024);
         path_segments(cwd, &path->segments, 0);
-        is_absolute = true;
     }
 
     stringview_t *strview;
@@ -97,7 +90,7 @@ path_t *path_resolve(path_t *path)
         }
     }
 
-    concat_segment(path, is_absolute);
+    concat_segment(path, true);
     return path;
 }
 
@@ -163,7 +156,8 @@ static void concat_segment(path_t *path, bool absolute)
     ARR_FOREACH_BYREF(path->segments, seg, i)
     {
         string_catlen(&path->back, seg->buf, seg->len);
-        string_catch(&path->back, '/');
+        if (i != path->segments.length - 1)
+            string_catch(&path->back, '/');
     }
 
     swap_buffer(path);
@@ -171,5 +165,6 @@ static void concat_segment(path_t *path, bool absolute)
 
 bool path_is_absolute(const path_t *path)
 {
-    return path->front.len > 0 && path->front.buf[0] == '/';
+    return path->front.len > 0 &&
+           (path->front.buf[0] == '/' || path->front.buf[0] == '\\');
 }

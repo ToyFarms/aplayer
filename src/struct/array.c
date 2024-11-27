@@ -32,7 +32,7 @@ array_t array_create(int max_item, int item_size)
     arr.capacity = max_item;
     arr.item_size = item_size;
 
-    arr.data = malloc(max_item * item_size);
+    arr.data = calloc(max_item, item_size);
     if (arr.data == NULL)
         errno = -ENOMEM;
 
@@ -51,15 +51,22 @@ void array_free(array_t *arr)
     memset(arr, 0, sizeof(*arr));
 }
 
-int array_resize(array_t *arr, int new_max_item)
+void array_resize(array_t *arr, int new_max_item)
 {
+    if (new_max_item == arr->capacity)
+        return;
+
     assert(arr && arr->data && new_max_item > 0);
     arr->data = realloc(arr->data, new_max_item * arr->item_size);
     assert(arr->data);
 
-    arr->capacity = new_max_item;
+    if (new_max_item > arr->capacity)
+    {
+        memset(offsetfrom(arr, arr->capacity), 0,
+               (new_max_item - arr->capacity) * arr->item_size);
+    }
 
-    return 0;
+    arr->capacity = new_max_item;
 }
 
 int array_append_static(array_t *arr, const void *mem, int item_count)
@@ -67,6 +74,8 @@ int array_append_static(array_t *arr, const void *mem, int item_count)
     assert(arr && mem && item_count > 0);
     if (arr->length + item_count > arr->capacity)
         return -ENOMEM;
+    else if (arr == NULL || item_count <= 0 || mem == NULL)
+        return -EINVAL;
 
     array_copy_buffer(arr, mem, item_count);
 
@@ -78,12 +87,14 @@ int array_append(array_t *arr, const void *mem, int item_count)
     assert(arr && mem && item_count > 0);
     if (item_count < 0 || arr->capacity <= 0)
         return -EINVAL;
+    else if (arr == NULL || item_count <= 0 || mem == NULL)
+        return -EINVAL;
 
-    int prev_capacity = arr->capacity;
-    while (arr->length + item_count > arr->capacity)
-        arr->capacity *= 2;
-    if (prev_capacity != arr->capacity)
-        array_resize(arr, arr->capacity);
+    int capacity = arr->capacity;
+    while (arr->length + item_count > capacity)
+        capacity *= 2;
+    array_resize(arr, capacity);
+
     array_copy_buffer(arr, mem, item_count);
 
     return 0;
@@ -92,17 +103,22 @@ int array_append(array_t *arr, const void *mem, int item_count)
 int array_insert(array_t *arr, const void *mem, int item_count, int index)
 {
     assert(arr && mem && item_count > 0 && index >= 0);
-    if (item_count < 0 || arr->capacity <= 0 || index >= arr->capacity)
+    if (item_count < 0 || arr->capacity <= 0 || index < 0)
         return -EINVAL;
 
-    int prev_capacity = arr->capacity;
-    while (arr->length + item_count > arr->capacity)
-        arr->capacity *= 2;
-    if (prev_capacity != arr->capacity)
-        array_resize(arr, arr->capacity);
+    int index_space = index > arr->capacity ? index : 0;
 
-    memmove(offsetfrom(arr, index + item_count), offsetfrom(arr, index),
-            (arr->length - index) * arr->item_size);
+    int capacity = arr->capacity;
+    while (arr->length + item_count + index_space > capacity)
+        capacity *= 2;
+    array_resize(arr, capacity);
+
+    if (index < arr->length)
+    {
+        memmove(offsetfrom(arr, index + item_count), offsetfrom(arr, index),
+                (arr->length - index) * arr->item_size);
+    }
+
     memcpy(offsetfrom(arr, index), mem, item_count * arr->item_size);
 
     arr->length += item_count;
