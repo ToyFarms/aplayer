@@ -26,12 +26,14 @@ TEST_END()
 TEST_BEGIN(init_illegal, EXPECT_FAIL)
 {
     ring_buf_t rbuf = ring_buf_create(0, 1);
+    (void)rbuf;
 }
 TEST_END()
 
 TEST_BEGIN(init_illegal2, EXPECT_FAIL)
 {
     ring_buf_t rbuf = ring_buf_create(8, 0);
+    (void)rbuf;
 }
 TEST_END()
 
@@ -69,9 +71,9 @@ TEST_END()
 
 TEST_BEGIN(write_null, EXPECT_FAIL)
 {
-    ring_buf_t rbuf = ring_buf_create(8, sizeof(int));
     int data[] = {1, 2, 3, 4, 5};
     int ret = ring_buf_write(NULL, data, 5);
+    (void)ret;
 }
 TEST_END()
 
@@ -79,6 +81,7 @@ TEST_BEGIN(write_null2, EXPECT_FAIL)
 {
     ring_buf_t rbuf = ring_buf_create(8, sizeof(int));
     int ret = ring_buf_write(&rbuf, NULL, 5);
+    (void)ret;
 }
 TEST_END()
 
@@ -87,6 +90,7 @@ TEST_BEGIN(write_illegal_size, EXPECT_FAIL)
     ring_buf_t rbuf = ring_buf_create(8, sizeof(int));
     int data[] = {1, 2, 3, 4, 5};
     int ret = ring_buf_write(&rbuf, data, -1);
+    (void)ret;
 }
 TEST_END()
 
@@ -96,6 +100,7 @@ TEST_BEGIN(write_buf_null, EXPECT_FAIL)
 
     int data[] = {1, 2, 3, 4, 5};
     int ret = ring_buf_write(&rbuf, data, 5);
+    (void)ret;
 }
 TEST_END()
 
@@ -153,10 +158,9 @@ TEST_END()
 
 TEST_BEGIN(read_null, EXPECT_FAIL)
 {
-    ring_buf_t rbuf = ring_buf_create(8, sizeof(int));
-
     int out[8] = {0};
     int ret = ring_buf_read(NULL, 5, out);
+    (void)ret;
 }
 TEST_END()
 
@@ -165,6 +169,7 @@ TEST_BEGIN(read_null2, EXPECT_FAIL)
     ring_buf_t rbuf = ring_buf_create(8, sizeof(int));
 
     int ret = ring_buf_read(&rbuf, 5, NULL);
+    (void)ret;
 }
 TEST_END()
 
@@ -174,6 +179,7 @@ TEST_BEGIN(read_illegal_size, EXPECT_FAIL)
 
     int out[8] = {0};
     int ret = ring_buf_read(&rbuf, -1, out);
+    (void)ret;
 }
 TEST_END()
 
@@ -183,6 +189,7 @@ TEST_BEGIN(read_buf_null, EXPECT_FAIL)
 
     int out[8] = {0};
     int ret = ring_buf_read(&rbuf, 8, out);
+    (void)ret;
 }
 TEST_END()
 
