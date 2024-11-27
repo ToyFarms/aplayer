@@ -266,3 +266,93 @@ TEST_BEGIN(absolute)
     }
 }
 TEST_END()
+
+TEST_BEGIN(preserve_input)
+{
+    struct
+    {
+        char *input;
+        char *expected;
+    } test_cases[] = {
+        {"./",              "./"             },
+        {"/",               "/"              },
+        {"./",              "./"             },
+        {"/",               "/"              },
+        {"../",             "../"            },
+        {"",                ""               },
+        {"/home/user",      "/home/user"     },
+        {"home/user",       "home/user"      },
+        {"/home/./user",    "/home/./user"   },
+        {"../user",         "../user"        },
+        {"/..",             "/.."            },
+        {".",               "."              },
+        {"/.",              "/."             },
+        {"/user/../bin",    "/user/../bin"   },
+        {"user/./docs",     "user/./docs"    },
+        {"//server/share",  "//server/share" },
+        {"/tmp///file",     "/tmp///file"    },
+        {"~/Documents",     "~/Documents"    },
+        {"path/to/file",    "path/to/file"   },
+        {"/path/to/./file", "/path/to/./file"},
+        {"../..",           "../.."          },
+        {"/var/../usr",     "/var/../usr"    },
+        {"file.txt",        "file.txt"       },
+        {"/etc/passwd",     "/etc/passwd"    },
+    };
+
+    for (size_t i = 0; i < sizeof(test_cases) / sizeof(test_cases[0]); i++)
+    {
+        path_t path = path_create(test_cases[i].input);
+        ASSERT_STR_EQ(path.front.buf, test_cases[i].expected,
+                      _MMAX(path.front.len, strlen(test_cases[i].expected)));
+
+        path_free(&path);
+    }
+}
+TEST_END()
+
+TEST_BEGIN(render)
+{
+    struct
+    {
+        char *input;
+        char *expected;
+    } test_cases[] = {
+        {"./",              "."              },
+        {"/",               "/"              },
+        {"./",              "."              },
+        {"/",               "/"              },
+        {"../",             ".."             },
+        {"",                ""               },
+        {"/home/user",      "/home/user"     },
+        {"home/user",       "home/user"      },
+        {"/home/./user",    "/home/./user"   },
+        {"../user",         "../user"        },
+        {"/..",             "/.."            },
+        {".",               "."              },
+        {"/.",              "/."             },
+        {"/user/../bin",    "/user/../bin"   },
+        {"user/./docs",     "user/./docs"    },
+        {"//server/share",  "/server/share"  },
+        {"/tmp///file",     "/tmp/file"      },
+        {"~/Documents",     "~/Documents"    },
+        {"path/to/file",    "path/to/file"   },
+        {"/path/to/./file", "/path/to/./file"},
+        {"../..",           "../.."          },
+        {"/var/../usr",     "/var/../usr"    },
+        {"file.txt",        "file.txt"       },
+        {"/etc/passwd",     "/etc/passwd"    },
+    };
+
+    for (size_t i = 0; i < sizeof(test_cases) / sizeof(test_cases[0]); i++)
+    {
+        path_t path = path_create(test_cases[i].input);
+        path_render(&path);
+        ASSERT_STR_EQ(path.front.buf, test_cases[i].expected,
+                      _MMAX(path.front.len, strlen(test_cases[i].expected)));
+
+        path_free(&path);
+    }
+}
+TEST_END()
+
