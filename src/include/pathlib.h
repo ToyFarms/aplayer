@@ -7,9 +7,9 @@
 
 typedef struct path_t
 {
-    string_t front;
-    string_t back;
-    array(stringview_t) segments;
+    str_t front;
+    str_t back;
+    array(strview_t) segments;
 } path_t;
 
 path_t path_create(const char *pathstr);

@@ -19,12 +19,12 @@ enum term_color_mode term_get_color_mode()
     return color_mode;
 }
 
-string_t *term_draw_pos(string_t *buf, vec2 pos)
+str_t *term_draw_pos(str_t *buf, vec2 pos)
 {
     return string_catf_d(buf, TESC TPOSYX, pos.y + 1, pos.x + 1);
 }
 
-string_t *term_draw_move(string_t *buf, vec2 pos)
+str_t *term_draw_move(str_t *buf, vec2 pos)
 {
     if (pos.y > 0)
         string_catf_d(buf, TESC TNDOWN, pos.y);
@@ -37,7 +37,7 @@ string_t *term_draw_move(string_t *buf, vec2 pos)
     return buf;
 }
 
-string_t *term_draw_color(string_t *buf, color_t bg, color_t fg)
+str_t *term_draw_color(str_t *buf, color_t bg, color_t fg)
 {
     if (color_mode == TERM_COLOR_24BIT)
     {
@@ -65,12 +65,12 @@ string_t *term_draw_color(string_t *buf, color_t bg, color_t fg)
     }
 }
 
-string_t *term_draw_str(string_t *buf, const char *str, int len)
+str_t *term_draw_str(str_t *buf, const char *str, int len)
 {
     return len > 0 ? string_catlen(buf, str, len) : string_cat(buf, str);
 }
 
-string_t *term_draw_strf(string_t *buf, const char *fmt, ...)
+str_t *term_draw_strf(str_t *buf, const char *fmt, ...)
 {
     va_list args;
     va_start(args, fmt);
@@ -79,7 +79,7 @@ string_t *term_draw_strf(string_t *buf, const char *fmt, ...)
     return buf;
 }
 
-string_t *term_draw_padding(string_t *buf, int length)
+str_t *term_draw_padding(str_t *buf, int length)
 {
     if (length <= 0)
         return buf;
@@ -103,18 +103,18 @@ string_t *term_draw_padding(string_t *buf, int length)
     return buf;
 }
 
-string_t *term_draw_hline(string_t *buf, int length)
+str_t *term_draw_hline(str_t *buf, int length)
 {
     if (length <= 0)
         return buf;
     return string_catf_d(buf, TESC THLINE, length);
 }
 
-string_t *term_draw_vline(string_t *buf, int length, color_t bg, color_t fg)
+str_t *term_draw_vline(str_t *buf, int length, color_t bg, color_t fg)
 {
     // NOTE: will crash if color length exceed 128; it shouldn't, but who knows
     char c[128];
-    string_t cs = {.buf = c, .len = 0, .capacity = 128};
+    str_t cs = {.buf = c, .len = 0, .capacity = 128};
     term_draw_color(&cs, bg, fg);
 
     for (int i = 0; i < length; i++)
@@ -127,7 +127,7 @@ string_t *term_draw_vline(string_t *buf, int length, color_t bg, color_t fg)
 
 // TODO: implement hlinef and vlinef
 
-string_t *term_draw_hblockf(string_t *buf, float x)
+str_t *term_draw_hblockf(str_t *buf, float x)
 {
     x = MATH_CLAMP(x, 0.0f, 1.0f);
     int index = x * (blocks_len - 1);
@@ -135,7 +135,7 @@ string_t *term_draw_hblockf(string_t *buf, float x)
     return string_catwch(buf, blocks_horizontal[index]);
 }
 
-string_t *term_draw_vblockf(string_t *buf, float x)
+str_t *term_draw_vblockf(str_t *buf, float x)
 {
     x = MATH_CLAMP(x, 0.0f, 1.0f);
     int index = x * (blocks_len - 1);
@@ -143,7 +143,7 @@ string_t *term_draw_vblockf(string_t *buf, float x)
     return string_catwch(buf, blocks_vertical[index]);
 }
 
-string_t *term_draw_rect(string_t *buf, vec2 size, color_t bg, color_t fg)
+str_t *term_draw_rect(str_t *buf, vec2 size, color_t bg, color_t fg)
 {
     // TODO: compute color only once
     for (int i = 0; i < size.y; i++)

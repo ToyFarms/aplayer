@@ -12,7 +12,7 @@ CFLAGS_BEGIN /*
 
 TEST_BEGIN(init)
 {
-    string_t str = string_create();
+    str_t str = string_create();
     ASSERT_NOTNULL(str.buf);
     ASSERT_INT_EQ((int)str.len, 0);
     ASSERT_INT_NEQ((int)str.capacity, 0);
@@ -21,7 +21,7 @@ TEST_END()
 
 TEST_BEGIN(alloc)
 {
-    string_t str = string_alloc(200);
+    str_t str = string_alloc(200);
     ASSERT_NOTNULL(str.buf);
     ASSERT_INT_EQ((int)str.len, 0);
     ASSERT_INT_EQ((int)str.capacity, 200);
@@ -30,25 +30,25 @@ TEST_END()
 
 TEST_BEGIN(free)
 {
-    string_t str = string_alloc(200);
+    str_t str = string_alloc(200);
     string_free(&str);
 
-    ASSERT_MEM_EQ(&str, &(string_t){0}, sizeof(string_t));
+    ASSERT_MEM_EQ(&str, &(str_t){0}, sizeof(str_t));
 }
 TEST_END()
 
 TEST_BEGIN(free_stack)
 {
-    string_t str = string_create();
+    str_t str = string_create();
     string_free(&str);
 
-    ASSERT_MEM_EQ(&str, &(string_t){0}, sizeof(string_t));
+    ASSERT_MEM_EQ(&str, &(str_t){0}, sizeof(str_t));
 }
 TEST_END()
 
 TEST_BEGIN(resize)
 {
-    string_t str = string_create();
+    str_t str = string_create();
 
     string_resize(&str, 200);
     ASSERT_NOTNULL(str.buf);
@@ -59,7 +59,7 @@ TEST_END()
 
 TEST_BEGIN(resize_with_item)
 {
-    string_t str = string_create();
+    str_t str = string_create();
     memcpy(str.buf, (char *){"Hello"}, 5);
 
     string_resize(&str, 200);
@@ -72,7 +72,7 @@ TEST_END()
 
 TEST_BEGIN(cat)
 {
-    string_t str = string_create();
+    str_t str = string_create();
     const char string[] = "Hello World!! %d %f %p %% // \\ /\n";
     const int len = sizeof(string) - 1; // no null ptr
     string_cat(&str, string);
@@ -85,7 +85,7 @@ TEST_END()
 
 TEST_BEGIN(cat_many)
 {
-    string_t str = string_create();
+    str_t str = string_create();
     const char string[] = "Hello World!! %d %f %p %% // \\ /\n";
     const char string2[] = "Hello World 22 2";
     const char string3[] = "Hello World 58";
@@ -123,7 +123,7 @@ TEST_END()
 
 TEST_BEGIN(cat_many_test_null_terminator)
 {
-    string_t str = string_create();
+    str_t str = string_create();
     const char string[] = "Hello World!! %d %f %p %% // \\ /\n";
     const char string2[] = "Hello World 22 2";
     const char string3[] = "Hello World 58";
@@ -172,7 +172,7 @@ TEST_END()
 
 TEST_BEGIN(catlen)
 {
-    string_t str = string_create();
+    str_t str = string_create();
     const char string[] = "1234567890";
 
     string_catlen(&str, string, 2);
@@ -196,7 +196,7 @@ TEST_END()
 
 TEST_BEGIN(catch)
 {
-    string_t str = string_create();
+    str_t str = string_create();
     const char string[] = "1234567890";
 
     string_catch(&str, string[0]);
@@ -256,8 +256,8 @@ TEST_END()
 
 TEST_BEGIN(cat_str)
 {
-    string_t str = string_create();
-    string_t str2 = string_create();
+    str_t str = string_create();
+    str_t str2 = string_create();
 
     string_cat(&str, "Hello World 1!");
     string_cat(&str2, "Hello World 2!");
@@ -273,8 +273,8 @@ TEST_END()
 
 TEST_BEGIN(cat_str_many)
 {
-    string_t str = string_create();
-    string_t str2 = string_create();
+    str_t str = string_create();
+    str_t str2 = string_create();
 
     string_cat(&str, "Hello World 1!");
     string_cat(&str2, "Hello World 2!");
@@ -305,7 +305,7 @@ TEST_END()
 
 TEST_BEGIN(catf)
 {
-    string_t str = string_create();
+    str_t str = string_create();
 
     string_catf(&str, "Hello %% %d %% %f %d%p %zu %llu %%\n", -100, 0.3f + 0.2f,
                 123, NULL, 0xFFFFFUL, 0xFFFFFFULL);
@@ -321,7 +321,7 @@ TEST_END()
 
 TEST_BEGIN(catf_many)
 {
-    string_t str = string_create();
+    str_t str = string_create();
 
     string_catf(&str, "Hello %% %d %% %f %d%p %zu %llu %%\n", -100, 0.3f + 0.2f,
                 123, NULL, 0xFFFFFUL, 0xFFFFFFULL);
@@ -362,7 +362,7 @@ TEST_END()
 
 TEST_BEGIN(catf_d)
 {
-    string_t str = string_create();
+    str_t str = string_create();
 
     string_catf_d(&str, "%d %d %% %%%%%%%d \n\n\n\n\r\r\r", -1000000, 199,
                   12345);
@@ -376,7 +376,7 @@ TEST_END()
 
 TEST_BEGIN(catf_d_many)
 {
-    string_t str = string_create();
+    str_t str = string_create();
 
     string_catf_d(&str, "%d %d %% %%%%%%%d \n\n\n\n\r\r\r", -1000000, 199,
                   12345);
@@ -415,7 +415,7 @@ TEST_END()
 
 TEST_BEGIN(catw, INIT : setlocale)
 {
-    string_t str = string_create();
+    str_t str = string_create();
     wchar_t string[] = L"おはよう世界!";
 
     string_catw(&str, string);
@@ -432,7 +432,7 @@ TEST_END()
 
 TEST_BEGIN(catw_many, INIT : setlocale)
 {
-    string_t str = string_create();
+    str_t str = string_create();
     wchar_t string[] = L"おはよう世界!";
 
     string_catw(&str, string);
@@ -470,7 +470,7 @@ TEST_END()
 
 TEST_BEGIN(catwch, INIT : setlocale)
 {
-    string_t str = string_alloc(1);
+    str_t str = string_alloc(1);
 
     string_catwch(&str, L'世');
     ASSERT_NOTNULL(str.buf);
@@ -504,7 +504,7 @@ TEST_END()
 
 TEST_BEGIN(stress, INIT : setlocale)
 {
-    string_t str = string_create();
+    str_t str = string_create();
 #define MAX  (1024 * 1024)
 #define ITER (5000)
     char expected[MAX] = {0};
@@ -521,7 +521,7 @@ TEST_BEGIN(stress, INIT : setlocale)
         char *b = malloc(1);
         b[0] = i;
 
-        string_t temp = string_create();
+        str_t temp = string_create();
         string_catf(&temp, "%lc %ls %d!", L'時', L"あの時は。。。", -10000);
 
         string_cat(&str, a);

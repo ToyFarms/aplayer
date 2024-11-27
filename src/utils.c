@@ -6,7 +6,7 @@
 
 void print_raw(const char *str)
 {
-    string_t s = string_alloc(strlen(str));
+    str_t s = string_alloc(strlen(str));
 
     char c = 0;
     while ((c = *str++))

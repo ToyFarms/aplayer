@@ -101,7 +101,7 @@ TEST_END()
 
 TEST_BEGIN(normalize_stress)
 {
-    string_t s = string_create();
+    str_t s = string_create();
     const int iter = 1000;
     for (int i = 0; i < iter; i++)
     {
@@ -119,7 +119,7 @@ TEST_END()
 
 TEST_BEGIN(normalize_stress2)
 {
-    string_t s = string_create();
+    str_t s = string_create();
     const int iter = 1000;
     for (int i = 0; i < iter; i++)
     {
@@ -144,7 +144,7 @@ TEST_BEGIN(resolve)
 #else
 #  error "getcwd() not implemented"
 #endif // __linux__
-    array_t cwd_seg = array_create(16, sizeof(stringview_t));
+    array_t cwd_seg = array_create(16, sizeof(strview_t));
     path_segments(cwd, &cwd_seg, 0);
 
     struct
@@ -207,7 +207,7 @@ TEST_BEGIN(resolve)
         size_t offset = path_is_absolute(&path);
         for (int j = 0; j < test_cases[i].len; j++)
         {
-            stringview_t view = ARR_AS(cwd_seg, stringview_t)[j];
+            strview_t view = ARR_AS(cwd_seg, strview_t)[j];
             ASSERT_STR_EQ(path.front.buf + offset, view.buf, view.len);
             offset += view.len + 1;
         }

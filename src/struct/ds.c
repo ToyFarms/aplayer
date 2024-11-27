@@ -9,12 +9,12 @@
 
 #define offset(str) ((str)->buf + (str)->len)
 
-static size_t get_avail(string_t *str)
+static size_t get_avail(str_t *str)
 {
     return str->capacity - str->len;
 }
 
-static void ensure_size(string_t *str, size_t required)
+static void ensure_size(str_t *str, size_t required)
 {
     if (get_avail(str) >= required)
         return;
@@ -26,16 +26,16 @@ static void ensure_size(string_t *str, size_t required)
     string_resize(str, capacity);
 }
 
-static void append_null(string_t *str)
+static void append_null(str_t *str)
 {
     ensure_size(str, 1);
     str->buf[str->len] = '\0';
 }
 
-string_t string_create()
+str_t string_create()
 {
     errno = 0;
-    string_t str = {0};
+    str_t str = {0};
 
     str.len = 0;
     str.capacity = 256;
@@ -46,10 +46,10 @@ string_t string_create()
     return str;
 }
 
-string_t string_new(const char *s)
+str_t string_new(const char *s)
 {
     errno = 0;
-    string_t str = {0};
+    str_t str = {0};
 
     str.len = strlen(s);
     str.capacity = str.len * 2;
@@ -60,9 +60,9 @@ string_t string_new(const char *s)
     return str;
 }
 
-string_t string_alloc(size_t capacity)
+str_t string_alloc(size_t capacity)
 {
-    string_t str = {0};
+    str_t str = {0};
 
     str.len = 0;
     str.capacity = capacity;
@@ -73,7 +73,7 @@ string_t string_alloc(size_t capacity)
     return str;
 }
 
-void string_free(string_t *str)
+void string_free(str_t *str)
 {
     if (str == NULL)
         return;
@@ -82,7 +82,7 @@ void string_free(string_t *str)
     memset(str, 0, sizeof(*str));
 }
 
-string_t *string_resize(string_t *str, size_t new)
+str_t *string_resize(str_t *str, size_t new)
 {
     assert(str);
 
@@ -99,7 +99,7 @@ string_t *string_resize(string_t *str, size_t new)
     return str;
 }
 
-string_t *string_cat(string_t *str, const char *s)
+str_t *string_cat(str_t *str, const char *s)
 {
     assert(str && s);
 
@@ -113,7 +113,7 @@ string_t *string_cat(string_t *str, const char *s)
     return str;
 }
 
-string_t *string_catch(string_t *str, char ch)
+str_t *string_catch(str_t *str, char ch)
 {
     assert(str);
 
@@ -124,7 +124,7 @@ string_t *string_catch(string_t *str, char ch)
     return str;
 }
 
-string_t *string_catlen(string_t *str, const char *s, size_t len)
+str_t *string_catlen(str_t *str, const char *s, size_t len)
 {
     assert(str && s);
 
@@ -137,7 +137,7 @@ string_t *string_catlen(string_t *str, const char *s, size_t len)
     return str;
 }
 
-string_t *string_cat_str(string_t *dst, const string_t *src)
+str_t *string_cat_str(str_t *dst, const str_t *src)
 {
     assert(dst);
 
@@ -150,7 +150,7 @@ string_t *string_cat_str(string_t *dst, const string_t *src)
     return dst;
 }
 
-string_t *string_catf(string_t *str, const char *fmt, ...)
+str_t *string_catf(str_t *str, const char *fmt, ...)
 {
     va_list args;
 
@@ -169,7 +169,7 @@ string_t *string_catf(string_t *str, const char *fmt, ...)
     return str;
 }
 
-string_t *string_catfv(string_t *str, const char *fmt, va_list args)
+str_t *string_catfv(str_t *str, const char *fmt, va_list args)
 {
     va_list args_copy;
     va_copy(args_copy, args);
@@ -208,7 +208,7 @@ static int int_to_str(long long int value, char *buffer)
     return len;
 }
 
-string_t *string_catf_d(string_t *str, const char *fmt, ...)
+str_t *string_catf_d(str_t *str, const char *fmt, ...)
 {
     va_list args;
     va_start(args, fmt);
@@ -257,7 +257,7 @@ string_t *string_catf_d(string_t *str, const char *fmt, ...)
     return str;
 }
 
-string_t *string_catw(string_t *str, wchar_t *ws)
+str_t *string_catw(str_t *str, wchar_t *ws)
 {
     size_t len = wcstombs(NULL, ws, 0);
     if (len == (size_t)-1)
@@ -282,7 +282,7 @@ string_t *string_catw(string_t *str, wchar_t *ws)
     return str;
 }
 
-string_t *string_catwch(string_t *str, wchar_t wc)
+str_t *string_catwch(str_t *str, wchar_t wc)
 {
     ensure_size(str, MB_CUR_MAX + 1);
 

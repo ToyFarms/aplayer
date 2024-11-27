@@ -145,7 +145,7 @@ typedef struct term_status
     int width, height;
     int mouse_x, mouse_y;
     bool resized;
-    string_t *buf;
+    str_t *buf;
 } term_status;
 
 handle_t term_handle(enum handle_type type);

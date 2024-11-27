@@ -12,12 +12,12 @@ static void print_obj_attr_unit(ui_unit unit)
         printf("%s", unit.v_str);
 }
 
-static void visualize_tree(ui_element *node, string_t *prefix, int is_last)
+static void visualize_tree(ui_element *node, str_t *prefix, int is_last)
 {
     if (node == NULL)
         return;
 
-    string_t new_prefix = string_create();
+    str_t new_prefix = string_create();
     if (prefix)
     {
         printf("%s%s── ", prefix->buf, is_last ? "└" : "├");

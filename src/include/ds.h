@@ -4,35 +4,35 @@
 #include <stdio.h>
 #include <wchar.h>
 
-typedef struct string_t
+typedef struct str_t
 {
     char *buf;
     size_t len;
     size_t capacity;
-} string_t;
+} str_t;
 
-typedef struct stringview_t
+typedef struct strview_t
 {
     char *buf;
     size_t len;
-} stringview_t;
+} strview_t;
 
-string_t string_create();
-string_t string_new(const char *s);
-string_t string_alloc(size_t capacity);
-void string_free(string_t *str);
-string_t *string_resize(string_t *str, size_t new);
+str_t string_create();
+str_t string_new(const char *s);
+str_t string_alloc(size_t capacity);
+void string_free(str_t *str);
+str_t *string_resize(str_t *str, size_t new);
 
-string_t *string_cat(string_t *str, const char *s);
-string_t *string_catch(string_t *str, char ch);
-string_t *string_catlen(string_t *str, const char *s, size_t len);
-string_t *string_cat_str(string_t *dst, const string_t *src);
+str_t *string_cat(str_t *str, const char *s);
+str_t *string_catch(str_t *str, char ch);
+str_t *string_catlen(str_t *str, const char *s, size_t len);
+str_t *string_cat_str(str_t *dst, const str_t *src);
 // faster version only for number concatenation
-string_t *string_catf_d(string_t *str, const char *fmt, ...);
-string_t *string_catf(string_t *str, const char *fmt, ...)
+str_t *string_catf_d(str_t *str, const char *fmt, ...);
+str_t *string_catf(str_t *str, const char *fmt, ...)
     __attribute__((format(printf, 2, 3)));
-string_t *string_catfv(string_t *str, const char *fmt, va_list args);
-string_t *string_catw(string_t *str, wchar_t *ws);
-string_t *string_catwch(string_t *str, wchar_t wc);
+str_t *string_catfv(str_t *str, const char *fmt, va_list args);
+str_t *string_catw(str_t *str, wchar_t *ws);
+str_t *string_catwch(str_t *str, wchar_t wc);
 
 #endif /* __DS_H */

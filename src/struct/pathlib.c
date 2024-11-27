@@ -15,7 +15,7 @@ path_t path_create(const char *path_str)
     path_t path = {0};
     path.front = string_create();
     path.back = string_create();
-    path.segments = array_create(16, sizeof(stringview_t));
+    path.segments = array_create(16, sizeof(strview_t));
 
     string_cat(&path.front, path_str);
 
@@ -37,7 +37,7 @@ path_t *path_normalize(path_t *path)
     path->segments.length = 0;
     path_segments(path->front.buf, &path->segments, 0);
 
-    stringview_t *strview;
+    strview_t *strview;
     ARR_FOREACH_BYREF(path->segments, strview, i)
     {
         if (strview->len == 1 && strview->buf[0] == '.')
@@ -69,7 +69,7 @@ path_t *path_resolve(path_t *path)
         path_segments(cwd, &path->segments, 0);
     }
 
-    stringview_t *strview;
+    strview_t *strview;
     ARR_FOREACH_BYREF(path->segments, strview, i)
     {
         if (strview->len == 1 && strview->buf[0] == '.')
@@ -104,7 +104,7 @@ void path_segments(char *str, array_t *out, int index)
     } state = STATE_READ;
 
     char c = *str;
-    stringview_t seg = {.buf = str, .len = 0};
+    strview_t seg = {.buf = str, .len = 0};
     while (true)
     {
         switch (state)
@@ -141,7 +141,7 @@ exit:;
 
 static void swap_buffer(path_t *path)
 {
-    string_t temp = path->front;
+    str_t temp = path->front;
     path->front = path->back;
     path->back = temp;
 }
@@ -152,7 +152,7 @@ static void concat_segment(path_t *path, bool absolute)
     if (absolute)
         string_catch(&path->back, '/');
 
-    stringview_t *seg;
+    strview_t *seg;
     ARR_FOREACH_BYREF(path->segments, seg, i)
     {
         string_catlen(&path->back, seg->buf, seg->len);
