@@ -10,6 +10,7 @@ typedef struct path_t
     str_t front;
     str_t back;
     array(strview_t) segments;
+    bool is_abs;
 } path_t;
 
 path_t path_create(const char *pathstr);
@@ -19,7 +20,9 @@ path_t *path_normalize(path_t *path);
 // NOTE: resolving path will make the path absolute, while also collapsing the
 // double dots
 path_t *path_resolve(path_t *path);
-bool path_is_absolute(const path_t *path);
-void path_segments(char *str, array_t *out, int index);
+str_t *path_render(path_t *path);
+
+void path_segmentize(char *str, array_t *out);
+void path_segmentize_insert(char *str, array_t *out, int index);
 
 #endif /* __PATHLIB_H */

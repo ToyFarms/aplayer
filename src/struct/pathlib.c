@@ -6,18 +6,18 @@
 #include <unistd.h>
 
 // TODO: figure out how to structure this with cross-platform in mind
-static void concat_segment(path_t *path, bool absolute);
-static void swap_buffer(path_t *path);
-void path_segments(char *str, array_t *out, int index);
 
 path_t path_create(const char *path_str)
 {
     path_t path = {0};
-    path.front = string_create();
+    path.front = string_new(path_str);
     path.back = string_create();
     path.segments = array_create(16, sizeof(strview_t));
 
-    string_cat(&path.front, path_str);
+    path.is_abs =
+        path.front.len >= 1 && (path_str[0] == '/' || path_str[0] == '\\');
+
+    path_segmentize(path.front.buf, &path.segments);
 
     return path;
 }
@@ -34,24 +34,15 @@ void path_free(path_t *path)
 
 path_t *path_normalize(path_t *path)
 {
-    path->segments.length = 0;
-    path_segments(path->front.buf, &path->segments, 0);
-
-    strview_t *strview;
-    ARR_FOREACH_BYREF(path->segments, strview, i)
+    strview_t *view;
+    ARR_FOREACH_BYREF(path->segments, view, i)
     {
-        if (strview->len == 1 && strview->buf[0] == '.')
+        if (view->len == 1 && view->buf[0] == '.')
             array_remove(&path->segments, i--, 1);
     }
 
     if (path->segments.length == 0)
-    {
-        path->back.len = 0;
-        string_cat(&path->back, path_is_absolute(path) ? "/." : ".");
-        swap_buffer(path);
-    }
-    else
-        concat_segment(path, path_is_absolute(path));
+        array_append(&path->segments, &(strview_t){".", 1}, 1);
 
     return path;
 }
@@ -59,23 +50,20 @@ path_t *path_normalize(path_t *path)
 // TODO: resolve path link & junction
 path_t *path_resolve(path_t *path)
 {
-    path->segments.length = 0;
-    path_segments(path->front.buf, &path->segments, 0);
-
-    if (!path_is_absolute(path))
+    if (!path->is_abs)
     {
         char cwd[1024];
         getcwd(cwd, 1024);
-        path_segments(cwd, &path->segments, 0);
+        path_segmentize_insert(cwd, &path->segments, 0);
+        path->is_abs = true;
     }
 
-    strview_t *strview;
-    ARR_FOREACH_BYREF(path->segments, strview, i)
+    strview_t *view;
+    ARR_FOREACH_BYREF(path->segments, view, i)
     {
-        if (strview->len == 1 && strview->buf[0] == '.')
+        if (view->len == 1 && view->buf[0] == '.')
             array_remove(&path->segments, i--, 1);
-        else if (strview->len == 2 && strview->buf[0] == '.' &&
-                 strview->buf[1] == '.')
+        else if (view->len == 2 && view->buf[0] == '.' && view->buf[1] == '.')
         {
             if (i == 0)
             {
@@ -90,66 +78,50 @@ path_t *path_resolve(path_t *path)
         }
     }
 
-    concat_segment(path, true);
     return path;
 }
 
-void path_segments(char *str, array_t *out, int index)
+static void path_segmentize_generic(char *str, array_t *out, int index)
 {
-    enum state_type
-    {
-        STATE_READ,
-        STATE_FLUSH,
-        STATE_END,
-    } state = STATE_READ;
-
-    char c = *str;
     strview_t seg = {.buf = str, .len = 0};
-    while (true)
+    char c = 0;
+    while ((c = *str++))
     {
-        switch (state)
+        if (c == '/' || c == '\\')
         {
-        case STATE_READ:
-            if (c != '\0')
-                c = *str++;
-            if (c == '/' || c == '\\' || c == '\0')
-                state = (c == '\0') ? STATE_END : STATE_FLUSH;
-            else
-                seg.len++;
-            break;
-        case STATE_FLUSH:
             if (seg.len > 0)
             {
-                array_insert(out, &seg, 1, index++);
+                index < 0 ? array_append(out, &seg, 1)
+                          : array_insert(out, &seg, 1, index++);
                 seg.buf += seg.len;
                 seg.len = 0;
             }
-
             seg.buf++;
-            state = STATE_READ;
-            break;
-        case STATE_END:
-            if (seg.len > 0)
-                state = STATE_FLUSH;
-            else
-                goto exit;
-            break;
         }
+        else
+            seg.len++;
     }
-exit:;
+    if (seg.len > 0)
+    {
+        index < 0 ? array_append(out, &seg, 1)
+                  : array_insert(out, &seg, 1, index++);
+    }
 }
 
-static void swap_buffer(path_t *path)
+void path_segmentize(char *str, array_t *out)
 {
-    str_t temp = path->front;
-    path->front = path->back;
-    path->back = temp;
+    path_segmentize_generic(str, out, -1);
 }
 
-static void concat_segment(path_t *path, bool absolute)
+void path_segmentize_insert(char *str, array_t *out, int index)
+{
+    path_segmentize_generic(str, out, index);
+}
+
+str_t *path_render(path_t *path)
 {
     path->back.len = 0;
-    if (absolute)
+    if (path->is_abs)
         string_catch(&path->back, '/');
 
     strview_t *seg;
@@ -160,11 +132,9 @@ static void concat_segment(path_t *path, bool absolute)
             string_catch(&path->back, '/');
     }
 
-    swap_buffer(path);
-}
+    str_t temp = path->front;
+    path->front = path->back;
+    path->back = temp;
 
-bool path_is_absolute(const path_t *path)
-{
-    return path->front.len > 0 &&
-           (path->front.buf[0] == '/' || path->front.buf[0] == '\\');
+    return &path->front;
 }

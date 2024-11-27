@@ -92,6 +92,7 @@ TEST_BEGIN(normalize)
     {
         path_t path = path_create(test_cases[i].input);
         path_normalize(&path);
+        path_render(&path);
         ASSERT_STR_EQ(path.front.buf, test_cases[i].expected,
                       _MMAX(path.front.len, strlen(test_cases[i].input)));
         path_free(&path);
@@ -110,6 +111,7 @@ TEST_BEGIN(normalize_stress)
 
     path_t path = path_create(s.buf);
     path_normalize(&path);
+    path_render(&path);
 
     const char *expected = ".";
     ASSERT_STR_EQ(path.front.buf, expected,
@@ -128,6 +130,7 @@ TEST_BEGIN(normalize_stress2)
 
     path_t path = path_create(s.buf);
     path_normalize(&path);
+    path_render(&path);
 
     const char *expected = "/.";
     ASSERT_STR_EQ(path.front.buf, expected,
@@ -145,7 +148,7 @@ TEST_BEGIN(resolve)
 #  error "getcwd() not implemented"
 #endif // __linux__
     array_t cwd_seg = array_create(16, sizeof(strview_t));
-    path_segments(cwd, &cwd_seg, 0);
+    path_segmentize(cwd, &cwd_seg);
 
     struct
     {
@@ -203,8 +206,9 @@ TEST_BEGIN(resolve)
     {
         path_t path = path_create(test_cases[i].input);
         path_resolve(&path);
+        path_render(&path);
 
-        size_t offset = path_is_absolute(&path);
+        size_t offset = path.is_abs;
         for (int j = 0; j < test_cases[i].len; j++)
         {
             strview_t view = ARR_AS(cwd_seg, strview_t)[j];
@@ -214,6 +218,49 @@ TEST_BEGIN(resolve)
 
         ASSERT_STR_EQ(path.front.buf + offset, test_cases[i].ext,
                       _MMAX(path.front.len, strlen(test_cases[i].ext)));
+
+        path_free(&path);
+    }
+}
+TEST_END()
+
+TEST_BEGIN(absolute)
+{
+    struct
+    {
+        char *input;
+        bool is_abs;
+    } test_cases[] = {
+        {"./",              false},
+        {"/",               true },
+        {"./",              false},
+        {"/",               true },
+        {"../",             false},
+        {"",                false},
+        {"/home/user",      true },
+        {"home/user",       false},
+        {"/home/./user",    true },
+        {"../user",         false},
+        {"/..",             true },
+        {".",               false},
+        {"/.",              true },
+        {"/user/../bin",    true },
+        {"user/./docs",     false},
+        {"//server/share",  true },
+        {"/tmp///file",     true },
+        {"~/Documents",     false},
+        {"path/to/file",    false},
+        {"/path/to/./file", true },
+        {"../..",           false},
+        {"/var/../usr",     true },
+        {"file.txt",        false},
+        {"/etc/passwd",     true },
+    };
+
+    for (size_t i = 0; i < sizeof(test_cases) / sizeof(test_cases[0]); i++)
+    {
+        path_t path = path_create(test_cases[i].input);
+        ASSERT_TRUE(path.is_abs == test_cases[i].is_abs);
 
         path_free(&path);
     }
