@@ -29,7 +29,7 @@ int queue_push(queue_t *q, void *data)
 {
     queue_entry_t *entry = calloc(1, sizeof(*entry));
     if (entry == NULL)
-        return -1;
+        return -ENOMEM;
     entry->data = data;
 
     pthread_mutex_lock(&q->mutex);
@@ -47,6 +47,21 @@ int queue_push(queue_t *q, void *data)
     return 0;
 }
 
+// TODO: add test for queue_push_copy
+int queue_push_copy(queue_t *q, const void *data, size_t size)
+{
+    void *heap = malloc(size);
+    if (heap == NULL)
+        return -ENOMEM;
+
+    memcpy(heap, data, size);
+
+    queue_push(q, heap);
+
+    return 0;
+}
+
+// TODO: add popfront and popback, this one is popfront
 void *queue_pop(queue_t *q)
 {
     pthread_mutex_lock(&q->mutex);

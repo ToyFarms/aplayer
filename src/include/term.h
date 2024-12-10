@@ -3,6 +3,7 @@
 
 #include "_math.h"
 #include "ds.h"
+#include "queue.h"
 
 #include <stdbool.h>
 #include <stdint.h>
@@ -153,6 +154,6 @@ void term_write(char *str, int size);
 void term_altbuf();
 void term_mainbuf();
 vec2 term_size();
-int term_get_events(term_event *out, int max);
+void term_get_events(queue_t *out);
 
 #endif /* __TERM_H */

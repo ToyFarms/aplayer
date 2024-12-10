@@ -26,6 +26,7 @@ typedef struct queue_t
 queue_t queue_create();
 void queue_free(queue_t *q);
 int queue_push(queue_t *q, void *data);
+int queue_push_copy(queue_t *q, const void *data, size_t size);
 void *queue_pop(queue_t *q);
 void queue_clear(queue_t *q);
 

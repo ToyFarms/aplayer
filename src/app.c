@@ -51,14 +51,14 @@ int app_init()
     if (app == NULL)
         return -ENOMEM;
 
-    // log_debug("Initializing audio\n");
-    // app->audio = audio_create(audio_callback, -1, 2, 48000, AUDIO_FLT);
-    // if (errno != 0)
-    // {
-    //     errnb = errno;
-    //     log_error("Failed to initialize audio: %s\n", strerror(errno));
-    //     return errnb;
-    // }
+    log_debug("Initializing audio\n");
+    app->audio = audio_create(audio_callback, -1, 2, 48000, AUDIO_FLT);
+    if (errno != 0)
+    {
+        errnb = errno;
+        log_error("Failed to initialize audio: %s\n", strerror(errno));
+        return errnb;
+    }
     (void)audio_callback;
 
     if ((errnb = load_plugins(app)) < 0)
@@ -67,8 +67,8 @@ int app_init()
     log_debug("Initializing layout manager\n");
     app->scene = create_default_scene();
 
-    // log_debug("Switching to alt buffer\n");
-    // term_altbuf();
+    log_debug("Switching to alt buffer\n");
+    term_altbuf();
 
     g_app = app;
     return 0;

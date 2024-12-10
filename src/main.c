@@ -8,6 +8,7 @@
 #include "exception.h"
 #include "libavutil/log.h"
 #include "logger.h"
+#include "queue.h"
 #include "term.h"
 #include "term_draw.h"
 #include "ui_manager.h"
@@ -208,7 +209,7 @@ int main(int argc, char **argv)
     arena_free(&arena);
     free(source);
 
-    return 0;
+    // return 0;
     if (argc < 2)
     {
         log_fatal("Usage: %s <file_with_audio>\n", argv[0]);
@@ -240,23 +241,22 @@ int main(int argc, char **argv)
         .buf = &scrbuf,
     };
 
-    term_event events[128];
+    queue_t events = queue_create();
     while (true)
     {
-        int len = term_get_events(events, 128);
         vec2 size = term_size();
-
         term.width = size.x;
         term.height = size.y;
 
-        for (int i = 0; i < len; i++)
+        term_get_events(&events);
+        for (int i = 0; i < events.len; i++)
         {
-            term_event e = events[i];
+            term_event *e = queue_pop(&events);
 
             apl_instance apl_inst;
             ARR_FOREACH(app->audio->mixer.master_plugins, apl_inst, i)
             {
-                try apl_inst.super->on_event(apl_inst.ctx, &term, &e);
+                try apl_inst.super->on_event(apl_inst.ctx, &term, e);
                 except
                 {
                     apl_crashed(apl_inst);
@@ -265,20 +265,23 @@ int main(int argc, char **argv)
                 }
             }
 
-            switch (e.type)
+            switch (e->type)
             {
             case TERM_EVENT_KEY:
-                if (e.key.ascii == 'q')
+                if (e->key.ascii == 'q')
                     goto exit;
                 break;
             case TERM_EVENT_MOUSE:
-                term.mouse_x = e.mouse.x;
-                term.mouse_y = e.mouse.y;
+                term.mouse_x = e->mouse.x;
+                term.mouse_y = e->mouse.y;
                 break;
             case TERM_EVENT_RESIZE:
             case TERM_EVENT_UNKNOWN:
                 break;
             }
+
+            // TODO: come up with a better way than just freeing manually
+            free(e);
         }
 
         apl_instance apl_inst;
