@@ -21,6 +21,6 @@ int _exception_pop_context();
 
 void exception_init();
 
-void exception_unrecoverable(void (*handler)());
+void exception_panic(void (*handler)());
 
 #endif /* __EXCEPTION_H */

@@ -5,7 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-static void (*unrecoverable)() = NULL;
+static void (*panic)() = NULL;
 static exc_context *exc_head = NULL;
 
 exc_context *_exception_push_context(exc_context *ctx)
@@ -35,11 +35,11 @@ static void signal_handler(int sig)
     else
     {
         log_fatal("No jmp_buf setpoint set, program will crash\n");
-        if (unrecoverable)
+        if (panic)
         {
             log_debug("Run final user-provided cleanup function %p\n",
-                      unrecoverable);
-            unrecoverable();
+                      panic);
+            panic();
         }
         exit(sig);
     }
@@ -58,7 +58,7 @@ void exception_init()
     sigaction(SIGBUS, &act, NULL);
 }
 
-void exception_unrecoverable(void (*handler)())
+void exception_panic(void (*handler)())
 {
-    unrecoverable = handler;
+    panic = handler;
 }

@@ -43,7 +43,7 @@ int app_init()
 
     log_debug("Initializing exception context\n");
     exception_init();
-    exception_unrecoverable(term_mainbuf);
+    exception_panic(term_mainbuf);
     atexit(term_mainbuf);
 
     log_debug("Allocating app\n");
