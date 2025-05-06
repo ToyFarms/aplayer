@@ -1,4 +1,5 @@
 #!/usr/bin/python
+# pyright: basic
 
 from pathlib import Path
 import os
@@ -776,7 +777,7 @@ nb_threads = 1
 def main() -> None:
     global global_stat, nb_threads
 
-    if not Path("tests").exists:
+    if not Path("tests").exists():
         print("No tests/ directory found")
         return
 

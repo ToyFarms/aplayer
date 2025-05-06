@@ -3,5 +3,11 @@ build/
 compile_commands.json
 a.py
 a.c
+a
+a.out
 *.exe
 logs/
+tests/out
+*.bak
+massif*
+test
