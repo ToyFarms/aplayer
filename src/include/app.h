@@ -2,12 +2,10 @@
 #define __APP_H
 
 #include "audio.h"
-#include "ui_manager.h"
 
 typedef struct app_instance
 {
     audio_ctx *audio;
-    ui_scene scene;
     array(apl_class) audio_classes;
     array(wpl_class) widget_classes;
 } app_instance;

@@ -3,7 +3,6 @@
 #include "exception.h"
 #include "libavutil/log.h"
 #include "term.h"
-#include "wpl.h"
 
 #include <errno.h>
 #include <locale.h>
@@ -16,7 +15,6 @@ static int audio_callback(const void *input, void *output,
                           PaStreamCallbackFlags statusFlags, void *userData);
 static void av_log_callback(void *avcl, int level, const char *fmt,
                             va_list args);
-static ui_scene create_default_scene();
 static int load_plugins(app_instance *app);
 
 static app_instance *g_app = NULL;
@@ -53,19 +51,16 @@ int app_init()
 
     log_debug("Initializing audio\n");
     app->audio = audio_create(audio_callback, -1, 2, 48000, AUDIO_FLT);
-    if (errno != 0)
-    {
-        errnb = errno;
-        log_error("Failed to initialize audio: %s\n", strerror(errno));
-        return errnb;
-    }
+    // if (errno != 0)
+    // {
+    //     errnb = errno;
+    //     log_error("Failed to initialize audio: %s\n", strerror(errno));
+    //     return errnb;
+    // }
     (void)audio_callback;
 
     if ((errnb = load_plugins(app)) < 0)
         return errnb;
-
-    log_debug("Initializing layout manager\n");
-    app->scene = create_default_scene();
 
     log_debug("Switching to alt buffer\n");
     term_altbuf();
@@ -133,13 +128,6 @@ static void av_log_callback(void *avcl, int level, const char *fmt,
     logger_logv(level, "", "ffmpeg", 0, fmt, args);
 }
 
-static ui_scene create_default_scene()
-{
-    ui_scene scene = {0};
-
-    return scene;
-}
-
 static int load_plugins(app_instance *app)
 {
     int errnb = 0;
@@ -155,17 +143,6 @@ static int load_plugins(app_instance *app)
 
     log_debug("Loading audio plugin\n");
     apl_class_loads(APL_PATH, &app->audio_classes);
-
-    log_debug("Allocating widget plugin array\n");
-    app->widget_classes = array_create(32, sizeof(wpl_class));
-    if (errno != 0)
-    {
-        errnb = errno;
-        log_error("Failed to allocate array: %s\n", strerror(errno));
-        return errnb;
-    }
-    log_debug("Loading widget plugin\n");
-    wpl_class_loads(WPL_PATH, &app->widget_classes);
 
     return 0;
 }

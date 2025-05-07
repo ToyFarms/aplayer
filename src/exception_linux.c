@@ -37,8 +37,7 @@ static void signal_handler(int sig)
         log_fatal("No jmp_buf setpoint set, program will crash\n");
         if (panic)
         {
-            log_debug("Run final user-provided cleanup function %p\n",
-                      panic);
+            log_debug("Run panic handler %p\n", panic);
             panic();
         }
         exit(sig);

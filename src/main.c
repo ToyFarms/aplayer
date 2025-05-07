@@ -1,23 +1,15 @@
 #include "apl.h"
 #include "app.h"
-#include "arena_allocator.h"
 #include "audio.h"
 #include "audio_mixer.h"
 #include "audio_source.h"
 #include "ds.h"
 #include "exception.h"
-#include "libavutil/log.h"
 #include "logger.h"
 #include "queue.h"
 #include "term.h"
-#include "term_draw.h"
-#include "ui_manager.h"
-#include "ui_parser.h"
-#include "wpl.h"
 
 #include <assert.h>
-#include <errno.h>
-#include <locale.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -178,38 +170,6 @@ int main(int argc, char **argv)
     logger_add_output(-1, stdout, LOG_USE_COLOR);
     logger_add_output(-1, fopen("out.log", "r"), LOG_DEFER_CLOSE);
 
-    if (app_init() < 0)
-        return 1;
-
-    char *source;
-    {
-        FILE *f = fopen("input.txt", "r");
-
-        fseek(f, 0, SEEK_END);
-        size_t size = ftell(f);
-        fseek(f, 0, SEEK_SET);
-
-        source = malloc(size + 1);
-        source[size] = '\0';
-        fread(source, 1, size, f);
-
-        fclose(f);
-    }
-
-    arena_allocator arena = arena_create(4096);
-
-    array_t tokens = ui_tokenize(source, &arena);
-    // ui_tokens_print(&tokens);
-    ui_scene scene = ui_scene_from_tokens(&tokens, &arena);
-    array_free(&tokens);
-
-    ui_element_print(&scene.body);
-
-    ui_element_free(&scene.body);
-    arena_free(&arena);
-    free(source);
-
-    // return 0;
     if (argc < 2)
     {
         log_fatal("Usage: %s <file_with_audio>\n", argv[0]);
@@ -218,7 +178,6 @@ int main(int argc, char **argv)
 
     if (app_init() < 0)
         return 1;
-    // TODO: figure out how to get wpl instance
 
     app_instance *app = app_get();
 
@@ -230,11 +189,6 @@ int main(int argc, char **argv)
     apl_instance apl_inst =
         apl_new_instance(&ARR_AS(app->audio_classes, apl_class)[0]);
     array_append(&app->audio->mixer.master_plugins, &apl_inst, 1);
-
-    array(wpl_instance) widgets = array_create(16, sizeof(wpl_instance));
-    wpl_instance wpl_inst =
-        wpl_new_instance(&ARR_AS(app->widget_classes, wpl_class)[0]);
-    array_append(&widgets, &wpl_inst, 1);
 
     str_t scrbuf = str_alloc(1024);
     term_status term = {
@@ -294,29 +248,6 @@ int main(int argc, char **argv)
                 array_remove(&app->audio->mixer.master_plugins, i, 1);
                 i--;
             }
-        }
-
-        wpl_instance wpl_inst;
-        ARR_FOREACH(widgets, wpl_inst, i)
-        {
-            wpl_definition def = {
-                .x = 0,
-                .y = 5,
-                .w = 50,
-                .h = 10,
-                .attr = NULL,
-                .theme = NULL,
-            };
-
-            try wpl_inst.super->render(wpl_inst.ctx, &term, &def);
-            except
-            {
-                wpl_crashed(wpl_inst);
-                array_remove(&widgets, i, 1);
-                i--;
-            };
-
-            term_draw_str(&scrbuf, TESC TRESET, -1);
         }
 
         term_write(scrbuf.buf, scrbuf.len);

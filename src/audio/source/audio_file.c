@@ -244,7 +244,7 @@ fail:
 static int audio_file_update(audio_source *audio)
 {
     audio_file *ctx = audio->ctx;
-    if (audio->is_eof || audio->buffer.length >= audio->target_sample_rate * 5)
+    if (audio->is_eof)
         return 0;
 
     int ret;

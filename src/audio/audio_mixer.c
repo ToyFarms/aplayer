@@ -82,17 +82,14 @@ int mixer_get_frame(audio_mixer *mixer, int req_sample, float *out)
         if (src->is_finished)
             continue;
 
+    update:
         ret = src->update(src);
         if (ret != EOF && ret < 0)
             continue;
 
         ret = len = src->get_frame(src, req_sample, src_buf);
         if (ret == -ENODATA)
-        {
-            log_warning("Frame size too big, not enough data in the "
-                        "buffer.\n");
-            continue;
-        }
+            goto update;
         else if (ret == EOF)
         {
             src->is_finished = true;

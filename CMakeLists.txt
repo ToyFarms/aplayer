@@ -5,9 +5,7 @@ string(LENGTH "${CMAKE_SOURCE_DIR}/" SOURCE_PATH_SIZE)
 add_definitions("-DLOGGER_BASEPATH_LENGTH=${SOURCE_PATH_SIZE}")
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
-
 include(${CMAKE_CURRENT_SOURCE_DIR}/src/audio/plugins/build_plugins.cmake)
-include(${CMAKE_CURRENT_SOURCE_DIR}/src/ui/widgets/build_widgets.cmake)
 
 include(FindPkgConfig)
 find_package(PkgConfig REQUIRED)
@@ -48,9 +46,6 @@ add_executable(aplayer
     ./src/audio/analyzer/audio_fft.c
 
     ./src/ui/color.c
-    ./src/ui/wpl.c
-    ./src/ui/ui_manager.c
-    ./src/ui/ui_parser.c
 )
 
 target_link_libraries(aplayer PRIVATE m pthread fftw3 portaudio)
