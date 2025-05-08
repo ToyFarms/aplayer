@@ -244,12 +244,13 @@ fail:
 static int audio_file_update(audio_source *audio)
 {
     audio_file *ctx = audio->ctx;
+    int ret, new_length, pre_length;
+
     if (audio->is_eof)
         return 0;
 
-    int ret;
-
-    while (avcodec_receive_frame(ctx->avctx, ctx->frame) == AVERROR(EAGAIN))
+    while ((ret = avcodec_receive_frame(ctx->avctx, ctx->frame)) ==
+           AVERROR(EAGAIN))
     {
         ret = av_read_frame(ctx->ic, ctx->pkt);
         if (ret == AVERROR(EAGAIN))
@@ -257,6 +258,8 @@ static int audio_file_update(audio_source *audio)
         else if (ret == AVERROR_EOF)
         {
             audio->is_eof = true;
+            av_frame_unref(ctx->frame);
+            av_packet_unref(ctx->pkt);
             return EOF;
         }
         else if (ret < 0)
@@ -266,9 +269,14 @@ static int audio_file_update(audio_source *audio)
         }
 
         if (ctx->pkt->stream_index != ctx->audio_stream)
+        {
+            av_packet_unref(ctx->pkt);
             continue;
+        }
 
         ret = avcodec_send_packet(ctx->avctx, ctx->pkt);
+        av_packet_unref(ctx->pkt);
+
         if (ret == AVERROR(EAGAIN))
             continue;
         else if (ret < 0)
@@ -278,7 +286,13 @@ static int audio_file_update(audio_source *audio)
         }
     }
 
-    int pre_length = audio->buffer.length;
+    if (ret < 0 && ret != AVERROR_EOF)
+    {
+        log_error("avcodec_receive_frame() failed: %s\n", av_err2str(ret));
+        goto error;
+    }
+
+    pre_length = audio->buffer.length;
 
     if (audio_resample(audio, ctx->frame->data, ctx->frame->nb_samples,
                        ctx->frame->format, ctx->frame->ch_layout.nb_channels,
@@ -287,19 +301,17 @@ static int audio_file_update(audio_source *audio)
                        audio->target_sample_rate) < 0)
         goto error;
 
-    int new_length = audio->buffer.length - pre_length;
+    new_length = audio->buffer.length - pre_length;
 
     av_frame_unref(ctx->frame);
-    av_packet_unref(ctx->pkt);
-
     return new_length;
 
 error:
+    // Clean up any partly‐used frame/packet before returning failure
     av_frame_unref(ctx->frame);
     av_packet_unref(ctx->pkt);
     return -2;
 }
-
 static int audio_file_get_frame(audio_source *audio, int req_sample, float *out)
 {
     if (req_sample < 0)
