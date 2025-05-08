@@ -198,10 +198,6 @@ int main(int argc, char **argv)
     queue_t events = queue_create();
     while (true)
     {
-        vec2 size = term_size();
-        term.width = size.x;
-        term.height = size.y;
-
         term_get_events(&events);
         for (int i = 0; i < events.len; i++)
         {
@@ -230,6 +226,8 @@ int main(int argc, char **argv)
                 term.mouse_y = e->mouse.y;
                 break;
             case TERM_EVENT_RESIZE:
+                term.width = e->resize.width;
+                term.height = e->resize.height;
             case TERM_EVENT_UNKNOWN:
                 break;
             }
