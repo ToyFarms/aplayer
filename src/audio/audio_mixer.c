@@ -1,5 +1,4 @@
 #include "audio_mixer.h"
-#include "apl.h"
 #include "audio_effect.h"
 #include "audio_source.h"
 #include "exception.h"
@@ -28,10 +27,6 @@ audio_mixer mixer_create(int nb_channels, int sample_rate,
     if (errno != 0)
         log_error("Cannot allocate mixer sources: %s\n", strerror(errno));
 
-    mixer.master_plugins = array_create(16, sizeof(apl_class));
-    if (errno != 0)
-        log_error("Cannot allocate mixer audio plugins: %s\n", strerror(errno));
-
     return mixer;
 }
 
@@ -53,16 +48,6 @@ void mixer_free(audio_mixer *mixer)
     }
     array_free(&mixer->sources);
     pthread_mutex_unlock(&mixer->source_mutex);
-
-    apl_instance *apl_inst;
-    ARR_FOREACH_BYREF(mixer->master_plugins, apl_inst, i)
-    {
-        try apl_inst->super->destroy(apl_inst->ctx);
-        except{};
-        apl_inst->ctx = NULL;
-    }
-    array_free(&mixer->master_plugins);
-
     pthread_mutex_destroy(&mixer->source_mutex);
 }
 
@@ -107,23 +92,6 @@ int mixer_get_frame(audio_mixer *mixer, int req_sample, float *out)
         finished = false;
     }
     pthread_mutex_unlock(&mixer->source_mutex);
-
-    apl_process_param p = {.samples = out,
-                           .size = req_sample,
-                           .nb_channels = mixer->nb_channels,
-                           .sample_rate = mixer->sample_rate};
-
-    apl_instance apl_inst;
-    ARR_FOREACH(mixer->master_plugins, apl_inst, i)
-    {
-        try apl_inst.super->process(apl_inst.ctx, &p);
-        except
-        {
-            apl_crashed(apl_inst);
-            array_remove(&mixer->master_plugins, i, 1);
-            i--;
-        }
-    }
 
     if (finished)
         return EOF;

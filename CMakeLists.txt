@@ -5,7 +5,6 @@ string(LENGTH "${CMAKE_SOURCE_DIR}/" SOURCE_PATH_SIZE)
 add_definitions("-DLOGGER_BASEPATH_LENGTH=${SOURCE_PATH_SIZE}")
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
-include(${CMAKE_CURRENT_SOURCE_DIR}/src/audio/plugins/build_plugins.cmake)
 
 include(FindPkgConfig)
 find_package(PkgConfig REQUIRED)
@@ -34,7 +33,6 @@ add_executable(aplayer
     ./src/audio/audio_source.c
     ./src/audio/audio_mixer.c
     ./src/audio/audio_effect.c
-    ./src/audio/apl.c
 
     ./src/audio/source/audio_file.c
 

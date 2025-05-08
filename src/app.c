@@ -1,5 +1,4 @@
 #include "app.h"
-#include "apl.h"
 #include "exception.h"
 #include "libavutil/log.h"
 #include "term.h"
@@ -15,7 +14,6 @@ static int audio_callback(const void *input, void *output,
                           PaStreamCallbackFlags statusFlags, void *userData);
 static void av_log_callback(void *avcl, int level, const char *fmt,
                             va_list args);
-static int load_plugins(app_instance *app);
 
 static app_instance *g_app = NULL;
 
@@ -26,7 +24,6 @@ int app_init()
         log_warning("App already initialized\n");
         return 0;
     }
-    int errnb = 0;
 
     setlocale(LC_ALL, "");
     logger_set_level(LOG_DEBUG);
@@ -51,16 +48,12 @@ int app_init()
 
     log_debug("Initializing audio\n");
     app->audio = audio_create(audio_callback, -1, 2, 48000, AUDIO_FLT);
-    // if (errno != 0)
-    // {
-    //     errnb = errno;
-    //     log_error("Failed to initialize audio: %s\n", strerror(errno));
-    //     return errnb;
-    // }
-    (void)audio_callback;
-
-    if ((errnb = load_plugins(app)) < 0)
-        return errnb;
+    // TODO: errno is not 0 (even though its fine), Socket operation on non-socket
+    if (errno != 0)
+    {
+        log_error("Failed to initialize audio: %s\n", strerror(errno));
+        // return errnb;
+    }
 
     log_debug("Switching to alt buffer\n");
     term_altbuf();
@@ -126,23 +119,4 @@ static void av_log_callback(void *avcl, int level, const char *fmt,
     if (level > av_log_get_level())
         return;
     logger_logv(level, "", "ffmpeg", 0, fmt, args);
-}
-
-static int load_plugins(app_instance *app)
-{
-    int errnb = 0;
-
-    log_debug("Allocating audio plugin array\n");
-    app->audio_classes = array_create(32, sizeof(apl_class));
-    if (errno != 0)
-    {
-        errnb = errno;
-        log_error("Failed to allocate array: %s\n", strerror(errno));
-        return errnb;
-    }
-
-    log_debug("Loading audio plugin\n");
-    apl_class_loads(APL_PATH, &app->audio_classes);
-
-    return 0;
 }

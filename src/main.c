@@ -1,4 +1,3 @@
-#include "apl.h"
 #include "app.h"
 #include "audio.h"
 #include "audio_mixer.h"
@@ -186,14 +185,11 @@ int main(int argc, char **argv)
                         app->audio->sample_rate, app->audio->sample_fmt);
     array_append(&app->audio->mixer.sources, &src, 1);
 
-    apl_instance apl_inst =
-        apl_new_instance(&ARR_AS(app->audio_classes, apl_class)[0]);
-    array_append(&app->audio->mixer.master_plugins, &apl_inst, 1);
-
     str_t scrbuf = str_alloc(1024);
     term_status term = {
         .buf = &scrbuf,
     };
+    (void)term;
 
     queue_t events = queue_create();
     while (true)
@@ -202,18 +198,6 @@ int main(int argc, char **argv)
         for (int i = 0; i < events.len; i++)
         {
             term_event *e = queue_pop(&events);
-
-            apl_instance apl_inst;
-            ARR_FOREACH(app->audio->mixer.master_plugins, apl_inst, i)
-            {
-                try apl_inst.super->on_event(apl_inst.ctx, &term, e);
-                except
-                {
-                    apl_crashed(apl_inst);
-                    array_remove(&app->audio->mixer.master_plugins, i, 1);
-                    i--;
-                }
-            }
 
             switch (e->type)
             {
@@ -234,18 +218,6 @@ int main(int argc, char **argv)
 
             // TODO: come up with a better way than just freeing manually
             free(e);
-        }
-
-        apl_instance apl_inst;
-        ARR_FOREACH(app->audio->mixer.master_plugins, apl_inst, i)
-        {
-            try apl_inst.super->render(apl_inst.ctx, &term);
-            except
-            {
-                apl_crashed(apl_inst);
-                array_remove(&app->audio->mixer.master_plugins, i, 1);
-                i--;
-            }
         }
 
         term_write(scrbuf.buf, scrbuf.len);
