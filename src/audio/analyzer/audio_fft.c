@@ -11,9 +11,7 @@ typedef struct analyzer_fft
 {
     fftw_plan plan;
     double *in;
-    int in_size;
-    int in_len;
-    fftw_complex *out;
+    int in_size; int in_len; fftw_complex *out;
     int out_size;
 } analyzer_fft;
 

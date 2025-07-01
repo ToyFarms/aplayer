@@ -13,7 +13,7 @@ typedef struct ring_buf_t
 
 ring_buf_t ring_buf_create(int capacity, int item_size);
 void ring_buf_free(ring_buf_t *rbuf);
-int ring_buf_write(ring_buf_t *rbuf, void *mem, int item);
+int ring_buf_write(ring_buf_t *rbuf, const void *mem, int items);
 int ring_buf_read(ring_buf_t *rbuf, int req_item, void *out);
 
 #endif /* __RING_BUF_H */

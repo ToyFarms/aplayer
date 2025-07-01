@@ -1,0 +1,248 @@
+#include "playlist.h"
+#include "logger.h"
+#include <locale.h>
+#include <stddef.h>
+#include <string.h>
+
+static int wrap_around(int n, int low, int high)
+{
+    int range = high - low + 1;
+    int offset = (n - low) % range;
+    if (offset < 0)
+        offset += range;
+    return low + offset;
+}
+static void playlist_do_sort(playlist_manager *pl);
+
+void playlist_init(playlist_manager *pl)
+{
+    setlocale(LC_COLLATE, "");
+    pl->files = array_create(16, sizeof(fs_entry_t));
+    pl->indices = array_create(16, sizeof(int));
+    pl->current_idx = -1;
+    pl->current_file = NULL;
+    pl->loop = PLAYLIST_LOOP;
+    pl->sort = PLAYLIST_SORT_CTIME;
+    pl->sort_direction = PLAYLIST_SORT_DESCENDING;
+}
+
+void playlist_free(playlist_manager *pl)
+{
+    fs_entry_t *entry;
+    ARR_FOREACH_BYREF(pl->files, entry, i)
+    {
+        str_free(&entry->path);
+    }
+    array_free(&pl->files);
+    array_free(&pl->indices);
+}
+
+void playlist_add(playlist_manager *pl, const char *root)
+{
+    fs_iterator iter = {0};
+    fs_iter_init(&iter, root);
+
+    fs_entry_t entry = {0};
+    while (fs_iter_next(&iter, &entry))
+    {
+        if (fs_is_dir(&entry))
+            continue;
+
+        array_append(&pl->files, &entry, 1);
+
+        int idx = pl->files.length - 1;
+        array_append(&pl->indices, &idx, 1);
+    }
+    fs_iter_free(&iter);
+
+    playlist_do_sort(pl);
+
+    log_debug("Loaded %d files from %s\n", pl->files.length, root);
+}
+
+void playlist_remove(playlist_manager *pl, int index)
+{
+    if (index < 0 || index >= pl->indices.length)
+        return;
+
+    int file_idx = ARR_AS(pl->indices, int)[index];
+    fs_entry_t *entry = &ARR_AS(pl->files, fs_entry_t)[file_idx];
+    str_free(&entry->path);
+
+    array_remove(&pl->files, file_idx, 1);
+    array_remove(&pl->indices, index, 1);
+
+    for (int i = 0; i < pl->indices.length; ++i)
+    {
+        int *v = &ARR_AS(pl->indices, int)[i];
+        if (*v > file_idx)
+            (*v)--;
+    }
+    log_debug("Removed playlist entry at position %d\n", index);
+}
+
+static void change_current_file(playlist_manager *pl)
+{
+    if (pl->current_idx < 0 || pl->current_idx >= pl->indices.length)
+    {
+        log_error("Playlist index out of bound (%d / %d)\n", pl->current_idx,
+                  pl->indices.length);
+        return;
+    }
+    int file_idx = ARR_AS(pl->indices, int)[pl->current_idx];
+    pl->current_file = &ARR_AS(pl->files, fs_entry_t)[file_idx];
+}
+
+const fs_entry_t *playlist_next(playlist_manager *pl)
+{
+    if (pl->loop == PLAYLIST_LOOP_TRACK)
+        return pl->current_file;
+
+    if (pl->loop == PLAYLIST_NO_LOOP &&
+        pl->current_idx + 1 > pl->indices.length - 1)
+        return NULL;
+
+    pl->current_idx =
+        wrap_around(pl->current_idx + 1, 0, pl->indices.length - 1);
+
+    change_current_file(pl);
+    log_debug("Next file %s\n", pl->current_file->path.buf);
+    return pl->current_file;
+}
+
+const fs_entry_t *playlist_prev(playlist_manager *pl)
+{
+    if (pl->loop == PLAYLIST_LOOP_TRACK)
+        return pl->current_file;
+
+    if (pl->loop == PLAYLIST_NO_LOOP && pl->current_idx - 1 < 0)
+        return NULL;
+
+    pl->current_idx =
+        wrap_around(pl->current_idx - 1, 0, pl->indices.length - 1);
+
+    change_current_file(pl);
+    log_debug("Prev file %s\n", pl->current_file->path.buf);
+    return pl->current_file;
+}
+
+const fs_entry_t *playlist_play(playlist_manager *pl, int index)
+{
+    if (index < 0 || index >= pl->indices.length)
+        return pl->current_file;
+    pl->current_idx = index;
+    change_current_file(pl);
+    log_debug("Play file %s (playlist pos %d)\n", pl->current_file->path.buf,
+              index);
+    return pl->current_file;
+}
+
+fs_entry_t *playlist_get_at_index(playlist_manager *pl, int index)
+{
+    if (index < 0 || index > pl->indices.length - 1)
+    {
+        log_error("Playlist index out of bound (%d / %d)\n", pl->current_idx,
+                  pl->indices.length);
+        return NULL;
+    }
+
+    int i = ARR_AS(pl->indices, int)[index];
+    return &ARR_AS(pl->files, fs_entry_t)[i];
+}
+
+static int find_file_index(playlist_manager *pl, const fs_entry_t *ent)
+{
+    int file_idx = ent - ARR_AS(pl->files, fs_entry_t);
+    int index;
+    ARR_FOREACH(pl->indices, index, i)
+    {
+        if (index == file_idx)
+            return i;
+    }
+
+    return -1;
+}
+
+static void playlist_do_sort(playlist_manager *pl)
+{
+    int n = pl->files.length;
+    if (n == 0)
+    {
+        pl->current_idx = -1;
+        pl->current_file = NULL;
+        return;
+    }
+
+    int *inds = ARR_AS(pl->indices, int);
+    fs_entry_t *files = ARR_AS(pl->files, fs_entry_t);
+    const fs_entry_t *prev = pl->current_file;
+
+    for (int i = 0; i < n - 1; ++i)
+    {
+        for (int j = i + 1; j < n; ++j)
+        {
+            fs_entry_t *a = &files[inds[i]];
+            fs_entry_t *b = &files[inds[j]];
+            int cmp = 0;
+            switch (pl->sort)
+            {
+            case PLAYLIST_SORT_CTIME:
+                cmp = (a->stat.st_ctime < b->stat.st_ctime)   ? -1
+                      : (a->stat.st_ctime > b->stat.st_ctime) ? 1
+                                                              : 0;
+                break;
+            case PLAYLIST_SORT_MTIME:
+                cmp = (a->stat.st_mtime < b->stat.st_mtime)   ? -1
+                      : (a->stat.st_mtime > b->stat.st_mtime) ? 1
+                                                              : 0;
+                break;
+            case PLAYLIST_SORT_NAME:
+                cmp = strcoll(a->path.buf, b->path.buf);
+                break;
+            default:
+                break;
+            }
+            if (pl->sort_direction == PLAYLIST_SORT_DESCENDING)
+                cmp = -cmp;
+            if (cmp > 0)
+            {
+                int tmp = inds[i];
+                inds[i] = inds[j];
+                inds[j] = tmp;
+            }
+        }
+    }
+
+    pl->current_idx = find_file_index(pl, prev);
+}
+
+static void playlist_reverse(playlist_manager *pl)
+{
+    const fs_entry_t *prev = pl->current_file;
+    array_reverse(&pl->indices);
+    pl->current_idx = find_file_index(pl, prev);
+}
+
+void playlist_sort(playlist_manager *pl, enum playlist_sort method,
+                   enum playlist_sort_direction sort_direction)
+{
+    if (method == pl->sort && sort_direction != pl->sort_direction)
+    {
+        pl->sort_direction = sort_direction;
+        playlist_reverse(pl);
+        return;
+    }
+
+    pl->sort = method;
+    pl->sort_direction = sort_direction;
+    playlist_do_sort(pl);
+    pl->is_shuffled = false;
+}
+
+void playlist_shuffle(playlist_manager *pl)
+{
+    const fs_entry_t *prev = pl->current_file;
+    array_shuffle(&pl->indices);
+    pl->current_idx = find_file_index(pl, prev);
+    pl->is_shuffled = true;
+}

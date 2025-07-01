@@ -324,27 +324,27 @@ TEST_BEGIN(catf_many)
     str_t str = str_create();
 
     str_catf(&str, "Hello %% %d %% %f %d%p %zu %llu %%\n", -100, 0.3f + 0.2f,
-                123, NULL, 0xFFFFFUL, 0xFFFFFFULL);
+             123, NULL, 0xFFFFFUL, 0xFFFFFFULL);
     ASSERT_NOTNULL(str.buf);
     ASSERT_MEM_EQ(str.buf + str.len, "\0", 1);
     str_catf(&str, "Hello %% %d %% %f %d%p %zu %llu %%\n", -100, 0.3f + 0.2f,
-                123, NULL, 0xFFFFFUL, 0xFFFFFFULL);
+             123, NULL, 0xFFFFFUL, 0xFFFFFFULL);
     ASSERT_NOTNULL(str.buf);
     ASSERT_MEM_EQ(str.buf + str.len, "\0", 1);
     str_catf(&str, "Hello %% %d %% %f %d%p %zu %llu %%\n", -100, 0.3f + 0.2f,
-                123, NULL, 0xFFFFFUL, 0xFFFFFFULL);
+             123, NULL, 0xFFFFFUL, 0xFFFFFFULL);
     ASSERT_NOTNULL(str.buf);
     ASSERT_MEM_EQ(str.buf + str.len, "\0", 1);
     str_catf(&str, "Hello %% %d %% %f %d%p %zu %llu %%\n", -100, 0.3f + 0.2f,
-                123, NULL, 0xFFFFFUL, 0xFFFFFFULL);
+             123, NULL, 0xFFFFFUL, 0xFFFFFFULL);
     ASSERT_NOTNULL(str.buf);
     ASSERT_MEM_EQ(str.buf + str.len, "\0", 1);
     str_catf(&str, "Hello %% %d %% %f %d%p %zu %llu %%\n", -100, 0.3f + 0.2f,
-                123, NULL, 0xFFFFFUL, 0xFFFFFFULL);
+             123, NULL, 0xFFFFFUL, 0xFFFFFFULL);
     ASSERT_NOTNULL(str.buf);
     ASSERT_MEM_EQ(str.buf + str.len, "\0", 1);
     str_catf(&str, "Hello %% %d %% %f %d%p %zu %llu %%\n", -100, 0.3f + 0.2f,
-                123, NULL, 0xFFFFFUL, 0xFFFFFFULL);
+             123, NULL, 0xFFFFFUL, 0xFFFFFFULL);
     ASSERT_NOTNULL(str.buf);
     ASSERT_MEM_EQ(str.buf + str.len, "\0", 1);
 
@@ -364,8 +364,7 @@ TEST_BEGIN(catf_d)
 {
     str_t str = str_create();
 
-    str_catf_d(&str, "%d %d %% %%%%%%%d \n\n\n\n\r\r\r", -1000000, 199,
-                  12345);
+    str_catf_d(&str, "%d %d %% %%%%%%%d \n\n\n\n\r\r\r", -1000000, 199, 12345);
     ASSERT_MEM_EQ(str.buf + str.len, "\0", 1);
     ASSERT_NOTNULL(str.buf);
     const char expected[] = "-1000000 199 % %%%12345 \n\n\n\n\r\r\r";
@@ -378,28 +377,23 @@ TEST_BEGIN(catf_d_many)
 {
     str_t str = str_create();
 
-    str_catf_d(&str, "%d %d %% %%%%%%%d \n\n\n\n\r\r\r", -1000000, 199,
-                  12345);
+    str_catf_d(&str, "%d %d %% %%%%%%%d \n\n\n\n\r\r\r", -1000000, 199, 12345);
     ASSERT_NOTNULL(str.buf);
     ASSERT_INT_EQ((int)str.len, 31);
     ASSERT_MEM_EQ(str.buf + str.len, "\0", 1);
-    str_catf_d(&str, "%d %d %% %%%%%%%d \n\n\n\n\r\r\r", -1000000, 199,
-                  12345);
+    str_catf_d(&str, "%d %d %% %%%%%%%d \n\n\n\n\r\r\r", -1000000, 199, 12345);
     ASSERT_NOTNULL(str.buf);
     ASSERT_INT_EQ((int)str.len, 31 * 2);
     ASSERT_MEM_EQ(str.buf + str.len, "\0", 1);
-    str_catf_d(&str, "%d %d %% %%%%%%%d \n\n\n\n\r\r\r", -1000000, 199,
-                  12345);
+    str_catf_d(&str, "%d %d %% %%%%%%%d \n\n\n\n\r\r\r", -1000000, 199, 12345);
     ASSERT_NOTNULL(str.buf);
     ASSERT_INT_EQ((int)str.len, 31 * 3);
     ASSERT_MEM_EQ(str.buf + str.len, "\0", 1);
-    str_catf_d(&str, "%d %d %% %%%%%%%d \n\n\n\n\r\r\r", -1000000, 199,
-                  12345);
+    str_catf_d(&str, "%d %d %% %%%%%%%d \n\n\n\n\r\r\r", -1000000, 199, 12345);
     ASSERT_NOTNULL(str.buf);
     ASSERT_INT_EQ((int)str.len, 31 * 4);
     ASSERT_MEM_EQ(str.buf + str.len, "\0", 1);
-    str_catf_d(&str, "%d %d %% %%%%%%%d \n\n\n\n\r\r\r", -1000000, 199,
-                  12345);
+    str_catf_d(&str, "%d %d %% %%%%%%%d \n\n\n\n\r\r\r", -1000000, 199, 12345);
     ASSERT_NOTNULL(str.buf);
     ASSERT_INT_EQ((int)str.len, 31 * 5);
     ASSERT_MEM_EQ(str.buf + str.len, "\0", 1);
@@ -418,7 +412,7 @@ TEST_BEGIN(catw, INIT : setlocale)
     str_t str = str_create();
     wchar_t string[] = L"おはよう世界!";
 
-    str_catw(&str, string);
+    str_catwcs(&str, string);
     ASSERT_NOTNULL(str.buf);
     ASSERT_INT_NEQ((int)str.len, 0);
     ASSERT_MEM_EQ(str.buf + str.len, "\0", 1);
@@ -435,23 +429,23 @@ TEST_BEGIN(catw_many, INIT : setlocale)
     str_t str = str_create();
     wchar_t string[] = L"おはよう世界!";
 
-    str_catw(&str, string);
+    str_catwcs(&str, string);
     ASSERT_NOTNULL(str.buf);
     ASSERT_INT_NEQ((int)str.len, 0);
     ASSERT_MEM_EQ(str.buf + str.len, "\0", 1);
-    str_catw(&str, string);
+    str_catwcs(&str, string);
     ASSERT_NOTNULL(str.buf);
     ASSERT_INT_NEQ((int)str.len, 0);
     ASSERT_MEM_EQ(str.buf + str.len, "\0", 1);
-    str_catw(&str, string);
+    str_catwcs(&str, string);
     ASSERT_NOTNULL(str.buf);
     ASSERT_INT_NEQ((int)str.len, 0);
     ASSERT_MEM_EQ(str.buf + str.len, "\0", 1);
-    str_catw(&str, string);
+    str_catwcs(&str, string);
     ASSERT_NOTNULL(str.buf);
     ASSERT_INT_NEQ((int)str.len, 0);
     ASSERT_MEM_EQ(str.buf + str.len, "\0", 1);
-    str_catw(&str, string);
+    str_catwcs(&str, string);
     ASSERT_NOTNULL(str.buf);
     ASSERT_INT_NEQ((int)str.len, 0);
     ASSERT_MEM_EQ(str.buf + str.len, "\0", 1);
@@ -529,7 +523,7 @@ TEST_BEGIN(stress, INIT : setlocale)
         str_catf(&str, "%d%d %f %p %%!", -120, 69, 0.3f + 0.2f, NULL);
         str_catf_d(&str, "%d%d%%%%%d!", 100, -100, -6969);
         str_catwch(&str, L'空');
-        str_catw(&str, L"HELLO 世界!");
+        str_catwcs(&str, L"HELLO 世界!");
         str_cat_str(&str, &temp);
 
         // ------------------------------
@@ -550,5 +544,542 @@ TEST_BEGIN(stress, INIT : setlocale)
 
     ASSERT_INT_EQ((int)str.len, len);
     ASSERT_MEM_EQ(str.buf, expected, len);
+}
+TEST_END()
+
+TEST_BEGIN(encode, INIT : setlocale)
+{
+    str_t s = str_encode(L"ハロ");
+    ASSERT_INT_GTE((int)s.capacity, 1);
+    ASSERT_NOTNULL(s.buf);
+    const char expected[] = {0xe3, 0x83, 0x8f, 0xe3, 0x83, 0xad};
+    ASSERT_INT_EQ((int)s.len, (int)sizeof(expected));
+    ASSERT_MEM_EQ(s.buf, expected, sizeof(expected));
+    ASSERT_INT_EQ(s.buf[s.len], '\0');
+}
+TEST_END()
+
+TEST_BEGIN(encode_ascii)
+{
+    str_t s = str_encode(L"HELLO!");
+    ASSERT_INT_GTE((int)s.capacity, 1);
+    ASSERT_NOTNULL(s.buf);
+    const char expected[] = "HELLO!";
+    ASSERT_INT_EQ((int)s.len, (int)strlen(expected));
+    ASSERT_MEM_EQ(s.buf, expected, sizeof(expected));
+    ASSERT_INT_EQ(s.buf[s.len], '\0');
+}
+TEST_END()
+
+TEST_BEGIN(decode, INIT : setlocale)
+{
+    str_t s = str_create();
+    const char utf8[] = {0xe3, 0x83, 0x8f, 0xe3, 0x83, 0xad, 0x0};
+    str_cat(&s, utf8);
+
+    wchar_t *res = str_decode(&s);
+    ASSERT_NOTNULL(res);
+    const wchar_t expected[] = L"ハロ";
+    ASSERT_MEM_EQ(res, expected, sizeof(expected));
+    ASSERT_INT_EQ(s.buf[s.len], '\0');
+}
+TEST_END()
+
+TEST_BEGIN(decode2, INIT : setlocale)
+{
+    str_t s = str_create();
+    str_cat(&s, "HELLO!");
+
+    wchar_t *res = str_decode(&s);
+    ASSERT_NOTNULL(res);
+    const wchar_t expected[] = L"HELLO!";
+    ASSERT_MEM_EQ(res, expected, sizeof(expected));
+    ASSERT_INT_EQ(s.buf[s.len], '\0');
+}
+TEST_END()
+
+TEST_BEGIN(repeat_char)
+{
+    str_t s = str_create();
+    str_repeat_char(&s, 'A', 5, NULL);
+    ASSERT_NOTNULL(s.buf);
+    ASSERT_INT_EQ((int)s.len, 5);
+    ASSERT_INT_GTE((int)s.capacity, (int)s.len + 1);
+    ASSERT_MEM_EQ(s.buf, "AAAAA", 5);
+    ASSERT_MEM_EQ(s.buf + s.len, "\0", 1);
+}
+TEST_END()
+
+TEST_BEGIN(repeat_char_zero)
+{
+    str_t s = str_create();
+    str_repeat_char(&s, 'Z', 0, "-");
+    ASSERT_NOTNULL(s.buf);
+    ASSERT_INT_EQ((int)s.len, 0);
+    ASSERT_INT_GTE((int)s.capacity, 1);
+    ASSERT_MEM_EQ(s.buf, "", 0);
+    ASSERT_MEM_EQ(s.buf + s.len, "\0", 1);
+}
+TEST_END()
+
+TEST_BEGIN(repeat_char_sep)
+{
+    str_t s = str_create();
+    str_repeat_char(&s, 'X', 3, ":");
+    ASSERT_NOTNULL(s.buf);
+    ASSERT_INT_EQ((int)s.len, 5);
+    ASSERT_INT_GTE((int)s.capacity, 6);
+    ASSERT_MEM_EQ(s.buf, "X:X:X", 5);
+    ASSERT_MEM_EQ(s.buf + s.len, "\0", 1);
+}
+TEST_END()
+
+TEST_BEGIN(repeat_char_multisep)
+{
+    str_t s = str_create();
+    str_repeat_char(&s, 'X', 3, "abc");
+    ASSERT_NOTNULL(s.buf);
+    ASSERT_INT_EQ((int)s.len, 9);
+    ASSERT_INT_GTE((int)s.capacity, 9);
+    ASSERT_MEM_EQ(s.buf, "XabcXabcX", 9);
+    ASSERT_MEM_EQ(s.buf + s.len, "\0", 1);
+}
+TEST_END()
+
+TEST_BEGIN(repeat_wchar)
+{
+    setlocale(LC_ALL, "");
+    str_t s = str_create();
+    str_repeat_wchar(&s, L'世', 3, L"-");
+    ASSERT_NOTNULL(s.buf);
+    ASSERT_INT_GTE((int)s.capacity, (int)s.len + 1);
+    wchar_t out[16] = {0};
+    mbstowcs(out, s.buf, s.len + 1);
+    wchar_t exp[] = L"世-世-世";
+    ASSERT_INT_EQ((int)wcslen(out), (int)wcslen(exp));
+    ASSERT_MEM_EQ(out, exp, sizeof(exp));
+}
+TEST_END()
+
+TEST_BEGIN(repeat_cstr)
+{
+    str_t s = str_create();
+    str_repeat_cstr(&s, "hi", 4, " ");
+    ASSERT_NOTNULL(s.buf);
+    ASSERT_INT_EQ((int)s.len, 11);
+    ASSERT_INT_GTE((int)s.capacity, 12);
+    ASSERT_MEM_EQ(s.buf, "hi hi hi hi", 11);
+    ASSERT_MEM_EQ(s.buf + s.len, "\0", 1);
+}
+TEST_END()
+
+TEST_BEGIN(repeat_cstr_empty_src)
+{
+    str_t s = str_create();
+    str_repeat_cstr(&s, "", 5, ",");
+    ASSERT_NOTNULL(s.buf);
+    ASSERT_INT_EQ((int)s.len, 4);
+    ASSERT_INT_GTE((int)s.capacity, 4);
+    ASSERT_MEM_EQ(s.buf, ",,,,", 4);
+    ASSERT_MEM_EQ(s.buf + s.len, "\0", 1);
+}
+TEST_END()
+
+TEST_BEGIN(repeat_wcs)
+{
+    setlocale(LC_ALL, "");
+    str_t s = str_create();
+    str_repeat_wcs(&s, L"あ", 4, L"・");
+    ASSERT_NOTNULL(s.buf);
+    ASSERT_INT_GTE((int)s.capacity, (int)s.len + 1);
+    wchar_t *out = str_decode(&s);
+    wchar_t exp[] = L"あ・あ・あ・あ";
+    ASSERT_MEM_EQ(out, exp, sizeof(exp));
+}
+TEST_END()
+
+TEST_BEGIN(repeat_empty_wcs)
+{
+    setlocale(LC_ALL, "");
+    str_t s = str_create();
+    str_repeat_wcs(&s, L"", 4, L"・");
+    ASSERT_NOTNULL(s.buf);
+    ASSERT_INT_GTE((int)s.capacity, (int)s.len + 1);
+    wchar_t *out = str_decode(&s);
+    wchar_t exp[] = L"・・・";
+    ASSERT_MEM_EQ(out, exp, sizeof(exp));
+}
+TEST_END()
+
+TEST_BEGIN(repeat_str_t)
+{
+    str_t base = str_new("abc");
+    str_t s = str_create();
+    str_repeat_str(&s, &base, 3, "-");
+    ASSERT_NOTNULL(s.buf);
+    ASSERT_INT_EQ((int)s.len, 11);
+    ASSERT_INT_GTE((int)s.capacity, 12);
+    ASSERT_MEM_EQ(s.buf, "abc-abc-abc", 11);
+    ASSERT_MEM_EQ(s.buf + s.len, "\0", 1);
+    str_free(&base);
+}
+TEST_END()
+
+TEST_BEGIN(repeat_stress)
+{
+    const size_t N = 10000;
+    str_t s = str_create();
+    str_repeat_char(&s, 'x', N, NULL);
+    ASSERT_NOTNULL(s.buf);
+    ASSERT_INT_EQ((int)s.len, (int)N);
+    ASSERT_INT_GTE((int)s.capacity, (int)N + 1);
+    ASSERT_MEM_EQ(&s.buf[0], "x", 1);
+    ASSERT_MEM_EQ(&s.buf[N / 2], "x", 1);
+    ASSERT_MEM_EQ(&s.buf[N - 1], "x", 1);
+    ASSERT_MEM_EQ(s.buf + s.len, "\0", 1);
+    str_free(&s);
+}
+TEST_END()
+
+TEST_BEGIN(tokenizer)
+{
+    str_t s = str_new("1,2,3");
+
+    str_tokenizer_t tok = {0};
+    str_tokenizer_init(&tok, &s, ",");
+
+    strview_t token = {0};
+
+    ASSERT_TRUE(str_tokenizer_next(&tok, &token));
+    ASSERT_INT_EQ((int)token.len, 1);
+    ASSERT_INT_EQ(token.buf[0], '1');
+
+    ASSERT_TRUE(str_tokenizer_next(&tok, &token));
+    ASSERT_INT_EQ((int)token.len, 1);
+    ASSERT_INT_EQ(token.buf[0], '2');
+
+    ASSERT_TRUE(str_tokenizer_next(&tok, &token));
+    ASSERT_INT_EQ((int)token.len, 1);
+    ASSERT_INT_EQ(token.buf[0], '3');
+
+    ASSERT_FALSE(str_tokenizer_next(&tok, &token));
+    ASSERT_INT_EQ((int)token.len, 0);
+    ASSERT_NULL(token.buf);
+}
+TEST_END()
+
+TEST_BEGIN(tokenizer_multi_len)
+{
+    str_t s = str_new("1000,2000,3");
+
+    str_tokenizer_t tok = {0};
+    str_tokenizer_init(&tok, &s, ",");
+
+    strview_t token = {0};
+
+    ASSERT_TRUE(str_tokenizer_next(&tok, &token));
+    ASSERT_INT_EQ((int)token.len, 4);
+    ASSERT_STR_EQ(token.buf, "1000", 4);
+
+    ASSERT_TRUE(str_tokenizer_next(&tok, &token));
+    ASSERT_INT_EQ((int)token.len, 4);
+    ASSERT_STR_EQ(token.buf, "2000", 4);
+
+    ASSERT_TRUE(str_tokenizer_next(&tok, &token));
+    ASSERT_INT_EQ((int)token.len, 1);
+    ASSERT_INT_EQ(token.buf[0], '3');
+
+    ASSERT_FALSE(str_tokenizer_next(&tok, &token));
+    ASSERT_INT_EQ((int)token.len, 0);
+    ASSERT_NULL(token.buf);
+}
+TEST_END()
+
+TEST_BEGIN(tokenizer_no_delim)
+{
+    str_t s = str_new("1,2,3");
+
+    str_tokenizer_t tok = {0};
+    str_tokenizer_init(&tok, &s, ";");
+
+    strview_t token = {0};
+
+    ASSERT_FALSE(str_tokenizer_next(&tok, &token));
+    ASSERT_INT_EQ((int)token.len, 0);
+    ASSERT_NULL(token.buf);
+}
+TEST_END()
+
+TEST_BEGIN(tokenizer_empty_string)
+{
+    str_t s = str_new("");
+
+    str_tokenizer_t tok = {0};
+    str_tokenizer_init(&tok, &s, ",");
+
+    strview_t token = {0};
+
+    ASSERT_FALSE(str_tokenizer_next(&tok, &token));
+    ASSERT_INT_EQ((int)token.len, 0);
+    ASSERT_NULL(token.buf);
+}
+TEST_END()
+
+TEST_BEGIN(tokenizer_trailing_delim)
+{
+    str_t s = str_new("1,2,3,");
+
+    str_tokenizer_t tok = {0};
+    str_tokenizer_init(&tok, &s, ",");
+
+    strview_t token = {0};
+
+    ASSERT_TRUE(str_tokenizer_next(&tok, &token));
+    ASSERT_INT_EQ((int)token.len, 1);
+    ASSERT_INT_EQ(token.buf[0], '1');
+
+    ASSERT_TRUE(str_tokenizer_next(&tok, &token));
+    ASSERT_INT_EQ((int)token.len, 1);
+    ASSERT_INT_EQ(token.buf[0], '2');
+
+    ASSERT_TRUE(str_tokenizer_next(&tok, &token));
+    ASSERT_INT_EQ((int)token.len, 1);
+    ASSERT_INT_EQ(token.buf[0], '3');
+
+    ASSERT_FALSE(str_tokenizer_next(&tok, &token));
+    ASSERT_INT_EQ((int)token.len, 0);
+    ASSERT_NULL(token.buf);
+}
+TEST_END()
+
+TEST_BEGIN(tokenizer_empty_between_delim)
+{
+    str_t s = str_new("12,,,34");
+
+    str_tokenizer_t tok = {0};
+    str_tokenizer_init(&tok, &s, ",");
+
+    strview_t token = {0};
+
+    ASSERT_TRUE(str_tokenizer_next(&tok, &token));
+    ASSERT_INT_EQ((int)token.len, 2);
+    ASSERT_STR_EQ(token.buf, "12", 2);
+
+    ASSERT_TRUE(str_tokenizer_next(&tok, &token));
+    ASSERT_INT_EQ((int)token.len, 0);
+    ASSERT_TRUE(token.buf == s.buf + 3);
+
+    ASSERT_TRUE(str_tokenizer_next(&tok, &token));
+    ASSERT_INT_EQ((int)token.len, 0);
+    ASSERT_TRUE(token.buf == s.buf + 4);
+
+    ASSERT_TRUE(str_tokenizer_next(&tok, &token));
+    ASSERT_INT_EQ((int)token.len, 2);
+    ASSERT_STR_EQ(token.buf, "34", 2);
+
+    ASSERT_FALSE(str_tokenizer_next(&tok, &token));
+    ASSERT_INT_EQ((int)token.len, 0);
+    ASSERT_NULL(token.buf);
+}
+TEST_END()
+
+TEST_BEGIN(tokenizer_only_delim)
+{
+    str_t s = str_new(",,,");
+
+    str_tokenizer_t tok = {0};
+    str_tokenizer_init(&tok, &s, ",");
+
+    strview_t token = {0};
+
+    ASSERT_TRUE(str_tokenizer_next(&tok, &token));
+    ASSERT_INT_EQ((int)token.len, 0);
+    ASSERT_TRUE(token.buf == s.buf + 0);
+
+    ASSERT_TRUE(str_tokenizer_next(&tok, &token));
+    ASSERT_INT_EQ((int)token.len, 0);
+    ASSERT_TRUE(token.buf == s.buf + 1);
+
+    ASSERT_TRUE(str_tokenizer_next(&tok, &token));
+    ASSERT_INT_EQ((int)token.len, 0);
+    ASSERT_TRUE(token.buf == s.buf + 2);
+
+    ASSERT_FALSE(str_tokenizer_next(&tok, &token));
+    ASSERT_INT_EQ((int)token.len, 0);
+    ASSERT_NULL(token.buf);
+}
+TEST_END()
+
+TEST_BEGIN(tokenizer_macro)
+{
+    str_t s = str_new("1,2,3,");
+
+    int i = 1;
+    STR_SPLIT(s, token, ",")
+    {
+        ASSERT_INT_EQ((int)token.len, 1);
+        ASSERT_INT_EQ(token.buf[0], '0' + i);
+        i++;
+    }
+
+    ASSERT_INT_EQ(i, 4);
+}
+TEST_END()
+
+TEST_BEGIN(tokenizer_utf8_multi_byte_delim)
+{
+    str_t s = str_new("あ、い、う");
+    str_tokenizer_t tok = {0};
+    str_tokenizer_init(&tok, &s, "、");
+    strview_t token = {0};
+
+    ASSERT_TRUE(str_tokenizer_next(&tok, &token));
+    ASSERT_INT_EQ((int)token.len, 3);
+    ASSERT_STR_EQ(token.buf, "あ", 3);
+
+    ASSERT_TRUE(str_tokenizer_next(&tok, &token));
+    ASSERT_INT_EQ((int)token.len, 3);
+    ASSERT_STR_EQ(token.buf, "い", 3);
+
+    ASSERT_TRUE(str_tokenizer_next(&tok, &token));
+    ASSERT_INT_EQ((int)token.len, 3);
+    ASSERT_STR_EQ(token.buf, "う", 3);
+
+    ASSERT_FALSE(str_tokenizer_next(&tok, &token));
+    ASSERT_INT_EQ((int)token.len, 0);
+    ASSERT_NULL(token.buf);
+}
+TEST_END()
+
+TEST_BEGIN(tokenizer_emoji)
+{
+    str_t s = str_new("😀|😂|👍");
+    str_tokenizer_t tok = {0};
+    str_tokenizer_init(&tok, &s, "|");
+    strview_t token = {0};
+
+    ASSERT_TRUE(str_tokenizer_next(&tok, &token));
+    ASSERT_INT_EQ((int)token.len, 4);
+    ASSERT_STR_EQ(token.buf, "😀", 4);
+
+    ASSERT_TRUE(str_tokenizer_next(&tok, &token));
+    ASSERT_INT_EQ((int)token.len, 4);
+    ASSERT_STR_EQ(token.buf, "😂", 4);
+
+    ASSERT_TRUE(str_tokenizer_next(&tok, &token));
+    ASSERT_INT_EQ((int)token.len, 4);
+    ASSERT_STR_EQ(token.buf, "👍", 4);
+
+    ASSERT_FALSE(str_tokenizer_next(&tok, &token));
+    ASSERT_INT_EQ((int)token.len, 0);
+    ASSERT_NULL(token.buf);
+}
+TEST_END()
+
+TEST_BEGIN(parse)
+{
+    str_t s = str_new("0");
+    long x = str_parse(view(s), 10);
+
+    ASSERT_INT_EQ((int)x, 0);
+}
+TEST_END()
+
+TEST_BEGIN(parse_10)
+{
+    str_t s = str_new("10");
+    long x = str_parse(view(s), 10);
+
+    ASSERT_INT_EQ((int)x, 10);
+}
+TEST_END()
+
+TEST_BEGIN(parse_negative)
+{
+    str_t s = str_new("-10");
+    long x = str_parse(view(s), 10);
+
+    ASSERT_INT_EQ((int)x, -10);
+}
+TEST_END()
+
+TEST_BEGIN(parse_negative_zero)
+{
+    str_t s = str_new("-0");
+    long x = str_parse(view(s), 10);
+
+    ASSERT_INT_EQ((int)x, 0);
+}
+TEST_END()
+
+TEST_BEGIN(parse_hex)
+{
+    str_t s = str_new("FF");
+    long x = str_parse(view(s), 16);
+
+    ASSERT_INT_EQ((int)x, 255);
+}
+TEST_END()
+
+TEST_BEGIN(parse_bin)
+{
+    str_t s = str_new("1100");
+    long x = str_parse(view(s), 2);
+
+    ASSERT_INT_EQ((int)x, 12);
+}
+TEST_END()
+
+TEST_BEGIN(parse_float)
+{
+    str_t s = str_new("10.099");
+    float x = str_parsef(view(s));
+
+    ASSERT_FLOAT_EQ(x, 10.099f);
+}
+TEST_END()
+
+TEST_BEGIN(parse_negative_float)
+{
+    str_t s = str_new("-10.099");
+    float x = str_parsef(view(s));
+
+    ASSERT_FLOAT_EQ(x, -10.099f);
+}
+TEST_END()
+
+TEST_BEGIN(parse_big_float)
+{
+    str_t s = str_new("912391923919239.127391283");
+    float x = str_parsef(view(s));
+
+    ASSERT_FLOAT_EQ(x, 912391923919239.127391283f);
+}
+TEST_END()
+
+TEST_BEGIN(parse_longdouble)
+{
+    str_t s = str_new("9123919239192391920310293.127391283");
+    long double x = str_parseld(view(s));
+
+    ASSERT_TRUE(x == 9123919239192391920310293.127391283L);
+}
+TEST_END()
+
+TEST_BEGIN(parse_negative_longdouble)
+{
+    str_t s = str_new("-9123919239192391920310293.127391283");
+    long double x = str_parseld(view(s));
+
+    ASSERT_TRUE(x == -9123919239192391920310293.127391283L);
+}
+TEST_END()
+
+TEST_BEGIN(parse_scientific_notation)
+{
+    str_t s = str_new("1e9");
+    long double x = str_parseld(view(s));
+
+    ASSERT_TRUE(x == 1000000000L);
 }
 TEST_END()

@@ -112,3 +112,12 @@ void queue_clear(queue_t *q)
 exit:
     pthread_mutex_unlock(&q->mutex);
 }
+
+bool queue_is_empty(queue_t *q)
+{
+    pthread_mutex_lock(&q->mutex);
+    bool empty = QUEUE_IS_EMPTY(q);
+    pthread_mutex_unlock(&q->mutex);
+
+    return empty;
+}

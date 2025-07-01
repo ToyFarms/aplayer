@@ -1,13 +1,15 @@
 #include "audio_mixer.h"
+#include "audio_analyzer.h"
 #include "audio_effect.h"
 #include "audio_source.h"
 #include "exception.h"
 #include "logger.h"
-#include <omp.h>
 
 #include <assert.h>
 #include <errno.h>
+#include <math.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 audio_mixer mixer_create(int nb_channels, int sample_rate,
@@ -21,11 +23,18 @@ audio_mixer mixer_create(int nb_channels, int sample_rate,
     mixer.nb_channels = nb_channels;
     mixer.sample_rate = sample_rate;
     mixer.sample_fmt = sample_fmt;
+    mixer.master_gain = 0.0f;
+    mixer.analyzer = array_create(4, sizeof(audio_analyzer));
     pthread_mutex_init(&mixer.source_mutex, NULL);
 
     mixer.sources = array_create(16, sizeof(audio_source));
     if (errno != 0)
         log_error("Cannot allocate mixer sources: %s\n", strerror(errno));
+
+    mixer.scratch = array_create(sample_rate * nb_channels, sizeof(float));
+    if (errno != 0)
+        log_error("Cannot allocate mixer scratch buffer: %s\n",
+                  strerror(errno));
 
     return mixer;
 }
@@ -35,6 +44,15 @@ void mixer_free(audio_mixer *mixer)
     if (mixer == NULL)
         return;
 
+    mixer_clear(mixer);
+    array_free(&mixer->sources);
+    array_free(&mixer->scratch);
+
+    pthread_mutex_destroy(&mixer->source_mutex);
+}
+
+void mixer_clear(audio_mixer *mixer)
+{
     pthread_mutex_lock(&mixer->source_mutex);
     audio_source src;
     ARR_FOREACH(mixer->sources, src, i)
@@ -46,19 +64,15 @@ void mixer_free(audio_mixer *mixer)
         }
         src.free(&src);
     }
-    array_free(&mixer->sources);
+    mixer->sources.length = 0;
     pthread_mutex_unlock(&mixer->source_mutex);
-    pthread_mutex_destroy(&mixer->source_mutex);
 }
 
 int mixer_get_frame(audio_mixer *mixer, int req_sample, float *out)
 {
-    float src_buf[req_sample];
-    memset(src_buf, 0, req_sample * sizeof(*src_buf));
-
-    int ret;
-    int len;
-    bool finished = mixer->sources.length != 0;
+    int ret, len, max_len = 0;
+    if (mixer->paused)
+        return 0;
 
     pthread_mutex_lock(&mixer->source_mutex);
     audio_source *src;
@@ -67,34 +81,46 @@ int mixer_get_frame(audio_mixer *mixer, int req_sample, float *out)
         if (src->is_finished)
             continue;
 
-    update:
-        ret = src->update(src);
-        if (ret != EOF && ret < 0)
-            continue;
+        while (!src->is_eof && src->buffer.length < req_sample)
+            ret = src->update(src);
 
-        ret = len = src->get_frame(src, req_sample, src_buf);
+        mixer->scratch.length = 0;
+        ret = len = src->get_frame(src, req_sample, mixer->scratch.data);
+        if (len > max_len)
+            max_len = len;
+
         if (ret == -ENODATA)
-            goto update;
+        {
+            log_error("Stream have no data left\n");
+            continue;
+        }
         else if (ret == EOF)
         {
             src->is_finished = true;
-            ret = len = src->get_frame(src, -1, src_buf);
+            ret = len = src->get_frame(src, -1, mixer->scratch.data);
+            log_error("Stream finished, flushing leftover (%d sample)\n", len);
             src->free(src);
             array_remove(&mixer->sources, i, 1);
         }
 
-        if (i == 0)
-            memcpy(out, src_buf, len * sizeof(float));
-        else
-            for (int sample = 0; sample < len; sample++)
-                out[sample] += src_buf[sample];
-
-        finished = false;
+        assert(mixer->scratch.capacity >= len);
+        for (int sample = 0; sample < len; sample++)
+            out[sample] += ARR_AS(mixer->scratch, float)[sample] *
+                           powf(10, mixer->master_gain / 20);
     }
-    pthread_mutex_unlock(&mixer->source_mutex);
 
-    if (finished)
-        return EOF;
+    audio_analyzer *analyzer;
+    ARR_FOREACH_BYREF(mixer->analyzer, analyzer, i)
+    {
+        analyzer->process(
+            analyzer, (audio_callback_param){.out = out,
+                                             .size = max_len,
+                                             .nb_channels = mixer->nb_channels,
+                                             .sample_rate = mixer->sample_rate,
+                                             .sample_fmt = mixer->sample_fmt});
+    }
+
+    pthread_mutex_unlock(&mixer->source_mutex);
 
     return 0;
 }

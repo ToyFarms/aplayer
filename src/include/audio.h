@@ -21,6 +21,5 @@ audio_ctx *audio_create(PaStreamCallback *callback, PaDeviceIndex dev,
                        int nb_channels, int sample_rate,
                        enum audio_format sample_fmt);
 void audio_free(audio_ctx *ctx);
-int audio_step(audio_ctx *audio);
 
 #endif /* __AUDIO_H */

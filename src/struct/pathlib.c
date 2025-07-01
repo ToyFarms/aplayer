@@ -1,10 +1,9 @@
 #include "pathlib.h"
 
 #include <assert.h>
-#include <stdlib.h>
-#include <string.h>
 #include <unistd.h>
 
+// TODO: come back to this, and change fs that use char to use path_t
 // TODO: figure out how to structure this with cross-platform in mind
 
 path_t path_create(const char *path_str)

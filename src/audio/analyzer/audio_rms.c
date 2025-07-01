@@ -1,6 +1,7 @@
 #include "audio_analyzer.h"
 #include "logger.h"
 
+#include <float.h>
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -68,8 +69,8 @@ void rms_process(audio_analyzer *analyzer, audio_callback_param p)
         buf = p.out;
     else if (analyzer->type == AUDIO_ANALYZER_RMS_HUMAN)
     {
-        lfilter(stage1_coeff_b, 3, stage1_coeff_a, 3, p.out, p.size, p.nb_channels,
-                filtered);
+        lfilter(stage1_coeff_b, 3, stage1_coeff_a, 3, p.out, p.size,
+                p.nb_channels, filtered);
         lfilter(stage2_coeff_b, 3, stage2_coeff_a, 3, filtered, p.size,
                 p.nb_channels, filtered2);
         buf = filtered2;
@@ -80,7 +81,10 @@ void rms_process(audio_analyzer *analyzer, audio_callback_param p)
     for (int i = 0; i < p.size; i += p.nb_channels)
     {
         for (int ch = 0; ch < p.nb_channels; ch++)
-            rms[ch] += buf[i + ch] * buf[i + ch];
+        {
+            float s = buf[i + ch];
+            rms[ch] += s * s;
+        }
     }
 
     float nb_samples = (float)p.size / (float)p.nb_channels;
@@ -97,7 +101,8 @@ audio_analyzer audio_analyzer_rms(bool adjust_human, analyzer_callback callback,
 {
     audio_analyzer analyzer = {0};
 
-    analyzer.type = adjust_human ? AUDIO_ANALYZER_RMS_HUMAN : AUDIO_ANALYZER_RMS;
+    analyzer.type =
+        adjust_human ? AUDIO_ANALYZER_RMS_HUMAN : AUDIO_ANALYZER_RMS;
     analyzer.callback = callback;
     analyzer.userdata = userdata;
     analyzer.free = rms_free;

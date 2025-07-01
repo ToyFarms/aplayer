@@ -35,6 +35,9 @@
 #define TCURSORHIDE   "[?25l"
 #define TMOUSEENABLE  "[?1003h"
 #define TMOUSEDISABLE "[?1003l"
+#define TNEGATIVE     "[7m"
+#define TPOSITIVE     "[7m"
+#define TCLEAR        "[2J"
 
 #define TERM_KMOD_SHIFT   (1 << 0)
 #define TERM_KMOD_CTRL    (1 << 1)
@@ -45,7 +48,7 @@
 #ifdef _WIN32
 #  error Key remapping not defined
 #elif defined(__linux__)
-#  include "curses.h"
+#  include "ncurses.h"
 #  define TERM_KEY_ESC         27
 #  define TERM_KEY_TAB         9
 #  define TERM_KEY_F0          KEY_F0
@@ -141,18 +144,53 @@ enum handle_type
     HANDLE_STDERR,
 };
 
-typedef struct term_status
+enum term_color_mode
+{
+    TERM_COLOR_24BIT,
+    TERM_COLOR_256,
+    TERM_COLOR_MONO,
+};
+
+static const char *term_color_mode_name(enum term_color_mode mode)
+{
+    switch (mode)
+    {
+    case TERM_COLOR_24BIT:
+        return "TRUE_COLOR";
+    case TERM_COLOR_256:
+        return "8 BIT";
+    case TERM_COLOR_MONO:
+        return "MONO";
+    }
+}
+
+typedef struct term_capability
+{
+    bool is_tmux;
+    bool supports_sixel;
+    bool supports_tgp;
+    int cell_width, cell_height;
+    enum term_color_mode color;
+} term_capability;
+
+typedef struct term_state
 {
     int width, height;
     int mouse_x, mouse_y;
+    int click[3];
     bool resized;
-    str_t *buf;
-} term_status;
+    str_t buf;
+    term_capability capability;
+} term_state;
 
+// NOTE: this function needs to be called before initializing the event loop,
+// because otherwise the response will get eaten up or mixed with other inputs
+term_capability term_query_capability();
 handle_t term_handle(enum handle_type type);
 void term_write(char *str, int size);
 void term_altbuf();
 void term_mainbuf();
+void term_exit();
 vec2 term_size();
 void term_get_events(queue_t *out);
 

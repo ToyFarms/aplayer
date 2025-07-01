@@ -11,9 +11,10 @@
 #define LOG_INFO    4
 #define LOG_DEBUG   5
 
-#define LOGGER_MAX_OUTPUT 32
-#define LOG_USE_COLOR     (1 << 0)
-#define LOG_DEFER_CLOSE   (1 << 1)
+#define LOGGER_MAX_OUTPUT   32
+#define LOGGER_MAX_CALLBACK 32
+#define LOG_USE_COLOR       (1 << 0)
+#define LOG_DEFER_CLOSE     (1 << 1)
 
 #ifndef LOGGER_BASEPATH_LENGTH
 #  define LOGGER_BASEPATH_LENGTH 0
@@ -39,8 +40,12 @@
 #define log_log(level, fmt, ...)                                               \
     logger_log(level, __FILENAME__, __FUNCTION__, __LINE__, fmt, ##__VA_ARGS__)
 
+typedef void (*logger_cb_fun)(const char *log);
+
 void logger_set_level(int level);
 void logger_add_output(int level, FILE *fd, int flags);
+void logger_add_callback(int level, logger_cb_fun callback, int flags);
+void logger_remove_callback(logger_cb_fun callback);
 void logger_use_color(bool enable);
 void logger_log(int level, const char *filename, const char *fn_name, int line,
                 const char *fmt, ...) __attribute__((format(printf, 5, 6)));

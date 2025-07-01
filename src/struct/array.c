@@ -143,3 +143,41 @@ int array_remove(array_t *arr, int index, int item_count)
 
     return 0;
 }
+
+static void swap_element(array_t *arr, int a, int b)
+{
+    unsigned char *x = arr->data + (a * arr->item_size);
+    unsigned char *y = arr->data + (b * arr->item_size);
+
+    for (int i = 0; i < arr->item_size; i++)
+    {
+        x[i] ^= y[i];
+        y[i] ^= x[i];
+        x[i] ^= y[i];
+    }
+}
+
+void array_shuffle(array_t *arr)
+{
+    assert(arr && arr->data);
+    if (arr->length < 2)
+        return;
+
+    for (int i = arr->length - 1; i > 0; --i)
+    {
+        int j = rand() % (i + 1);
+        if (i == j)
+            continue;
+        swap_element(arr, i, j);
+    }
+}
+
+void array_reverse(array_t *arr)
+{
+    assert(arr && arr->data);
+    if (arr->length < 2)
+        return;
+
+    for (int i = 0; i < arr->length / 2; ++i)
+        swap_element(arr, i, arr->length - 1 - i);
+}

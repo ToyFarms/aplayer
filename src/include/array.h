@@ -20,9 +20,12 @@ typedef struct array_t
 
 array_t array_create(int max_item, int item_size);
 void array_free(array_t *arr);
+void array_resize(array_t *arr, int new_max_item);
 int array_append_static(array_t *arr, const void *mem, int item_count);
 int array_append(array_t *arr, const void *mem, int item_count);
 int array_insert(array_t *arr, const void *mem, int item_count, int index);
 int array_remove(array_t *arr, int index, int item_count);
+void array_shuffle(array_t *arr);
+void array_reverse(array_t *arr);
 
 #endif /* __ARRAY_H */

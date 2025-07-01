@@ -5,7 +5,6 @@
 
 #include <stdbool.h>
 
-struct audio_analyzer;
 typedef void (*analyzer_callback)(void *actx, void *userdata);
 
 enum audio_analyzer_type

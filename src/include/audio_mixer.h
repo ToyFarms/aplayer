@@ -14,12 +14,17 @@ typedef struct audio_mixer
 
     pthread_mutex_t source_mutex;
     array(audio_source) sources;
-    array(apl_instance) master_plugins;
+    array(float) scratch;
+
+    float master_gain;
+    bool paused;
+    array(audio_analyzer) analyzer;
 } audio_mixer;
 
 audio_mixer mixer_create(int nb_channels, int sample_rate,
                          enum audio_format sample_fmt);
 void mixer_free(audio_mixer *mixer);
+void mixer_clear(audio_mixer *mixer);
 int mixer_get_frame(audio_mixer *mixer, int req_sample, float *out);
 
 #endif /* __AUDIO_MIXER_H */

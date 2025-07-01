@@ -2,12 +2,15 @@
 #define __APP_H
 
 #include "audio.h"
+#include "playlist.h"
+#include "ui.h"
 
 typedef struct app_instance
 {
     audio_ctx *audio;
-    array(apl_class) audio_classes;
-    array(wpl_class) widget_classes;
+    playlist_manager playlist;
+    ui_state ui;
+    term_state term;
 } app_instance;
 
 int app_init();

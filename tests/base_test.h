@@ -61,7 +61,8 @@ void print_memory(const void *addr, size_t n)
         exit(EXIT_FAILURE);                                                    \
     }
 
-#define ASSERT_TRUE(a) _assert(a)
+#define ASSERT_TRUE(a)  _assert(a)
+#define ASSERT_FALSE(a) _assert(!(a))
 #define _ASSERT_NUM(a, b, fmt, nop, name)                                      \
     if ((a)nop(b))                                                             \
     {                                                                          \

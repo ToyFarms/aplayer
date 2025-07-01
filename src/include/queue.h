@@ -4,6 +4,7 @@
 #include "struct.h"
 
 #include <pthread.h>
+#include <stdbool.h>
 
 typedef struct queue_entry_t
 {
@@ -29,5 +30,6 @@ int queue_push(queue_t *q, void *data);
 int queue_push_copy(queue_t *q, const void *data, size_t size);
 void *queue_pop(queue_t *q);
 void queue_clear(queue_t *q);
+bool queue_is_empty(queue_t *q);
 
 #endif /* __QUEUE_H */

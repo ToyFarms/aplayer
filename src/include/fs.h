@@ -1,41 +1,39 @@
 #ifndef __FS_H
 #define __FS_H
 
-#include <stdbool.h>
-#include <stdio.h>
+#include "ds.h"
 
+#include <stdbool.h>
+#include <sys/stat.h>
 #ifdef _WIN32
-#  error PATHMAX not defined
-#  define PATHMAX 0
-#elif defined(__linux__)
-#  include <linux/limits.h>
-#  define PATHMAX (PATH_MAX + 255)
+#  error "NOT IMPLEMENTED"
+#else
+#  include <dirent.h>
 #endif // _WIN32
 
-#define FS_FILTER_DIR  (1 << 0)
-#define FS_FILTER_FILE (1 << 1)
-
-typedef struct entry_t
+typedef struct fs_entry_t
 {
-    char name[256];
-    int namelen;
-    bool isdir;
-} entry_t;
+    struct stat stat;
+    str_t path;
+    strview_t name;
+} fs_entry_t;
 
-typedef struct fs_root
+typedef struct fs_iterator
 {
-    char *base;
-    int baselen;
+    const char *dir;
+#ifdef _WIN32
+#  error "NOT IMPLEMENTED"
+#else
+    DIR *d;
+#endif // _WIN32
+    int exhausted;
+} fs_iterator;
 
-    entry_t *entries;
-    int len;
-    int capacity;
-} fs_root;
-
-fs_root fs_readdir(const char *path, int flags);
-void fs_root_free(fs_root *root);
-
-int fs_normpath(const char *path, char *output, size_t max);
-int fs_cmppath(const char *a, const char *b);
+int fs_iter_init(fs_iterator *iter, const char *dir);
+bool fs_iter_next(fs_iterator *iter, fs_entry_t *entry_out);
+void fs_iter_free(fs_iterator *iter);
+bool fs_is_dir(const fs_entry_t *entry);
+strview_t fs_name(const fs_entry_t *entry);
+strview_t fs_suffix(const fs_entry_t *entry);
 
 #endif /* __FS_H */

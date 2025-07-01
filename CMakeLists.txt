@@ -8,16 +8,19 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 include(FindPkgConfig)
 find_package(PkgConfig REQUIRED)
-string(APPEND CMAKE_C_FLAGS "-Wall -Werror -pg")
+# string(APPEND CMAKE_C_FLAGS " -Wall -Werror -pg")
 
 add_executable(aplayer
     ./src/main.c
     ./src/fs_linux.c
     ./src/logger.c
     ./src/exception_linux.c
-    ./src/plugin.c
     ./src/app.c
     ./src/utils.c
+    ./src/playlist.c
+    ./src/clock.c
+    ./src/imgconv.c
+    ./src/image.c
 
     ./src/struct/array.c
     ./src/struct/dict.c
@@ -44,6 +47,23 @@ add_executable(aplayer
     ./src/audio/analyzer/audio_fft.c
 
     ./src/ui/color.c
+    ./src/ui/ui.c
+    ./src/ui/layout.c
+    ./src/ui/image_renderer.c
+
+    ./src/ui/widgets/list.c
+    ./src/ui/widgets/hprogress.c
+    ./src/ui/widgets/debug.c
+    ./src/ui/widgets/rect.c
+    ./src/ui/widgets/timestamp.c
+    ./src/ui/widgets/volume.c
+    ./src/ui/widgets/media_control.c
+    ./src/ui/widgets/vu_meter.c
+    ./src/ui/widgets/statusline.c
+    ./src/ui/widgets/tabs.c
+    ./src/ui/widgets/art.c
+
+    ./thirdparty/wcwidth.c
 )
 
 target_link_libraries(aplayer PRIVATE m pthread fftw3 portaudio)
@@ -52,7 +72,7 @@ if (NOT WIN32)
   target_link_libraries(aplayer PRIVATE ncurses)
 endif()
 
-pkg_check_modules(LIBAV REQUIRED libavformat libavcodec libavutil libswresample)
+pkg_check_modules(LIBAV REQUIRED libavformat libavcodec libavutil libswresample libswscale)
 target_include_directories(aplayer PRIVATE ${LIBAV_INCLUDE_DIRS})
 target_link_directories(aplayer PRIVATE ${LIBAV_LIBRARY_DIRS})
 target_link_libraries(aplayer PRIVATE ${LIBAV_LIBRARIES})

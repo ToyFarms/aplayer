@@ -34,13 +34,13 @@ void ring_buf_free(ring_buf_t *rbuf)
     memset(rbuf, 0, sizeof(*rbuf));
 }
 
-int ring_buf_write(ring_buf_t *rbuf, void *mem, int item)
+int ring_buf_write(ring_buf_t *rbuf, const void *mem, int items)
 {
-    assert(rbuf != NULL && rbuf->buf != NULL && mem != NULL && item > 0);
-    if (item == 0)
+    assert(rbuf != NULL && rbuf->buf != NULL && mem != NULL && items > 0);
+    if (items == 0)
         return 0;
 
-    int items_to_write = item;
+    int items_to_write = items;
     const char *src = (const char *)mem;
 
     while (items_to_write > 0)

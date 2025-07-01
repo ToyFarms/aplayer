@@ -1,131 +1,90 @@
 #include "fs.h"
 #include "logger.h"
 
-#include <assert.h>
-#include <dirent.h>
 #include <errno.h>
-#include <stdlib.h>
 #include <string.h>
-#include <sys/stat.h>
-#include <wordexp.h>
 
-fs_root fs_readdir(const char *_path, int flags)
+int fs_iter_init(fs_iterator *iter, const char *dir)
 {
-    errno = 0;
-    const char *path = _path;
-
-    wordexp_t exp;
-    wordexp(_path, &exp, 0);
-
-    path = exp.we_wordv[0];
-
-    int initcap = 32;
-    fs_root root = {0};
-    root.entries = calloc(sizeof(*root.entries), initcap);
-    root.len = 0;
-    root.capacity = initcap;
-    root.base = strdup(path);
-    root.baselen = strlen(path);
-    DIR *dir = NULL;
-    int errnb = 0;
-
-    if (path == NULL)
+    DIR *d = opendir(dir);
+    if (d == NULL)
     {
-        errnb = errno;
-        log_error("path is NULL\n");
-        goto exit;
+        log_error("Could not open directory: %s: %s\n", dir, strerror(errno));
+        return -1;
     }
 
-    dir = opendir(path);
-    if (dir == NULL)
-    {
-        errnb = errno;
-        log_error("Failed to open path '%s'\n", path);
-        goto exit;
-    }
+    iter->d = d;
+    iter->dir = dir;
+    iter->exhausted = 0;
 
-    struct dirent *file = NULL;
-
-    while ((file = readdir(dir)) != NULL)
-    {
-        if (strcmp(file->d_name, ".") == 0 || strcmp(file->d_name, "..") == 0)
-            continue;
-
-        bool isdir = file->d_type == DT_DIR;
-        if (flags & FS_FILTER_DIR && isdir)
-            continue;
-        else if (flags & FS_FILTER_FILE && !isdir)
-            continue;
-
-        if (root.len >= root.capacity)
-        {
-            root.capacity *= 2;
-            root.entries =
-                realloc(root.entries, root.capacity * sizeof(*root.entries));
-        }
-
-        entry_t entry;
-        memcpy(entry.name, file->d_name, NAME_MAX);
-        size_t namelen = strlen(file->d_name);
-        entry.name[namelen] = '\0';
-        entry.namelen = namelen;
-        entry.isdir = isdir;
-
-        root.entries[root.len++] = entry;
-    }
-
-exit:
-    errno = errnb;
-    if (dir != NULL)
-        closedir(dir);
-
-    wordfree(&exp);
-
-    return root;
+    return 0;
 }
 
-void fs_root_free(fs_root *root)
+bool fs_iter_next(fs_iterator *iter, fs_entry_t *entry_out)
 {
-    if (root == NULL)
+    if (iter->exhausted)
+        return false;
+
+    struct dirent *ent = NULL;
+    do
+    {
+        ent = readdir(iter->d);
+        if (ent == NULL)
+        {
+            if (errno != 0)
+                log_error("Failed to read the next entry: %s\n",
+                          strerror(errno));
+            iter->exhausted = 1;
+            return false;
+        }
+    } while (ent &&
+             (strcmp(ent->d_name, ".") == 0 || strcmp(ent->d_name, "..") == 0));
+
+    entry_out->path = str_create();
+    str_catf(&entry_out->path, "%s/%s", iter->dir, ent->d_name);
+
+    entry_out->name = (strview_t){
+        .buf = entry_out->path.buf + strlen(iter->dir) + 1,
+        .len = strlen(ent->d_name),
+    };
+
+    if (stat(entry_out->path.buf, &entry_out->stat) == -1)
+    {
+        log_error("Failed get file stat: %s: %s\n", entry_out->path.buf,
+                  strerror(errno));
+    }
+
+    return true;
+}
+
+void fs_iter_free(fs_iterator *iter)
+{
+    if (iter == NULL)
         return;
 
-    free(root->base);
-    root->base = NULL;
-
-    free(root->entries);
-    root->entries = NULL;
-
-    memset(root, 0, sizeof(*root));
+    closedir(iter->d);
 }
 
-int fs_normpath(const char *path, char *output, size_t max)
+bool fs_is_dir(const fs_entry_t *entry)
 {
-    wordexp_t exp;
-    wordexp(path, &exp, 0);
-
-    strncpy(output, exp.we_wordv[0], max);
-    int len = strlen(exp.we_wordv[0]);
-
-    wordfree(&exp);
-
-    return len;
+    return entry->stat.st_mode & S_IFDIR;
 }
 
-int fs_cmppath(const char *a, const char *b)
+strview_t fs_name(const fs_entry_t *entry)
 {
-    struct stat stat1, stat2;
-
-    if (stat(a, &stat1) == -1)
-    {
-        log_error("Failed getting stat() for '%s'", a);
-        return -1;
-    }
-
-    if (stat(b, &stat2) == -1)
-    {
-        log_error("Failed getting stat() for '%s'", b);
-        return -1;
-    }
-
-    return stat1.st_ino == stat2.st_ino && stat1.st_dev == stat2.st_dev;
+    char *name = strrchr(entry->path.buf, '/');
+    name = name ? name + 1 : entry->path.buf;
+    return (strview_t){
+        .buf = name,
+        .len = (size_t)(name - entry->path.buf),
+    };
+}
+strview_t fs_suffix(const fs_entry_t *entry)
+{
+    char *suffix = strrchr(entry->path.buf, '.');
+    suffix = suffix ? suffix + 1 : entry->path.buf;
+    return (strview_t){
+        .buf = suffix,
+        .len = (size_t)(suffix - entry->path.buf),
+    };
 }

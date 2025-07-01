@@ -253,7 +253,7 @@ class Unit:
             else:
                 print(f"@@@ stderr=\x1b[1m{res.stderr}\x1b[0m", flush=True)
 
-            content = find_path_and_read(stderr)
+            content = find_path_and_read(stderr, self.test_name())
             if content:
                 print(content, flush=True)
 
@@ -323,7 +323,7 @@ def diff_memory(dump: str) -> str:
     return "\n".join(diff)
 
 
-def find_path_and_read(string: str) -> Optional[str]:
+def find_path_and_read(string: str, test_name: str) -> Optional[str]:
     if string.endswith(('"', "'")):
         path = string[:-1].rsplit(string[-1])[-1]
     else:
@@ -395,7 +395,7 @@ def find_path_and_read(string: str) -> Optional[str]:
             )
 
         return (
-            f"@@@ \x1b[38;2;138;183;255;48;2;30;30;30m{original_file}:{original_row + 1}\x1b[0m"
+            f"@@@ \x1b[38;2;138;183;255;48;2;30;30;30m{original_file}:{original_row + 1} ({test_name})\x1b[0m"
             f"\n{'\n'.join(result)}"
         )
     else:

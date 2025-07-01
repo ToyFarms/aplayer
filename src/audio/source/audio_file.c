@@ -1,4 +1,7 @@
+#include "_math.h"
 #include "audio_source.h"
+#include "image.h"
+#include "imgconv.h"
 #include "libavcodec/avcodec.h"
 #include "libavformat/avformat.h"
 #include "libavutil/log.h"
@@ -30,6 +33,7 @@ typedef struct audio_file
     resampler resampl;
 
     AVFrame *frame;
+    AVFrame *resampl_frame;
     AVPacket *pkt;
 } audio_file;
 
@@ -62,6 +66,11 @@ static int audio_file_init(audio_source *audio)
         log_error("Failed to open input: %s\n", av_err2str(ret));
         return -1;
     }
+    if (ctx->ic->probe_score < 20)
+    {
+        log_error("Probe score too low!\n");
+        return -1;
+    }
 
     log_debug("Find stream info\n");
     av_log_set_level(AV_LOG_ERROR);
@@ -75,6 +84,16 @@ static int audio_file_init(audio_source *audio)
 
     ctx->audio_stream = av_find_best_stream(ctx->ic, AVMEDIA_TYPE_AUDIO, -1, -1,
                                             &ctx->codec, 0);
+    log_debug("Audio stream index: %d\n", ctx->audio_stream);
+    if (ctx->audio_stream == AVERROR_STREAM_NOT_FOUND)
+    {
+        log_error("Cannot find audio stream, aborting...\n");
+        return -1;
+    }
+
+    audio->duration = ctx->ic->duration;
+    audio->timestamp = 0;
+    log_debug("Duration: %lu\n", audio->duration);
 
     log_debug("Allocating AVCodecContext\n");
     ctx->avctx = avcodec_alloc_context3(ctx->codec);
@@ -119,13 +138,16 @@ static void audio_file_free(audio_source *audio)
 
     free(ctx->filename);
 
-    log_debug("Cleanup: Free AVCodecContext\n");
-    avcodec_free_context(&ctx->avctx);
+    swr_free(&ctx->resampl.swr);
 
     log_debug("Cleanup: Closing AVFormatContext\n");
     avformat_close_input(&ctx->ic);
 
+    log_debug("Cleanup: Free AVCodecContext\n");
+    avcodec_free_context(&ctx->avctx);
+
     av_frame_free(&ctx->frame);
+    av_frame_free(&ctx->resampl_frame);
     av_packet_free(&ctx->pkt);
 
     free(ctx);
@@ -186,19 +208,12 @@ static int audio_resample(audio_source *audio, uint8_t **data,
     bool first_iter = true;
     do
     {
-        AVFrame *frame = av_frame_alloc();
-        if (!frame)
-        {
-            log_error("Failed to allocate AVFrame\n");
-            goto fail_inner;
-        }
+        ctx->resampl_frame->ch_layout = tgt_layout;
+        ctx->resampl_frame->sample_rate = tgt_sample_rate;
+        ctx->resampl_frame->format = tgt_fmt;
+        ctx->resampl_frame->nb_samples = n;
 
-        frame->ch_layout = tgt_layout;
-        frame->sample_rate = tgt_sample_rate;
-        frame->format = tgt_fmt;
-        frame->nb_samples = n;
-
-        int ret = av_frame_get_buffer(frame, 0);
+        int ret = av_frame_get_buffer(ctx->resampl_frame, 0);
         if (ret < 0)
         {
             log_error("Failed to allocate sample buffer: %s\n",
@@ -206,7 +221,7 @@ static int audio_resample(audio_source *audio, uint8_t **data,
             goto fail_inner;
         }
         nb_samples = ret =
-            swr_convert(ctx->resampl.swr, frame->data, nb_samples,
+            swr_convert(ctx->resampl.swr, ctx->resampl_frame->data, nb_samples,
                         first_iter ? (const uint8_t **)data : NULL,
                         first_iter ? src_nb_samples : 0);
         if (ret < 0)
@@ -217,22 +232,33 @@ static int audio_resample(audio_source *audio, uint8_t **data,
         if (nb_samples == 0)
             goto fail_inner;
 
-        frame->nb_samples = nb_samples;
-        ret = ring_buf_write(&audio->buffer, frame->data[0],
-                             frame->nb_samples * frame->ch_layout.nb_channels);
+        ctx->resampl_frame->nb_samples = nb_samples;
+        if (ctx->resampl_frame->nb_samples *
+                ctx->resampl_frame->ch_layout.nb_channels >
+            audio->buffer.capacity - audio->buffer.length)
+        {
+            log_error(
+                "Buffer overwrite! attempt to write %d sample, available: %d\n",
+                ctx->resampl_frame->nb_samples *
+                    ctx->resampl_frame->ch_layout.nb_channels,
+                audio->buffer.capacity - audio->buffer.length);
+        }
+        ret = ring_buf_write(&audio->buffer, ctx->resampl_frame->data[0],
+                             ctx->resampl_frame->nb_samples *
+                                 ctx->resampl_frame->ch_layout.nb_channels);
         if (ret < 0)
         {
             log_error("Failed to enqueue the audio frame\n");
             goto fail_inner;
         }
-        av_frame_free(&frame);
+        av_frame_unref(ctx->resampl_frame);
 
         n -= nb_samples;
         first_iter = false;
 
         continue;
     fail_inner:
-        av_frame_free(&frame);
+        av_frame_unref(ctx->resampl_frame);
         break;
     } while (n && nb_samples);
 
@@ -274,6 +300,11 @@ static int audio_file_update(audio_source *audio)
             continue;
         }
 
+        audio->timestamp = (ctx->pkt->pts *
+                            ctx->ic->streams[ctx->audio_stream]->time_base.num *
+                            AV_TIME_BASE) /
+                           ctx->ic->streams[ctx->audio_stream]->time_base.den;
+
         ret = avcodec_send_packet(ctx->avctx, ctx->pkt);
         av_packet_unref(ctx->pkt);
 
@@ -307,11 +338,91 @@ static int audio_file_update(audio_source *audio)
     return new_length;
 
 error:
-    // Clean up any partly‐used frame/packet before returning failure
     av_frame_unref(ctx->frame);
     av_packet_unref(ctx->pkt);
     return -2;
 }
+
+static void audio_file_seek(audio_source *src, int64_t ms, int whence)
+{
+    src->buffer.write_idx = 0;
+    src->buffer.read_idx = 0;
+    src->buffer.length = 0;
+
+    audio_file *file = src->ctx;
+
+    int64_t pos = ((double)ms / 1000.0) * (double)AV_TIME_BASE;
+    int64_t abs_pos = src->timestamp;
+    switch (whence)
+    {
+    case SEEK_SET:
+        abs_pos = pos;
+        break;
+    case SEEK_CUR:
+        abs_pos = src->timestamp + pos;
+        break;
+    case SEEK_END:
+        abs_pos = src->duration - pos;
+        break;
+    }
+
+    abs_pos = MATH_CLAMP(abs_pos, 0, src->duration);
+    int err = avformat_seek_file(file->ic, -1, INT64_MIN, abs_pos, INT64_MAX,
+                                 AVSEEK_FLAG_BACKWARD | AVSEEK_FLAG_ANY);
+
+    if (err < 0)
+    {
+        log_error("Could not seek to %.2fs. %s.\n",
+                  (double)abs_pos / (double)AV_TIME_BASE, av_err2str(err));
+    }
+}
+
+static void audio_file_get_arts(audio_source *src, array(image_t) * out)
+{
+    audio_file *file = src->ctx;
+
+    for (int i = 0; i < file->ic->nb_streams; i++)
+    {
+        AVStream *stream = file->ic->streams[i];
+        if (stream->disposition & AV_DISPOSITION_ATTACHED_PIC)
+        {
+            AVPacket *pkt = &stream->attached_pic;
+            AVDictionaryEntry *title_ent =
+                av_dict_get(stream->metadata, "title", NULL, 0);
+            AVDictionaryEntry *comment_ent =
+                av_dict_get(stream->metadata, "comment", NULL, 0);
+            char *title = NULL;
+            char *comment = NULL;
+            if (title_ent)
+                title = strdup(title_ent->value);
+            if (comment_ent)
+                comment = strdup(comment_ent->value);
+
+            log_debug("Got attached picture: %s (%s) size=%d\n", title, comment,
+                      pkt->size);
+            imgconv_frame frame = imgconv_decode(
+                pkt->data, pkt->size, AV_CODEC_ID_NONE, AV_PIX_FMT_RGB24);
+            if (frame.buffer == NULL)
+            {
+                log_error("Failed to decode packet\n");
+                continue;
+            }
+
+            image_t img = {0};
+
+            img.data = frame.buffer;
+            img.size = frame.size;
+            img.width = frame.width;
+            img.height = frame.height;
+            img.title = title;
+            img.comment = comment;
+            img.repr = NULL;
+
+            array_append(out, &img, 1);
+        }
+    }
+}
+
 static int audio_file_get_frame(audio_source *audio, int req_sample, float *out)
 {
     if (req_sample < 0)
@@ -326,8 +437,8 @@ static int audio_file_get_frame(audio_source *audio, int req_sample, float *out)
     return req_sample;
 }
 
-int audio_set_metadata(audio_source *audio, int nb_channels, int sample_rate,
-                       enum audio_format sample_fmt)
+int audio_set_info(audio_source *audio, int nb_channels, int sample_rate,
+                   enum audio_format sample_fmt)
 {
     if (audio == NULL)
     {
@@ -397,31 +508,43 @@ audio_source audio_from_file(const char *filename, int nb_channels,
     audio.free = audio_file_free;
     audio.update = (void *)audio_file_update;
     audio.get_frame = audio_file_get_frame;
+    audio.seek = audio_file_seek;
+    audio.get_arts = audio_file_get_arts;
 
     if (audio_file_init(&audio) < 0)
+    {
         log_error("Failed to initialize audio source: %s\n", filename);
+        errno = -1;
+        goto exit;
+    }
 
-    AVFrame *frame = av_frame_alloc();
-    if (frame == NULL)
+    ctx->frame = av_frame_alloc();
+    if (ctx->frame == NULL)
     {
         log_error("Failed to initialize audio: cannot allocate AVFrame\n");
         errno = -ENOMEM;
         goto exit;
     }
-    ctx->frame = frame;
 
-    AVPacket *pkt = av_packet_alloc();
-    if (pkt == NULL)
+    ctx->resampl_frame = av_frame_alloc();
+    if (ctx->resampl_frame == NULL)
+    {
+        log_error("Failed to initialize audio: cannot allocate AVFrame\n");
+        errno = -ENOMEM;
+        goto exit;
+    }
+
+    ctx->pkt = av_packet_alloc();
+    if (ctx->pkt == NULL)
     {
         log_error("Failed to initialize audio: cannot allocate AVPacket\n");
         errno = -ENOMEM;
         goto exit;
     }
-    ctx->pkt = pkt;
 
-    if (audio_set_metadata(&audio, nb_channels, sample_rate, sample_fmt) < 0)
+    if (audio_set_info(&audio, nb_channels, sample_rate, sample_fmt) < 0)
     {
-        log_error("Cannot set audio metadata to %d:%d:%s\n", nb_channels,
+        log_error("Cannot set audio info to %d:%d:%s\n", nb_channels,
                   sample_rate, audio_format_str(sample_fmt));
         errno = -EINVAL;
         goto exit;

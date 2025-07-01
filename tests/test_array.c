@@ -551,3 +551,77 @@ TEST_BEGIN(check_zero_realloc)
     ASSERT_MEM_EQ(arr.data, expected, sizeof(expected));
 }
 TEST_END()
+
+TEST_BEGIN(random_shuffle_integrity)
+{
+    array_t arr = array_create(10, sizeof(int));
+    for (int i = 0; i < 10; ++i)
+        array_append(&arr, &i, 1);
+
+    bool exists[10];
+    for (int iter = 0; iter < 100; ++iter)
+    {
+        memset(exists, 0, sizeof(exists));
+        array_shuffle(&arr);
+        int x;
+        ARR_FOREACH(arr, x, i)
+        {
+            exists[x] = true;
+        }
+
+        for (int i = 0; i < 10; i++)
+            ASSERT_TRUE(exists[i]);
+    }
+
+    ASSERT_INT_EQ(arr.length, 10);
+    ASSERT_INT_EQ(arr.capacity, 10);
+}
+TEST_END()
+
+TEST_BEGIN(reverse)
+{
+    array_t arr = array_create(6, sizeof(int));
+    int data[] = {10, 20, 30, 40, 50, 60};
+    array_append(&arr, data, 6);
+
+    array_reverse(&arr);
+
+    int expected[] = {60, 50, 40, 30, 20, 10};
+    ASSERT_MEM_EQ(arr.data, expected, sizeof(expected));
+    ASSERT_INT_EQ(arr.length, 6);
+    ASSERT_INT_EQ(arr.capacity, 6);
+}
+TEST_END()
+
+TEST_BEGIN(reverse2x)
+{
+    array_t arr = array_create(6, sizeof(int));
+    int data[] = {10, 20, 30, 40, 50, 60};
+    array_append(&arr, data, 6);
+
+    array_reverse(&arr);
+    array_reverse(&arr);
+
+    int expected[] = {10, 20, 30, 40, 50, 60};
+    ASSERT_MEM_EQ(arr.data, expected, sizeof(expected));
+    ASSERT_INT_EQ(arr.length, 6);
+    ASSERT_INT_EQ(arr.capacity, 6);
+}
+TEST_END()
+
+TEST_BEGIN(reverse3x)
+{
+    array_t arr = array_create(6, sizeof(int));
+    int data[] = {10, 20, 30, 40, 50, 60};
+    array_append(&arr, data, 6);
+
+    array_reverse(&arr);
+    array_reverse(&arr);
+    array_reverse(&arr);
+
+    int expected[] = {60, 50, 40, 30, 20, 10};
+    ASSERT_MEM_EQ(arr.data, expected, sizeof(expected));
+    ASSERT_INT_EQ(arr.length, 6);
+    ASSERT_INT_EQ(arr.capacity, 6);
+}
+TEST_END()

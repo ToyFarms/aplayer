@@ -8,6 +8,11 @@
 #define MATH_XYTOIDX(x, y, width) (((y) * (width)) + (x))
 #define MATH_ABS(x)               ((x) >= 0 ? (x) : -(x))
 
+#define MATH_RESCALE(x, x_min, x_max, y_min, y_max)                            \
+    ((y_min) + ((x) - (x_min)) / ((x_max) - (x_min)) * ((y_max) - (y_min)))
+#define MATH_CLOSE_ENOUGH(x, y)      (MATH_ABS((x) - (y)) < 0.001f)
+#define MATH_INBETWEEN(x, low, high) (x >= low && x <= high)
+
 typedef struct vec2
 {
     int x, y;

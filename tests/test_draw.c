@@ -9,10 +9,12 @@ INCLUDE_END
 
 CFLAGS_BEGIN /*
  -Isrc/include
+ -Ithirdparty/include
  src/term/term_draw.c
  src/ui/color.c
  src/struct/ds.c
  src/logger.c
+ thirdparty/wcwidth.c
  -lm
  */ CFLAGS_END
 
@@ -413,7 +415,7 @@ TEST_BEGIN(hblockf, INIT : setlocale)
         float x = i - (int)i;
         term_draw_hblockf(&str, x);
 
-        int idx = x * 9.0f;
+        int idx = x * 8.0f;
         str_catwch(&expected, blocks[idx]);
 
         ASSERT_INT_EQ((int)str.len, (int)expected.len);
@@ -433,7 +435,7 @@ TEST_BEGIN(vblockf, INIT : setlocale)
         float x = i - (int)i;
         term_draw_vblockf(&str, x);
 
-        int idx = x * 9.0f;
+        int idx = x * 8.0f;
         str_catwch(&expected, blocks[idx]);
 
         ASSERT_INT_EQ((int)str.len, (int)expected.len);
@@ -449,10 +451,11 @@ TEST_BEGIN(rect)
     term_draw_rect(&str, VEC(69, 5), COLOR(12, 23, 34), COLOR_NONE);
 
     char *expected =
-        TESC "[48;2;12;23;34m" TESC "[69X" TESC "[B" TESC "[48;2;12;23;34m" TESC
-             "[69X" TESC "[B" TESC "[48;2;12;23;34m" TESC "[69X" TESC "[B" TESC
-             "[48;2;12;23;34m" TESC "[69X" TESC "[B" TESC "[48;2;12;23;34m" TESC
-             "[69X" TESC "[B";
+        TESC "[48;2;12;23;34m" TESC "[69X" TESC TRESET TESC "[B" TESC
+             "[48;2;12;23;34m" TESC "[69X" TESC TRESET TESC "[B" TESC
+             "[48;2;12;23;34m" TESC "[69X" TESC TRESET TESC "[B" TESC
+             "[48;2;12;23;34m" TESC "[69X" TESC TRESET TESC "[B" TESC
+             "[48;2;12;23;34m" TESC "[69X" TESC TRESET TESC "[B";
     ASSERT_STR_EQ(str.buf, expected, str.len);
 }
 TEST_END()
@@ -464,10 +467,11 @@ TEST_BEGIN(rect2)
     term_draw_rect(&str, VEC(69, 5), COLOR_NONE, COLOR(12, 23, 34));
 
     char *expected =
-        TESC "[38;2;12;23;34m" TESC "[69X" TESC "[B" TESC "[38;2;12;23;34m" TESC
-             "[69X" TESC "[B" TESC "[38;2;12;23;34m" TESC "[69X" TESC "[B" TESC
-             "[38;2;12;23;34m" TESC "[69X" TESC "[B" TESC "[38;2;12;23;34m" TESC
-             "[69X" TESC "[B";
+        TESC "[38;2;12;23;34m" TESC "[69X" TESC TRESET TESC "[B" TESC
+             "[38;2;12;23;34m" TESC "[69X" TESC TRESET TESC "[B" TESC
+             "[38;2;12;23;34m" TESC "[69X" TESC TRESET TESC "[B" TESC
+             "[38;2;12;23;34m" TESC "[69X" TESC TRESET TESC "[B" TESC
+             "[38;2;12;23;34m" TESC "[69X" TESC TRESET TESC "[B";
     ASSERT_STR_EQ(str.buf, expected, str.len);
 }
 TEST_END()
