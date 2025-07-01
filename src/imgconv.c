@@ -162,9 +162,6 @@ imgconv_frame imgconv_resize(const uint8_t *src_buf, int src_width,
         goto cleanup;
     }
 
-    int alignment = sws_receive_slice_alignment(sws);
-    // int alignment = 1;
-
     src_frame = av_frame_alloc();
     if (src_frame == NULL)
     {
@@ -172,7 +169,7 @@ imgconv_frame imgconv_resize(const uint8_t *src_buf, int src_width,
         goto cleanup;
     }
     ret = av_image_fill_arrays(src_frame->data, src_frame->linesize, src_buf,
-                               srcfmt, src_width, src_height, alignment);
+                               srcfmt, src_width, src_height, 1);
     if (ret < 0)
     {
         log_error("Failed to fill array to src_frame: %s\n", av_err2str(ret));
@@ -186,7 +183,7 @@ imgconv_frame imgconv_resize(const uint8_t *src_buf, int src_width,
         goto cleanup;
     }
     ret = av_image_alloc(dst_frame->data, dst_frame->linesize, dst_width,
-                         dst_height, dstfmt, alignment);
+                         dst_height, dstfmt, 1);
     if (ret < 0)
     {
         log_error("Failed to allocate image buffer: %s\n", av_err2str(ret));
@@ -202,8 +199,7 @@ imgconv_frame imgconv_resize(const uint8_t *src_buf, int src_width,
         goto cleanup;
     }
 
-    int buf_size =
-        av_image_get_buffer_size(dstfmt, dst_width, dst_height, alignment);
+    int buf_size = av_image_get_buffer_size(dstfmt, dst_width, dst_height, 1);
     uint8_t *buf = av_malloc(buf_size);
     if (buf == NULL)
     {
@@ -213,7 +209,7 @@ imgconv_frame imgconv_resize(const uint8_t *src_buf, int src_width,
 
     ret = av_image_copy_to_buffer(
         buf, buf_size, (const uint8_t *const *)dst_frame->data,
-        dst_frame->linesize, dstfmt, dst_width, dst_height, alignment);
+        dst_frame->linesize, dstfmt, dst_width, dst_height, 1);
     if (ret < 0)
     {
         log_error("av_image_copy_to_buffer failed: %s\n", av_err2str(ret));
