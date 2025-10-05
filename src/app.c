@@ -1,7 +1,9 @@
 #include "app.h"
 #include "audio_analyzer.h"
+#include "audio_effect.h"
 #include "exception.h"
 #include "libavutil/log.h"
+#include "session.h"
 #include "term.h"
 
 #include <errno.h>
@@ -68,7 +70,7 @@ int app_init()
 
     log_debug("Initializing audio\n");
     app->audio = audio_create(audio_callback, -1, 2, 48000, AUDIO_FLT);
-    // TODO: errno is not 0 (even though its fine), Socket operation on
+    // FIXME: errno is not 0 (even though its fine), Socket operation on
     // non-socket
     if (errno != 0)
     {
@@ -78,6 +80,9 @@ int app_init()
 
     audio_analyzer rms = audio_analyzer_rms(false, rms_callback, NULL);
     array_append(&app->audio->mixer.analyzer, &rms, 1);
+
+    audio_effect autogain = audio_eff_autogain();
+    array_append(&app->audio->mixer.effects, &autogain, 1);
 
     g_app = app;
     return 0;
@@ -121,6 +126,14 @@ void app_cleanup()
 
     str_free(&g_app->term.buf);
     ui_free(&g_app->ui);
+
+    char *s = session_serialize(g_app);
+
+    FILE *f = fopen(".session.json", "w");
+    fwrite(s, 1, strlen(s), f);
+    fclose(f);
+
+    free(s);
 
     playlist_free(&g_app->playlist);
 

@@ -161,6 +161,8 @@ static const char *term_color_mode_name(enum term_color_mode mode)
         return "8 BIT";
     case TERM_COLOR_MONO:
         return "MONO";
+    default:
+        return "?";
     }
 }
 
@@ -192,6 +194,7 @@ void term_altbuf();
 void term_mainbuf();
 void term_exit();
 vec2 term_size();
+vec2 term_size_update(term_state *term);
 void term_get_events(queue_t *out);
 
 #endif /* __TERM_H */

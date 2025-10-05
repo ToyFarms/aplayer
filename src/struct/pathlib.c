@@ -1,4 +1,5 @@
 #include "pathlib.h"
+#include "logger.h"
 
 #include <assert.h>
 #include <unistd.h>
@@ -136,4 +137,24 @@ str_t *path_render(path_t *path)
     path->back = temp;
 
     return &path->front;
+}
+
+bool path_exists(char *path)
+{
+#if OS == OS_LINUX
+    return access(path, F_OK) == 0;
+#else
+#  warning "NOT TESTED"
+    return _access(path, 0) == 0;
+#endif // OS == OS_LINUX
+}
+
+strview_t path_name(char *path)
+{
+    char *name = strrchr(path, '/');
+    name = name ? name + 1 : path;
+    return (strview_t){
+        .buf = name,
+        .len = (size_t)(name - path),
+    };
 }

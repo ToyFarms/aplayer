@@ -18,6 +18,8 @@ int vu_meter_get_width(ui_state *state, int height, int nb_channels);
 void render_statusline(ui_state *state, vec2 pos, vec2 size);
 int tabs_get_width(ui_state *state);
 void render_tabs(ui_state *state, vec2 pos, vec2 size);
-void render_art(ui_state *state, vec2 pos, vec2 size);
+vec2 art_get_size(ui_state *state, int width, enum image_render_method method);
+void render_art(ui_state *state, vec2 pos, vec2 size,
+                enum image_render_method method);
 
 #endif /* __LIST_H */

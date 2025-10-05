@@ -2,14 +2,12 @@
 #include "audio_analyzer.h"
 #include "audio_effect.h"
 #include "audio_source.h"
-#include "exception.h"
 #include "logger.h"
 
 #include <assert.h>
 #include <errno.h>
 #include <math.h>
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 
 audio_mixer mixer_create(int nb_channels, int sample_rate,
@@ -25,6 +23,7 @@ audio_mixer mixer_create(int nb_channels, int sample_rate,
     mixer.sample_fmt = sample_fmt;
     mixer.master_gain = 0.0f;
     mixer.analyzer = array_create(4, sizeof(audio_analyzer));
+    mixer.effects = array_create(4, sizeof(audio_effect));
     pthread_mutex_init(&mixer.source_mutex, NULL);
 
     mixer.sources = array_create(16, sizeof(audio_source));
@@ -44,9 +43,27 @@ void mixer_free(audio_mixer *mixer)
     if (mixer == NULL)
         return;
 
+    pthread_mutex_lock(&mixer->source_mutex);
+    audio_analyzer *analyzer;
+    ARR_FOREACH_BYREF(mixer->analyzer, analyzer, i)
+    {
+        analyzer->free(analyzer);
+    }
+    audio_effect *eff;
+    ARR_FOREACH_BYREF(mixer->effects, eff, i)
+    {
+        eff->free(eff);
+    }
+    pthread_mutex_unlock(&mixer->source_mutex);
+
     mixer_clear(mixer);
+
+    pthread_mutex_lock(&mixer->source_mutex);
+    array_free(&mixer->analyzer);
+    array_free(&mixer->effects);
     array_free(&mixer->sources);
     array_free(&mixer->scratch);
+    pthread_mutex_unlock(&mixer->source_mutex);
 
     pthread_mutex_destroy(&mixer->source_mutex);
 }
@@ -54,15 +71,10 @@ void mixer_free(audio_mixer *mixer)
 void mixer_clear(audio_mixer *mixer)
 {
     pthread_mutex_lock(&mixer->source_mutex);
-    audio_source src;
-    ARR_FOREACH(mixer->sources, src, i)
+    audio_source *src;
+    ARR_FOREACH_BYREF(mixer->sources, src, i)
     {
-        audio_effect eff;
-        ARR_FOREACH(src.pipeline, eff, j)
-        {
-            eff.free(&eff);
-        }
-        src.free(&src);
+        src->free(src);
     }
     mixer->sources.length = 0;
     pthread_mutex_unlock(&mixer->source_mutex);
@@ -70,12 +82,13 @@ void mixer_clear(audio_mixer *mixer)
 
 int mixer_get_frame(audio_mixer *mixer, int req_sample, float *out)
 {
-    int ret, len, max_len = 0;
+    int ret = 0, len = 0, max_len = 0;
     if (mixer->paused)
         return 0;
 
     pthread_mutex_lock(&mixer->source_mutex);
     audio_source *src;
+    float gain = powf(10, mixer->master_gain / 20);
     ARR_FOREACH_BYREF(mixer->sources, src, i)
     {
         if (src->is_finished)
@@ -105,9 +118,50 @@ int mixer_get_frame(audio_mixer *mixer, int req_sample, float *out)
 
         assert(mixer->scratch.capacity >= len);
         for (int sample = 0; sample < len; sample++)
-            out[sample] += ARR_AS(mixer->scratch, float)[sample] *
-                           powf(10, mixer->master_gain / 20);
+            out[sample] += ARR_AS(mixer->scratch, float)[sample];
     }
+
+    // TODO: fix order, make all changeable
+
+    float peak = 0.0f;
+    for (int sample = 0; sample < max_len; sample++)
+    {
+        float a = fabsf(out[sample]);
+        if (a > peak)
+            peak = a;
+    }
+
+    const float target_peak = 0.95f;
+    float desired_gain = 1.0f;
+    if (peak > 1e-12f)
+        desired_gain = (peak > target_peak) ? (target_peak / peak) : 1.0f;
+
+    const float attack = 0.2f;
+    const float release = 0.99f;
+
+    if (mixer->norm_gain <= 0.0f)
+        mixer->norm_gain = 1.0f;
+
+    if (desired_gain < mixer->norm_gain)
+        mixer->norm_gain =
+            mixer->norm_gain * (1.0f - attack) + desired_gain * attack;
+    else
+        mixer->norm_gain =
+            mixer->norm_gain * release + desired_gain * (1.0f - release);
+
+    for (int sample = 0; sample < max_len; sample++)
+        out[sample] *= mixer->norm_gain;
+
+    audio_effect *eff;
+    ARR_FOREACH_BYREF(mixer->effects, eff, i)
+    {
+        eff->process(eff, AUDIO_CALLBACK_PARAM(out, max_len, mixer->nb_channels,
+                                               mixer->sample_rate,
+                                               mixer->sample_fmt));
+    }
+
+    for (int sample = 0; sample < max_len; sample++)
+        out[sample] *= gain;
 
     audio_analyzer *analyzer;
     ARR_FOREACH_BYREF(mixer->analyzer, analyzer, i)

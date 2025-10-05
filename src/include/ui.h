@@ -15,6 +15,7 @@ enum tab_type
 {
     TAB_PLAYLIST,
     TAB_VISUAL,
+    TAB_METADATA,
     TAB_LEN,
 };
 
@@ -26,6 +27,8 @@ static const char *tab_name(enum tab_type tab)
         return "PLAYLIST";
     case TAB_VISUAL:
         return "VISUAL";
+    case TAB_METADATA:
+        return "METADATA";
     default:
         return "TAB_UNKNOWN";
     }
@@ -118,12 +121,31 @@ typedef struct ui_tabs_state
     enum tab_type selected;
 } ui_tabs_state;
 
+typedef struct ui_art_image
+{
+    int ref_index;
+    str_t rendered;
+    int width;
+    int height;
+    enum image_render_method method;
+} ui_art_image;
+
 typedef struct ui_art_state
 {
     array(image_t) images;
+    array(ui_art_image) images_state;
     bool initialized;
-    image_renderer_ctx renderer;
+    enum image_render_method method;
 } ui_art_state;
+
+struct ui_overlay_state;
+
+typedef struct ui_overlay_state
+{
+    struct ui_overlay_state *next;
+    int layer;
+    str_t content;
+} ui_overlay_state;
 
 typedef struct ui_state
 {
@@ -137,6 +159,7 @@ typedef struct ui_state
     ui_vu_meter_state vu_meter_st;
     ui_tabs_state tabs_st;
     ui_art_state art_st;
+    ui_overlay_state overlay_st;
 
     ui_setting opt;
 } ui_state;

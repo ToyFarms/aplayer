@@ -1,8 +1,13 @@
+#include "dict.h"
 #include "fs.h"
 #include "logger.h"
+#include "queue.h"
 
 #include <errno.h>
+#include <stdlib.h>
 #include <string.h>
+#include <sys/inotify.h>
+#include <unistd.h>
 
 int fs_iter_init(fs_iterator *iter, const char *dir)
 {
@@ -88,3 +93,95 @@ strview_t fs_suffix(const fs_entry_t *entry)
         .len = (size_t)(suffix - entry->path.buf),
     };
 }
+
+// TODO: complete this
+
+// typedef struct fsmon_watch_t
+// {
+//     int wd;
+//     char *path;
+//     int flags;
+//     int active;
+// } fsmon_watch_t;
+//
+// typedef struct fsmon_t
+// {
+//     int inotify_fd;
+//     dict_t /* of fsmon_watch_t */ watches;
+//     queue_t /* of fsmon_event */ events;
+// } fsmon_t;
+//
+// fsmon_t *fsmon_create()
+// {
+//     fsmon_t *mon = calloc(1, sizeof(*mon));
+//     if (mon == NULL)
+//     {
+//         log_error("Failed to allocate monitor object\n");
+//         goto error;
+//     }
+//
+//     mon->inotify_fd = inotify_init1(IN_CLOEXEC | IN_NONBLOCK);
+//     if (mon->inotify_fd == -1)
+//     {
+//         log_error("Failed to initialize inotify: %s\n", strerror(errno));
+//         goto error;
+//     }
+//
+//     mon->watches = dict_create();
+//     if (errno != 0)
+//     {
+//         log_error("Failed to create dict for watches: %s\n", strerror(errno));
+//         goto error;
+//     }
+//
+//     mon->events = queue_create();
+//     if (errno != 0)
+//     {
+//         log_error("Failed to create queue for fsmon event: %s\n",
+//                   strerror(errno));
+//         goto error;
+//     }
+//
+//     return mon;
+// error:
+//     if (mon)
+//     {
+//         free(mon);
+//         if (mon->watches.bucket_slot > 0)
+//             dict_free(&mon->watches);
+//         queue_free(&mon->events);
+//         close(mon->inotify_fd);
+//     }
+//
+//     return NULL;
+// }
+//
+// void fsmon_free(fsmon_t *mon)
+// {
+//     if (mon == NULL)
+//         return;
+//
+//     fsmon_watch_t *watch;
+//     DICT_FOREACH(key, watch, i, &mon->watches)
+//     {
+//         inotify_rm_watch(mon->inotify_fd, watch->wd);
+//         free(watch->path);
+//     }
+//     DICT_FOREACH_END;
+//
+//     dict_free(&mon->watches);
+//     queue_free(&mon->events);
+//     close(mon->inotify_fd);
+//
+//     free(mon);
+// }
+//
+// int fsmon_watch(fsmon_t *mon, const char *path, int flags)
+// {
+//     if (dict_exists(&mon->watches, path))
+//         return FSMON_ALREADY_WATCHING;
+//
+//     return FSMON_OK;
+// }
+//
+// const fsmon_event *fsmon_poll(fsmon_t *mon);

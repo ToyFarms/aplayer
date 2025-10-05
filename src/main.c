@@ -5,7 +5,9 @@
 #include "clock.h"
 #include "ds.h"
 #include "logger.h"
+#include "pathlib.h"
 #include "queue.h"
+#include "session.h"
 #include "term.h"
 #include "term_draw.h"
 #include "ui.h"
@@ -23,14 +25,32 @@ int main(int argc, char **argv)
 
     app_instance *app = app_get();
 
-    for (int i = 1; i < argc; i++)
-        playlist_add(&app->playlist, argv[i]);
+    if (path_exists(".session.json"))
+    {
+        FILE *f = fopen(".session.json", "r");
+        fseek(f, 0, SEEK_END);
+        size_t size = ftell(f);
+        rewind(f);
+
+        char *buf = calloc(size, 1);
+        fread(buf, 1, size, f);
+
+        fclose(f);
+
+        session_deserialize(app, buf, size);
+    }
+    else
+    {
+        for (int i = 1; i < argc; i++)
+            playlist_add(&app->playlist, argv[i]);
+    }
 
     clock_highres_t clock = {0};
     clock_init(&clock);
 
     queue_t event_queue = queue_create();
-    play_next(app);
+    event_queue.free = free;
+    play_at_index(app, app->playlist.current_idx);
 
     while (true)
     {
@@ -42,7 +62,10 @@ int main(int argc, char **argv)
             {
             case TERM_EVENT_KEY:
                 if (e->key.ascii == 'q')
+                {
+                    free(e);
                     goto exit;
+                }
                 break;
             case TERM_EVENT_MOUSE:
                 app->term.mouse_x = e->mouse.x;
@@ -52,8 +75,7 @@ int main(int argc, char **argv)
                 app->term.click[2] = e->mouse.state[2];
                 break;
             case TERM_EVENT_RESIZE:
-                app->term.width = e->resize.width;
-                app->term.height = e->resize.height;
+                term_size_update(&app->term);
                 app->term.resized = true;
             case TERM_EVENT_UNKNOWN:
                 break;

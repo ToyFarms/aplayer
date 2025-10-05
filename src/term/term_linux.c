@@ -2,6 +2,7 @@
 #include "logger.h"
 #include "ncurses.h"
 #include "term.h"
+#include "utils.h"
 
 #include <assert.h>
 #include <errno.h>
@@ -76,6 +77,23 @@ vec2 term_size()
 {
     struct winsize w;
     ioctl(STDOUT_FILENO, TIOCGWINSZ, &w);
+
+    return VEC(w.ws_col, w.ws_row);
+}
+
+vec2 term_size_update(term_state *term)
+{
+    struct winsize w;
+    ioctl(STDOUT_FILENO, TIOCGWINSZ, &w);
+
+    term->width = w.ws_col;
+    term->height = w.ws_row;
+
+    if (w.ws_xpixel > 0 && w.ws_ypixel > 0)
+    {
+        term->capability.cell_width = w.ws_xpixel / w.ws_col;
+        term->capability.cell_width = w.ws_xpixel / w.ws_row;
+    }
 
     return VEC(w.ws_col, w.ws_row);
 }
@@ -297,8 +315,8 @@ static void get_cell_size(str_t *resp, int *width, int *height)
         {
             log_error("Unexpected response from terminal, defaulting size to "
                       "10,20\n");
-            *width = 10;
-            *height = 20;
+            *width = 8;
+            *height = 16;
         }
         else
         {
@@ -343,6 +361,7 @@ static bool supports_sixel(str_t *resp)
     if (resp->len <= 3)
         return false;
 
+    print_raw(resp->buf);
     if (resp->buf[0] != '\x1b' || resp->buf[1] != '[' ||
         resp->buf[resp->len - 1] != 'c')
         return false;
@@ -351,7 +370,7 @@ static bool supports_sixel(str_t *resp)
     strview_t v = (strview_t){.buf = resp->buf + 2, .len = resp->len - 1};
     STR_SPLIT(strv(v), token, ";")
     {
-        if (token.len == 1 && token.buf[0] == 4)
+        if (token.len > 0 && token.buf[0] == '4')
             return true;
     }
 
@@ -408,7 +427,6 @@ term_capability term_query_capability()
     cap.supports_sixel = supports_sixel(&resp);
     resp.len = 0;
 
-    // endwin();
     str_free(&resp);
 
     return cap;

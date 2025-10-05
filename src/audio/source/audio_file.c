@@ -270,7 +270,7 @@ fail:
 static int audio_file_update(audio_source *audio)
 {
     audio_file *ctx = audio->ctx;
-    int ret, new_length, pre_length;
+    int ret = 0, decoded_length = 0, pre_length = 0;
 
     if (audio->is_eof)
         return 0;
@@ -332,10 +332,10 @@ static int audio_file_update(audio_source *audio)
                        audio->target_sample_rate) < 0)
         goto error;
 
-    new_length = audio->buffer.length - pre_length;
+    decoded_length = audio->buffer.length - pre_length;
 
     av_frame_unref(ctx->frame);
-    return new_length;
+    return decoded_length;
 
 error:
     av_frame_unref(ctx->frame);
@@ -408,15 +408,9 @@ static void audio_file_get_arts(audio_source *src, array(image_t) * out)
                 continue;
             }
 
-            image_t img = {0};
-
-            img.data = frame.buffer;
-            img.size = frame.size;
-            img.width = frame.width;
-            img.height = frame.height;
+            image_t img = image_from_frame(&frame);
             img.title = title;
             img.comment = comment;
-            img.repr = NULL;
 
             array_append(out, &img, 1);
         }
@@ -506,7 +500,7 @@ audio_source audio_from_file(const char *filename, int nb_channels,
 
     audio.is_realtime = false;
     audio.free = audio_file_free;
-    audio.update = (void *)audio_file_update;
+    audio.update = audio_file_update;
     audio.get_frame = audio_file_get_frame;
     audio.seek = audio_file_seek;
     audio.get_arts = audio_file_get_arts;

@@ -2,6 +2,7 @@
 #define __PLAYLIST_H
 
 #include "array.h"
+#include "cJSON.h"
 #include "fs.h"
 
 enum playlist_loop
@@ -78,5 +79,8 @@ void playlist_remove(playlist_manager *pl, int index);
 void playlist_sort(playlist_manager *pl, enum playlist_sort method,
                    enum playlist_sort_direction sort_direction);
 void playlist_shuffle(playlist_manager *pl);
+void playlist_add_file(playlist_manager *pl, const char *file);
+cJSON *playlist_serialize(playlist_manager *pl);
+int playlist_deserialize(playlist_manager *pl, cJSON *root);
 
 #endif /* __PLAYLIST_H */

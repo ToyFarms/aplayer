@@ -100,6 +100,37 @@ int array_append(array_t *arr, const void *mem, int item_count)
     return 0;
 }
 
+int array_append_slide(array_t *arr, const float *mem, int item_count)
+{
+    assert(arr && mem && item_count > 0);
+    if (item_count < 0 || arr->capacity <= 0)
+        return -EINVAL;
+    else if (arr == NULL || item_count <= 0 || mem == NULL)
+        return -EINVAL;
+
+    if (item_count >= arr->capacity)
+    {
+        memcpy(arr->data, mem + (item_count - arr->capacity) * arr->item_size,
+               arr->capacity * arr->item_size);
+        arr->length = arr->capacity;
+    }
+    else if (arr->length + item_count <= arr->capacity)
+    {
+        array_copy_buffer(arr, mem, item_count);
+    }
+    else
+    {
+        int overflow = (arr->length + item_count) - arr->capacity;
+        memmove(arr->data, offsetfrom(arr, overflow),
+                (arr->length - overflow) * arr->item_size);
+        memcpy(offsetfrom(arr, arr->length - overflow), mem,
+               item_count * arr->item_size);
+        arr->length = arr->capacity;
+    }
+
+    return 0;
+}
+
 int array_insert(array_t *arr, const void *mem, int item_count, int index)
 {
     assert(arr && mem && item_count > 0 && index >= 0);

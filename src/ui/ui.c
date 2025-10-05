@@ -104,7 +104,8 @@ void ui_init(ui_state *state, term_state *term, app_instance *app)
     }
 
     state->art_st.images = array_create(8, sizeof(image_t));
-    state->art_st.renderer = image_renderer_create();
+    state->art_st.images_state = array_create(8, sizeof(ui_art_image));
+    state->art_st.method = IMAGE_RENDER_SIXEL;
 }
 
 void ui_free(ui_state *state)
@@ -131,7 +132,13 @@ void ui_free(ui_state *state)
         image_free(img);
     }
     array_free(&state->art_st.images);
-    image_renderer_free(&state->art_st.renderer);
+
+    ui_art_image *img_state;
+    ARR_FOREACH_BYREF(state->art_st.images_state, img_state, i)
+    {
+        str_free(&img_state->rendered);
+    }
+    array_free(&state->art_st.images_state);
 }
 
 static void ui_update(ui_state *state)
@@ -198,7 +205,25 @@ static void render_playlist_tabs(ui_state *state)
 
 static void render_visual_tabs(ui_state *state)
 {
-    render_art(state, VEC(0, 0), VEC(state->term->width * 0.3, 0));
+    if (!state->art_st.initialized)
+        term_draw_clear(&state->term->buf);
+
+    int width = state->term->width * 0.3;
+    int height = state->term->height * 0.5;
+    render_art(state,
+               VEC(state->term->width / 2 - width / 2,
+                   state->term->height / 2 - height / 2),
+               VEC(width, height), state->art_st.method);
+    // render_art(state, VEC(0, 0), VEC(1, height), state->art_st.method);
+}
+
+static void render_metadata_tabs(ui_state *state)
+{
+}
+
+static void render_overlay(ui_state *state)
+{
+
 }
 
 void ui_render(ui_state *state)
@@ -213,9 +238,14 @@ void ui_render(ui_state *state)
     case TAB_VISUAL:
         render_visual_tabs(state);
         break;
+    case TAB_METADATA:
+        render_metadata_tabs(state);
+        break;
     default:
         break;
     }
+
+    render_overlay(state);
 }
 
 void ui_event(ui_state *state, term_event *e)
@@ -358,6 +388,11 @@ void ui_event(ui_state *state, term_event *e)
                 state->tabs_st.selected = e->key.ascii - '0' - 1;
                 state->term->resized = true;
             }
+        }
+        else if (e->key.virtual == TERM_KEY_F1)
+        {
+            state->art_st.method =
+                (state->art_st.method + 1) % IMAGE_RENDER_LENGTH;
         }
         break;
     case TERM_EVENT_MOUSE:

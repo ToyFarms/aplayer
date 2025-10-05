@@ -2,12 +2,14 @@
 #define __AUDIO_EFFECT_H
 
 #include "audio_callback.h"
+#include "audio_source.h"
 
 enum audio_eff_type
 {
     AUDIO_EFF_GAIN,
     AUDIO_EFF_PAN,
     AUDIO_EFF_FILTER,
+    AUDIO_EFF_AUTOGAIN,
 };
 
 enum audio_filt_type
@@ -50,5 +52,8 @@ audio_effect audio_eff_filter(enum audio_filt_type type, float freq,
                               int sample_rate, filter_param *param);
 void audio_eff_filter_set(audio_effect *eff, enum audio_filt_type type,
                           float freq, int sample_rate, filter_param *param);
+
+audio_effect audio_eff_autogain();
+void audio_eff_autogain_set(audio_effect *eff, audio_source *src);
 
 #endif /* __AUDIO_EFFECT_H */

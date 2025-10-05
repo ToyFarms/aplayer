@@ -121,7 +121,7 @@ void render_list(ui_state *state, vec2 pos, vec2 size)
 
         fs_entry_t *entry =
             playlist_get_at_index(&state->app->playlist, abs_idx);
-        str_cat_str(&line, &strv(entry->name));
+        str_cat(&line, entry->name.buf);
 
         size_t width = term_draw_truncate(buf, &line, left);
         term_draw_padding(buf, left - width);

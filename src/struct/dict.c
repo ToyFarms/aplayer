@@ -15,9 +15,16 @@ uint64_t hash_djb2(const char *buf, size_t size)
     return hash;
 }
 
+static void buckets_free(array(dict_item) * buckets, int length)
+{
+    for (int i = 0; i < length; i++)
+        array_free(&buckets[i]);
+    free(buckets);
+}
+
 static array(dict_item) * buckets_alloc(int length)
 {
-    array(dict_item) *buckets = malloc(length * sizeof(array_t));
+    array(dict_item) *buckets = calloc(length, sizeof(array_t));
     if (buckets == NULL)
         return NULL;
 
@@ -29,12 +36,15 @@ static array(dict_item) * buckets_alloc(int length)
         if (errno != 0)
         {
             log_error("Failed creating array for dict: %s\n", strerror(errno));
-            free(buckets);
-            return NULL;
+            goto error;
         }
     }
 
     return buckets;
+
+error:
+    buckets_free(buckets, length);
+    return NULL;
 }
 
 dict_t dict_create()
@@ -54,7 +64,8 @@ dict_t dict_create()
 
 void dict_free(dict_t *dict)
 {
-    assert(dict);
+    if (dict == NULL)
+        return;
 
     dict_clear(dict);
     free(dict->buckets);
@@ -97,6 +108,7 @@ static array_t *bkt_from_key(dict_t *dict, const char *key)
 
 void dict_resize(dict_t *dict, int new_size)
 {
+    // TODO: reuse old buffer instead of creating new one
     assert(dict && dict->buckets && new_size > 0);
     array(dict_item) *new = buckets_alloc(new_size);
     if (new == NULL)
@@ -121,7 +133,7 @@ void dict_resize(dict_t *dict, int new_size)
         }
     }
 
-    free(dict->buckets);
+    buckets_free(dict->buckets, dict->bucket_slot);
     dict->buckets = new;
     dict->bucket_slot = new_size;
 }
@@ -159,6 +171,8 @@ void dict_insert_copy(dict_t *dict, const char *key, void *item, size_t size)
         dict_resize(dict, dict->bucket_slot * 2);
 
     array_t *bkt = bkt_from_key(dict, key);
+    if (bkt == NULL)
+        return;
 
     dict_item *itm;
     ARR_FOREACH_BYREF(*bkt, itm, i)

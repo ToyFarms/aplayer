@@ -1,4 +1,5 @@
 #include "utils.h"
+#include "audio_effect.h"
 #include "audio_source.h"
 #include "ds.h"
 #include "playlist.h"
@@ -27,7 +28,7 @@
 
 void print_raw(const char *str)
 {
-    str_t s = str_alloc(strlen(str));
+    str_t s = str_alloc(strlen(str) * 1.5);
 
     char c = 0;
     while ((c = *str++))
@@ -49,7 +50,7 @@ void print_raw(const char *str)
         }
     }
 
-    printf("%s", s.buf);
+    log_info("%s", s.buf);
     str_free(&s);
 }
 
@@ -106,6 +107,14 @@ void play_at_index(app_instance *app, int index)
         return;
 
     char *file = entry->path.buf;
+
+    audio_source src_autogain =
+        audio_from_file(file, app->audio->nb_channels, app->audio->sample_rate,
+                        app->audio->sample_fmt);
+    audio_effect *autogain =
+        &ARR_AS(app->audio->mixer.effects, audio_effect)[0];
+    audio_eff_autogain_set(autogain, &src_autogain);
+
     audio_source src =
         audio_from_file(file, app->audio->nb_channels, app->audio->sample_rate,
                         app->audio->sample_fmt);

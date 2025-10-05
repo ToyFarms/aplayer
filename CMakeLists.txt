@@ -8,7 +8,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 include(FindPkgConfig)
 find_package(PkgConfig REQUIRED)
-# string(APPEND CMAKE_C_FLAGS " -Wall -Werror -pg")
+string(APPEND CMAKE_C_FLAGS " -Wall -Werror -pg -Wno-unused-but-set-variable -Wno-unused-variable -Wno-unused-function")
 
 add_executable(aplayer
     ./src/main.c
@@ -21,6 +21,7 @@ add_executable(aplayer
     ./src/clock.c
     ./src/imgconv.c
     ./src/image.c
+    ./src/session.c
 
     ./src/struct/array.c
     ./src/struct/dict.c
@@ -28,6 +29,7 @@ add_executable(aplayer
     ./src/struct/ring_buf.c
     ./src/struct/ds.c
     ./src/struct/arena_allocator.c
+    ./src/struct/pathlib.c
 
     ./src/term/term_linux.c
     ./src/term/term_draw.c
@@ -42,6 +44,7 @@ add_executable(aplayer
     ./src/audio/effect/audio_gain.c
     ./src/audio/effect/audio_pan.c
     ./src/audio/effect/audio_filter.c
+    ./src/audio/effect/audio_autogain.c
 
     ./src/audio/analyzer/audio_rms.c
     ./src/audio/analyzer/audio_fft.c
@@ -64,6 +67,7 @@ add_executable(aplayer
     ./src/ui/widgets/art.c
 
     ./thirdparty/wcwidth.c
+    ./thirdparty/cJSON.c
 )
 
 target_link_libraries(aplayer PRIVATE m pthread fftw3 portaudio)
@@ -72,7 +76,7 @@ if (NOT WIN32)
   target_link_libraries(aplayer PRIVATE ncurses)
 endif()
 
-pkg_check_modules(LIBAV REQUIRED libavformat libavcodec libavutil libswresample libswscale)
+pkg_check_modules(LIBAV REQUIRED libavformat libavcodec libavutil libswresample libswscale libavfilter libsixel libebur128)
 target_include_directories(aplayer PRIVATE ${LIBAV_INCLUDE_DIRS})
 target_link_directories(aplayer PRIVATE ${LIBAV_LIBRARY_DIRS})
 target_link_libraries(aplayer PRIVATE ${LIBAV_LIBRARIES})

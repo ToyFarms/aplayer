@@ -13,6 +13,11 @@ int audio_common_init(audio_source *audio)
 
 void audio_common_free(audio_source *audio)
 {
+    audio_effect *eff;
+    ARR_FOREACH_BYREF(audio->pipeline, eff, i)
+    {
+        eff->free(eff);
+    }
     array_free(&audio->pipeline);
     ring_buf_free(&audio->buffer);
 }

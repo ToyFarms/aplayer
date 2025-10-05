@@ -12,7 +12,7 @@ typedef struct dict_item
 {
     char *key;
     void *data;
-    bool self_owned; // whether the `data` is malloc'ed internally
+    bool self_owned; // whether the `data` is allocated internally
 } dict_item;
 
 typedef uint64_t (*dict_hash_fn)(const char *key, size_t len);

@@ -20,8 +20,8 @@ void queue_free(queue_t *q)
     if (q == NULL)
         return;
 
-    pthread_mutex_destroy(&q->mutex);
     queue_clear(q);
+    pthread_mutex_destroy(&q->mutex);
     memset(q, 0, sizeof(*q));
 }
 

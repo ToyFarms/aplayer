@@ -24,5 +24,7 @@ str_t *path_render(path_t *path);
 
 void path_segmentize(char *str, array_t *out);
 void path_segmentize_insert(char *str, array_t *out, int index);
+bool path_exists(char *path);
+strview_t path_name(char *path);
 
 #endif /* __PATHLIB_H */

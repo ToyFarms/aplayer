@@ -17,7 +17,9 @@ typedef struct audio_mixer
     array(float) scratch;
 
     float master_gain;
+    float norm_gain;
     bool paused;
+    array(audio_effect) effects;
     array(audio_analyzer) analyzer;
 } audio_mixer;
 

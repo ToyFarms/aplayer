@@ -8,7 +8,7 @@
 
 static int audio_init_output(audio_ctx *audio)
 {
-    PaError err;
+    PaError err = paNoError;
     WITH_MUTED_STREAM(stderr)
     {
         err = Pa_Initialize();

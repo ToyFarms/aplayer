@@ -226,9 +226,6 @@ void logger_logv(int level, const char *filename, const char *fn_name, int line,
         va_list args_copy;
         va_copy(args_copy, args);
 
-        // bool use_color = use_color_global && (out.flags & LOG_USE_COLOR);
-        // re-compute the colored prefix for this output if needed
-        // (or you could skip per-output color and just drop it into prefix)
         fprintf(out.fd, "%.*s", prefix_size, prefix);
         vfprintf(out.fd, fmt, args_copy);
         if (fmt[strlen(fmt) - 1] != '\n')
