@@ -16,11 +16,10 @@ char *session_serialize(app_instance *app)
     cJSON *root = playlist_serialize(&app->playlist);
     char *s = cJSON_Print(root);
 
-    audio_source *src;
-    ARR_FOREACH_BYREF(app->audio->mixer.sources, src, i)
-    {
-
-    }
+    // audio_source *src;
+    // ARR_FOREACH_BYREF(app->audio->mixer.sources, src, i)
+    // {
+    // }
 
     return s;
 }

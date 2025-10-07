@@ -25,7 +25,8 @@ void render_art(ui_state *state, vec2 pos, vec2 size,
 
         audio_source *src =
             &ARR_AS(state->app->audio->mixer.sources, audio_source)[0];
-        src->get_arts(src, &state->art_st.images);
+        if (src->get_arts)
+            src->get_arts(src, &state->art_st.images);
 
         for (int i = state->art_st.images_state.length;
              i < state->art_st.images.length; i++)

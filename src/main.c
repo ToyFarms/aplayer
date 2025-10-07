@@ -38,6 +38,7 @@ int main(int argc, char **argv)
         fclose(f);
 
         session_deserialize(app, buf, size);
+        app->ui.playlist_st.recenter = true;
     }
     else
     {

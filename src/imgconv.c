@@ -8,11 +8,117 @@
 #include <libavfilter/buffersink.h>
 #include <libavfilter/buffersrc.h>
 #include <libavformat/avformat.h>
+#include <libavformat/avio.h>
+#include <libavutil/avutil.h>
 #include <libavutil/imgutils.h>
 #include <libavutil/opt.h>
+#include <libavutil/pixfmt.h>
 #include <libswscale/swscale.h>
+#include <stdint.h>
 
 // TODO: add persistent decoder chain, and possibly for sws context also
+
+static enum AVCodecID guess_image_codec_from_magic(const uint8_t *data,
+                                                   int size)
+{
+    if (size >= 4)
+    {
+        // PNG: 89 50 4E 47
+        if (data[0] == 0x89 && data[1] == 'P' && data[2] == 'N' &&
+            data[3] == 'G')
+            return AV_CODEC_ID_PNG;
+        // JPEG: FF D8 FF
+        if (data[0] == 0xFF && data[1] == 0xD8 && data[2] == 0xFF)
+            return AV_CODEC_ID_MJPEG;
+        // GIF: 'G' 'I' 'F'
+        if (data[0] == 'G' && data[1] == 'I' && data[2] == 'F')
+            return AV_CODEC_ID_GIF;
+        // BMP: 'B' 'M'
+        if (data[0] == 'B' && data[1] == 'M')
+            return AV_CODEC_ID_BMP;
+        // WebP: "RIFF" .... "WEBP"
+        if (data[0] == 'R' && data[1] == 'I' && data[2] == 'F' &&
+            data[3] == 'F')
+        {
+            if (size >= 12 && data[8] == 'W' && data[9] == 'E' &&
+                data[10] == 'B' && data[11] == 'P')
+                return AV_CODEC_ID_WEBP;
+        }
+        // JPEG2000 or JP2: "jP  "
+        if (size >= 12 && data[4] == 'j' && data[5] == 'P' && data[6] == ' ' &&
+            data[7] == ' ')
+            return AV_CODEC_ID_JPEG2000;
+        // TIFF: 'II' or 'MM' and magic 42
+        if (size >= 4 && ((data[0] == 'I' && data[1] == 'I' && data[2] == 42 &&
+                           data[3] == 0) ||
+                          (data[0] == 'M' && data[1] == 'M' && data[2] == 0 &&
+                           data[3] == 42)))
+            return AV_CODEC_ID_TIFF;
+    }
+    return AV_CODEC_ID_NONE;
+}
+
+static enum AVCodecID probe_format(const uint8_t *data, size_t size)
+{
+    AVFormatContext *avctx = NULL;
+    AVIOContext *ioctx = NULL;
+    unsigned char *iobuf = NULL;
+    enum AVCodecID codec = AV_CODEC_ID_NONE;
+
+    iobuf = av_malloc(size + AVPROBE_PADDING_SIZE);
+    if (!iobuf)
+    {
+        log_error("malloc failed\n");
+        goto error;
+    }
+    memcpy(iobuf, data, size);
+    memset(iobuf + size, 0, AVPROBE_PADDING_SIZE);
+
+    ioctx = avio_alloc_context(iobuf, size, 0, NULL, NULL, NULL, NULL);
+    if (!ioctx)
+    {
+        log_error("avio_alloc_context failed\n");
+        av_free(iobuf);
+        goto error;
+    }
+
+    avctx = avformat_alloc_context();
+    if (!avctx)
+    {
+        log_error("avformat_alloc_context failed\n");
+        av_free(ioctx->buffer);
+        avio_context_free(&ioctx);
+        goto error;
+    }
+    avctx->pb = ioctx;
+
+    if (avformat_open_input(&avctx, NULL, NULL, NULL) >= 0)
+    {
+        if (avformat_find_stream_info(avctx, NULL) >= 0)
+        {
+            for (unsigned int i = 0; i < avctx->nb_streams; ++i)
+            {
+                AVCodecParameters *par = avctx->streams[i]->codecpar;
+                if (par->codec_type == AVMEDIA_TYPE_VIDEO)
+                {
+                    codec = par->codec_id;
+                    break;
+                }
+            }
+        }
+    }
+
+error:
+    if (avctx)
+        avformat_close_input(&avctx);
+    else
+        avio_context_free(&ioctx);
+
+    if (codec == AV_CODEC_ID_NONE)
+        codec = guess_image_codec_from_magic(data, size);
+
+    return codec;
+}
 
 imgconv_frame imgconv_decode(const uint8_t *data, int size,
                              enum AVCodecID codec_id, enum AVPixelFormat dstfmt)
@@ -25,17 +131,7 @@ imgconv_frame imgconv_decode(const uint8_t *data, int size,
     struct SwsContext *sws = NULL;
 
     if (codec_id == AV_CODEC_ID_NONE)
-    {
-        AVProbeData pd = {.buf = (uint8_t *)data, .buf_size = size};
-        const AVInputFormat *fmt = av_probe_input_format(&pd, 1);
-        if (fmt == NULL || fmt->raw_codec_id == AV_CODEC_ID_NONE)
-        {
-            log_error("Failed to probe data\n");
-            goto error;
-        }
-
-        codec_id = fmt->raw_codec_id;
-    }
+        codec_id = probe_format(data, size);
 
     if (codec_id == AV_CODEC_ID_NONE)
     {
@@ -548,8 +644,10 @@ imgconv_frame imgconv_filter_chain(const uint8_t *buf, int width, int height,
         goto cleanup;
     }
 
-    ret = av_opt_set_int_list(buffersink_ctx, "pix_fmts", pix_fmts,
-                              AV_PIX_FMT_NONE, AV_OPT_SEARCH_CHILDREN);
+    av_opt_set_array(buffersink_ctx, "pix_fmts", AV_OPT_SEARCH_CHILDREN, 0, 2,
+                     AV_OPT_TYPE_FLAG_ARRAY | AV_OPT_TYPE_INT, NULL);
+    // ret = av_opt_set_int_list(buffersink_ctx, "pix_fmts", pix_fmts,
+    //                           AV_PIX_FMT_NONE, AV_OPT_SEARCH_CHILDREN);
     if (ret < 0)
     {
         log_error("Failed to set pix_fmts to output: %s\n", av_err2str(ret));

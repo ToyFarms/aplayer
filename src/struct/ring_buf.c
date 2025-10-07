@@ -63,8 +63,8 @@ int ring_buf_write(ring_buf_t *rbuf, const void *mem, int items)
 
 int ring_buf_read(ring_buf_t *rbuf, int req_item, void *out)
 {
-    assert(rbuf != NULL && rbuf->buf != NULL && req_item > 0 && out != NULL);
-    if (req_item > rbuf->length)
+    assert(rbuf != NULL && rbuf->buf != NULL && out != NULL);
+    if (req_item <= 0 || req_item > rbuf->length)
         return -ENODATA;
 
     if (rbuf->read_idx + req_item <= rbuf->capacity)

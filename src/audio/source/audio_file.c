@@ -130,11 +130,12 @@ static int audio_file_init(audio_source *audio)
 
 static void audio_file_free(audio_source *audio)
 {
-    audio_common_free(audio);
-
     audio_file *ctx = audio->ctx;
     if (ctx == NULL)
+    {
+        audio_common_free(audio);
         return;
+    }
 
     free(ctx->filename);
 
@@ -152,6 +153,8 @@ static void audio_file_free(audio_source *audio)
 
     free(ctx);
     audio->ctx = NULL;
+
+    audio_common_free(audio);
 }
 
 static int audio_resample(audio_source *audio, uint8_t **data,
@@ -343,30 +346,30 @@ error:
     return -2;
 }
 
-static void audio_file_seek(audio_source *src, int64_t ms, int whence)
+static void audio_file_seek(audio_source *audio, int64_t ms, int whence)
 {
-    src->buffer.write_idx = 0;
-    src->buffer.read_idx = 0;
-    src->buffer.length = 0;
+    audio->buffer.write_idx = 0;
+    audio->buffer.read_idx = 0;
+    audio->buffer.length = 0;
 
-    audio_file *file = src->ctx;
+    audio_file *file = audio->ctx;
 
     int64_t pos = ((double)ms / 1000.0) * (double)AV_TIME_BASE;
-    int64_t abs_pos = src->timestamp;
+    int64_t abs_pos = audio->timestamp;
     switch (whence)
     {
     case SEEK_SET:
         abs_pos = pos;
         break;
     case SEEK_CUR:
-        abs_pos = src->timestamp + pos;
+        abs_pos = audio->timestamp + pos;
         break;
     case SEEK_END:
-        abs_pos = src->duration - pos;
+        abs_pos = audio->duration - pos;
         break;
     }
 
-    abs_pos = MATH_CLAMP(abs_pos, 0, src->duration);
+    abs_pos = MATH_CLAMP(abs_pos, 0, audio->duration);
     int err = avformat_seek_file(file->ic, -1, INT64_MIN, abs_pos, INT64_MAX,
                                  AVSEEK_FLAG_BACKWARD | AVSEEK_FLAG_ANY);
 
@@ -377,9 +380,9 @@ static void audio_file_seek(audio_source *src, int64_t ms, int whence)
     }
 }
 
-static void audio_file_get_arts(audio_source *src, array(image_t) * out)
+static void audio_file_get_arts(audio_source *audio, array(image_t) * out)
 {
-    audio_file *file = src->ctx;
+    audio_file *file = audio->ctx;
 
     for (int i = 0; i < file->ic->nb_streams; i++)
     {

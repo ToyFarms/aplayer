@@ -121,19 +121,19 @@ void app_cleanup()
     if (g_app == NULL)
         return;
 
+    char *s = session_serialize(g_app);
+    FILE *f = fopen(".session.json", "w");
+    fwrite(s, 1, strlen(s), f);
+    if (errno != 0)
+        log_error("Failed to write session: %s\n", strerror(errno));
+    fclose(f);
+    free(s);
+
     audio_free(g_app->audio);
     g_app->audio = NULL;
 
     str_free(&g_app->term.buf);
     ui_free(&g_app->ui);
-
-    char *s = session_serialize(g_app);
-
-    FILE *f = fopen(".session.json", "w");
-    fwrite(s, 1, strlen(s), f);
-    fclose(f);
-
-    free(s);
 
     playlist_free(&g_app->playlist);
 
