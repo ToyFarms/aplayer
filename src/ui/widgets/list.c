@@ -41,7 +41,8 @@ void render_list(ui_state *state, vec2 pos, vec2 size)
     bool redraw = state->term->resized || state->playlist_st.redraw;
     if (state->playlist_st.lines.data == NULL)
         state->playlist_st.lines =
-            array_create(state->app->playlist.files.length, sizeof(int32_t));
+            array_create(MATH_MAX(state->app->playlist.files.length, size.y),
+                         sizeof(int32_t));
     else if (state->playlist_st.lines.capacity <
              state->app->playlist.files.length)
     {

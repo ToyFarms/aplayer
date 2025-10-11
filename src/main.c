@@ -25,7 +25,7 @@ int main(int argc, char **argv)
 
     app_instance *app = app_get();
 
-    if (path_exists(".session.json"))
+    if (path_exists(".session.json") && argc <= 1)
     {
         FILE *f = fopen(".session.json", "r");
         fseek(f, 0, SEEK_END);
