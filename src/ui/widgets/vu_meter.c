@@ -1,3 +1,4 @@
+#include "_math.h"
 #include "clock.h"
 #include "widgets.h"
 #include <math.h>
@@ -189,190 +190,214 @@ void render_vu_meter(ui_state *state, vec2 pos, vec2 size)
             term_draw_reset(buf);
         }
 
-        state->vu_meter_st.initialized = true;
+        // sometimes the audio is not loaded yet (rms callback set bars length)
+        // making the width wrong (vu_meter_get_width) because the channel is
+        // unknown yet
+        if (state->vu_meter_st.bars.length != 0)
+            state->vu_meter_st.initialized = true;
     }
 
-#define PEAK_RMS 9.0f
-
-    float rms_raw;
-    ARR_FOREACH(state->vu_meter_st.bars, rms_raw, ch)
+    if (!state->app->audio->mixer.paused)
     {
-        if (isnan(rms_raw))
-            continue;
-
-        float dbfs_raw = 20 * log10f(rms_raw / PEAK_RMS);
-        float dbfs = lerp(ARR_AS(state->vu_meter_st.easing_bars, float)[ch],
-                          dbfs_raw, 0.5);
-        if (isinf(dbfs) || isnan(dbfs) || dbfs < -100)
-            dbfs = -99.0f;
-        ARR_AS(state->vu_meter_st.easing_bars, float)[ch] = dbfs;
-
-        float height = 0;
-        if (dbfs <= -36.0f)
-            height = MATH_RESCALE(dbfs, -90.0f, -40.0f, 0.0f, lower);
-        else
-            height = MATH_RESCALE(dbfs, -36.0f, state->vu_meter_st.high_end,
-                                  state->vu_meter_st.high_start, size.y);
-
-        height = MATH_CLAMP(height, 0, size.y - 1);
-
-        if (state->opt.vu_meter.render_peak)
+#define PEAK_RMS 9.0f
+        float rms_raw;
+        ARR_FOREACH(state->vu_meter_st.bars, rms_raw, ch)
         {
-            if (height > ARR_AS(state->vu_meter_st.peaks, float)[ch])
-            {
-                ARR_AS(state->vu_meter_st.peaks, float)[ch] = height;
-                ARR_AS(state->vu_meter_st.peak_set, uint64_t)
-                [ch] = gclock_now_ns();
-            }
-            else if (gclock_now_ns() -
-                         ARR_AS(state->vu_meter_st.peak_set, uint64_t)[ch] >
-                     MS2NS(500))
-            {
-                ARR_AS(state->vu_meter_st.peaks, float)
-                [ch] *= state->opt.vu_meter.peak_decay;
-            }
-        }
+            if (isnan(rms_raw))
+                continue;
 
-        float old_h = ARR_AS(state->vu_meter_st.prev_bars, float)[ch];
-        int old_height = (int)old_h;
-        int new_height = (int)height;
-        float frac = height - new_height;
-        int x =
-            pos.x + state->opt.vu_meter.left_pad +
-            ch * (state->opt.vu_meter.bar_width + state->opt.vu_meter.bar_gap);
+            float dbfs_raw = 20 * log10f(rms_raw / PEAK_RMS);
+            float dbfs = lerp(ARR_AS(state->vu_meter_st.easing_bars, float)[ch],
+                              dbfs_raw, 0.5);
+            if (isinf(dbfs) || isnan(dbfs) || dbfs < -100)
+                dbfs = -99.0f;
+            ARR_AS(state->vu_meter_st.easing_bars, float)[ch] = dbfs;
 
-        if (new_height > old_height)
-        {
-            for (int y = old_height; y <= new_height; y++)
+            float height = 0;
+            if (dbfs <= -36.0f)
+                height = MATH_RESCALE(dbfs, -90.0f, -40.0f, 0.0f, lower);
+            else
+                height = MATH_RESCALE(dbfs, -36.0f, state->vu_meter_st.high_end,
+                                      state->vu_meter_st.high_start, size.y);
+
+            height = MATH_CLAMP(height, 0, size.y - 1);
+
+            if (state->opt.vu_meter.render_peak)
             {
-                term_draw_pos(buf, VEC(x, pos.y - y));
-                switch (state->opt.vu_meter.style)
+                if (height > ARR_AS(state->vu_meter_st.peaks, float)[ch])
                 {
-                case VU_METER_ANALOG_LINE:
-                    term_draw_color(
-                        buf, COLOR_NONE,
-                        (y >= state->vu_meter_st.mark_red
-                             ? GET_THEMECOLOR(state, "VU_METER_HIGH_FG")
-                         : y >= state->vu_meter_st.mark_yellow
-                             ? GET_THEMECOLOR(state, "VU_METER_MID_FG")
-                             : GET_THEMECOLOR(state, "VU_METER_LOW_FG")));
-                    str_repeat_wchar(buf, L'—', state->opt.vu_meter.bar_width,
-                                     NULL);
-                    break;
-                case VU_METER_ANALOG_HALF:
-                    term_draw_color(
-                        buf, GET_THEMECOLOR(state, "VU_METER_BG"),
-                        (y >= state->vu_meter_st.mark_red
-                             ? GET_THEMECOLOR(state, "VU_METER_HIGH_FG")
-                         : y >= state->vu_meter_st.mark_yellow
-                             ? GET_THEMECOLOR(state, "VU_METER_MID_FG")
-                             : GET_THEMECOLOR(state, "VU_METER_LOW_FG")));
-                    str_repeat_wchar(buf, L'▄', state->opt.vu_meter.bar_width,
-                                     NULL);
-                    break;
-                case VU_METER_ANALOG_BAR:
-                    term_draw_color(
-                        buf,
-                        (y >= state->vu_meter_st.mark_red
-                             ? GET_THEMECOLOR(state, "VU_METER_HIGH_FG")
-                         : y >= state->vu_meter_st.mark_yellow
-                             ? GET_THEMECOLOR(state, "VU_METER_MID_FG")
-                             : GET_THEMECOLOR(state, "VU_METER_LOW_FG")),
-                        GET_THEMECOLOR(state, "VU_METER_SEP"));
-                    if (state->opt.vu_meter.render_separator)
-                        str_repeat_wchar(buf, L'—',
-                                         state->opt.vu_meter.bar_width, NULL);
-                    else
-                        term_draw_hline(buf, state->opt.vu_meter.bar_width);
-                    break;
-                default:
-                    break;
+                    ARR_AS(state->vu_meter_st.peaks, float)[ch] = height;
+                    ARR_AS(state->vu_meter_st.peak_set, uint64_t)
+                    [ch] = gclock_now_ns();
                 }
-                term_draw_reset(buf);
+                else if (gclock_now_ns() -
+                             ARR_AS(state->vu_meter_st.peak_set, uint64_t)[ch] >
+                         MS2NS(500))
+                {
+                    ARR_AS(state->vu_meter_st.peaks, float)
+                    [ch] *= state->opt.vu_meter.peak_decay;
+                }
             }
-        }
-        else if (new_height < old_height)
-        {
-            for (int y = MATH_MIN(old_height + 1, size.y - 1); y > new_height;
-                 y--)
-            {
-                term_draw_pos(buf, VEC(x, pos.y - y));
-                term_draw_color(
-                    buf, GET_THEMECOLOR(state, "VU_METER_BG"),
-                    (y >= state->vu_meter_st.mark_red
-                         ? GET_THEMECOLOR(state, "VU_METER_HIGH_BG")
-                     : y >= state->vu_meter_st.mark_yellow
-                         ? GET_THEMECOLOR(state, "VU_METER_MID_BG")
-                         : GET_THEMECOLOR(state, "VU_METER_LOW_BG")));
-                if (state->opt.vu_meter.render_marks)
-                    str_repeat_wchar(buf, L'—', state->opt.vu_meter.bar_width,
-                                     NULL);
-                else
-                    term_draw_padding(buf, state->opt.vu_meter.bar_width);
-                term_draw_reset(buf);
-            }
-        }
 
-        if (state->opt.vu_meter.style != VU_METER_ANALOG_LINE &&
-            !state->opt.vu_meter.discrete && frac >= 1.0f / 8.0f)
-        {
-            int y = new_height + 1;
-            term_draw_pos(buf, VEC(x, pos.y - y));
-            term_draw_color(buf, GET_THEMECOLOR(state, "VU_METER_BG"),
+            float old_h = ARR_AS(state->vu_meter_st.prev_bars, float)[ch];
+            int old_height = (int)old_h;
+            int new_height = (int)height;
+            float frac = height - new_height;
+            int x = pos.x + state->opt.vu_meter.left_pad +
+                    ch * (state->opt.vu_meter.bar_width +
+                          state->opt.vu_meter.bar_gap);
+
+            if (new_height > old_height)
+            {
+                for (int y = old_height; y <= new_height; y++)
+                {
+                    term_draw_pos(buf, VEC(x, pos.y - y));
+                    switch (state->opt.vu_meter.style)
+                    {
+                    case VU_METER_ANALOG_LINE:
+                        term_draw_color(
+                            buf, COLOR_NONE,
                             (y >= state->vu_meter_st.mark_red
                                  ? GET_THEMECOLOR(state, "VU_METER_HIGH_FG")
                              : y >= state->vu_meter_st.mark_yellow
                                  ? GET_THEMECOLOR(state, "VU_METER_MID_FG")
                                  : GET_THEMECOLOR(state, "VU_METER_LOW_FG")));
-            for (int w = 0; w < state->opt.vu_meter.bar_width; ++w)
-                term_draw_vblockf(buf, frac);
-            term_draw_reset(buf);
-        }
-
-        if (state->opt.vu_meter.render_peak)
-        {
-            int peak_y = ceilf(ARR_AS(state->vu_meter_st.peaks, float)[ch]);
-            if (peak_y + 1 <= size.y)
+                        str_repeat_wchar(buf, L'—',
+                                         state->opt.vu_meter.bar_width, NULL);
+                        break;
+                    case VU_METER_ANALOG_HALF:
+                        term_draw_color(
+                            buf, GET_THEMECOLOR(state, "VU_METER_BG"),
+                            (y >= state->vu_meter_st.mark_red
+                                 ? GET_THEMECOLOR(state, "VU_METER_HIGH_FG")
+                             : y >= state->vu_meter_st.mark_yellow
+                                 ? GET_THEMECOLOR(state, "VU_METER_MID_FG")
+                                 : GET_THEMECOLOR(state, "VU_METER_LOW_FG")));
+                        str_repeat_wchar(buf, L'▄',
+                                         state->opt.vu_meter.bar_width, NULL);
+                        break;
+                    case VU_METER_ANALOG_BAR:
+                        term_draw_color(
+                            buf,
+                            (y >= state->vu_meter_st.mark_red
+                                 ? GET_THEMECOLOR(state, "VU_METER_HIGH_FG")
+                             : y >= state->vu_meter_st.mark_yellow
+                                 ? GET_THEMECOLOR(state, "VU_METER_MID_FG")
+                                 : GET_THEMECOLOR(state, "VU_METER_LOW_FG")),
+                            GET_THEMECOLOR(state, "VU_METER_SEP"));
+                        if (state->opt.vu_meter.render_separator)
+                            str_repeat_wchar(
+                                buf, L'—', state->opt.vu_meter.bar_width, NULL);
+                        else
+                            term_draw_hline(buf, state->opt.vu_meter.bar_width);
+                        break;
+                    default:
+                        break;
+                    }
+                    term_draw_reset(buf);
+                }
+            }
+            else if (new_height < old_height)
             {
-                term_draw_pos(buf, VEC(x, pos.y - peak_y));
-                term_draw_color(
-                    buf, GET_THEMECOLOR(state, "VU_METER_BG"),
-                    (peak_y >= state->vu_meter_st.mark_red
-                         ? GET_THEMECOLOR(state, "VU_METER_HIGH_FG")
-                     : peak_y >= state->vu_meter_st.mark_yellow
-                         ? GET_THEMECOLOR(state, "VU_METER_MID_FG")
-                         : GET_THEMECOLOR(state, "VU_METER_LOW_FG")));
-                str_repeat_wchar(buf, L'—', state->opt.vu_meter.bar_width,
-                                 NULL);
+                for (int y = MATH_MIN(old_height + 1, size.y - 1);
+                     y > new_height; y--)
+                {
+                    term_draw_pos(buf, VEC(x, pos.y - y));
+                    term_draw_color(
+                        buf, GET_THEMECOLOR(state, "VU_METER_BG"),
+                        (y >= state->vu_meter_st.mark_red
+                             ? GET_THEMECOLOR(state, "VU_METER_HIGH_BG")
+                         : y >= state->vu_meter_st.mark_yellow
+                             ? GET_THEMECOLOR(state, "VU_METER_MID_BG")
+                             : GET_THEMECOLOR(state, "VU_METER_LOW_BG")));
+                    if (state->opt.vu_meter.render_marks)
+                        str_repeat_wchar(buf, L'—',
+                                         state->opt.vu_meter.bar_width, NULL);
+                    else
+                        term_draw_padding(buf, state->opt.vu_meter.bar_width);
+                    term_draw_reset(buf);
+                }
+            }
 
-                int y = peak_y + 1;
+            if (state->opt.vu_meter.style != VU_METER_ANALOG_LINE &&
+                !state->opt.vu_meter.discrete && frac >= 1.0f / 8.0f)
+            {
+                int y = new_height + 1;
                 term_draw_pos(buf, VEC(x, pos.y - y));
                 term_draw_color(
                     buf, GET_THEMECOLOR(state, "VU_METER_BG"),
                     (y >= state->vu_meter_st.mark_red
-                         ? GET_THEMECOLOR(state, "VU_METER_HIGH_BG")
+                         ? GET_THEMECOLOR(state, "VU_METER_HIGH_FG")
                      : y >= state->vu_meter_st.mark_yellow
-                         ? GET_THEMECOLOR(state, "VU_METER_MID_BG")
-                         : GET_THEMECOLOR(state, "VU_METER_LOW_BG")));
+                         ? GET_THEMECOLOR(state, "VU_METER_MID_FG")
+                         : GET_THEMECOLOR(state, "VU_METER_LOW_FG")));
+                for (int w = 0; w < state->opt.vu_meter.bar_width; ++w)
+                    term_draw_vblockf(buf, frac);
+                term_draw_reset(buf);
+            }
 
-                if (state->opt.vu_meter.render_marks)
+            if (state->opt.vu_meter.render_peak)
+            {
+                int peak_y = ceilf(ARR_AS(state->vu_meter_st.peaks, float)[ch]);
+                if (peak_y + 1 <= size.y && !MATH_AROUND(peak_y, height, 1.0))
+                {
+                    term_draw_pos(buf, VEC(x, pos.y - peak_y));
+                    term_draw_color(
+                        buf, GET_THEMECOLOR(state, "VU_METER_BG"),
+                        (peak_y >= state->vu_meter_st.mark_red
+                             ? GET_THEMECOLOR(state, "VU_METER_HIGH_FG")
+                         : peak_y >= state->vu_meter_st.mark_yellow
+                             ? GET_THEMECOLOR(state, "VU_METER_MID_FG")
+                             : GET_THEMECOLOR(state, "VU_METER_LOW_FG")));
                     str_repeat_wchar(buf, L'—', state->opt.vu_meter.bar_width,
                                      NULL);
+
+                    int y = peak_y + 1;
+                    term_draw_pos(buf, VEC(x, pos.y - y));
+                    term_draw_color(
+                        buf, GET_THEMECOLOR(state, "VU_METER_BG"),
+                        (y >= state->vu_meter_st.mark_red
+                             ? GET_THEMECOLOR(state, "VU_METER_HIGH_BG")
+                         : y >= state->vu_meter_st.mark_yellow
+                             ? GET_THEMECOLOR(state, "VU_METER_MID_BG")
+                             : GET_THEMECOLOR(state, "VU_METER_LOW_BG")));
+
+                    if (state->opt.vu_meter.render_marks)
+                        str_repeat_wchar(buf, L'—',
+                                         state->opt.vu_meter.bar_width, NULL);
+                    else
+                        term_draw_hline(buf, state->opt.vu_meter.bar_width);
+                }
                 else
-                    term_draw_hline(buf, state->opt.vu_meter.bar_width);
+                {
+                    int y = height + 2;
+                    term_draw_pos(buf, VEC(x, pos.y - y));
+                    term_draw_color(
+                        buf, GET_THEMECOLOR(state, "VU_METER_BG"),
+                        (y >= state->vu_meter_st.mark_red
+                             ? GET_THEMECOLOR(state, "VU_METER_HIGH_BG")
+                         : y >= state->vu_meter_st.mark_yellow
+                             ? GET_THEMECOLOR(state, "VU_METER_MID_BG")
+                             : GET_THEMECOLOR(state, "VU_METER_LOW_BG")));
+                    if (state->opt.vu_meter.render_marks)
+                        str_repeat_wchar(buf, L'—',
+                                         state->opt.vu_meter.bar_width, NULL);
+                    else
+                        term_draw_hline(buf, state->opt.vu_meter.bar_width);
+                }
             }
-        }
 
-        if (state->opt.vu_meter.render_numeric)
-        {
-            term_draw_pos(buf, VEC(x, pos.y + 1));
-            term_draw_color(buf, GET_THEMECOLOR(state, "VU_METER_BG"),
-                            GET_THEMECOLOR(state, "VU_METER_FG"));
-            str_catf(buf, "%-4.0f", dbfs);
-            term_draw_reset(buf);
-        }
+            if (state->opt.vu_meter.render_numeric)
+            {
+                term_draw_pos(buf, VEC(x, pos.y + 1));
+                term_draw_color(buf, GET_THEMECOLOR(state, "VU_METER_BG"),
+                                GET_THEMECOLOR(state, "VU_METER_FG"));
+                str_catf(buf, "%-4.0f", dbfs);
+                term_draw_reset(buf);
+            }
 
-        ARR_AS(state->vu_meter_st.prev_bars, float)[ch] = height;
+            ARR_AS(state->vu_meter_st.prev_bars, float)[ch] = height;
+        }
     }
 
     term_draw_reset(buf);

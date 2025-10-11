@@ -5,6 +5,7 @@
 #include "clock.h"
 #include "color.h"
 #include "image.h"
+#include "image_renderer.h"
 #include "term_draw.h"
 #include "utils.h"
 #include "widgets/widgets.h"
@@ -105,7 +106,7 @@ void ui_init(ui_state *state, term_state *term, app_instance *app)
 
     state->art_st.images = array_create(8, sizeof(image_t));
     state->art_st.images_state = array_create(8, sizeof(ui_art_image));
-    state->art_st.method = IMAGE_RENDER_SIXEL;
+    state->art_st.method = IMAGE_RENDER_BRAILLE;
 }
 
 void ui_free(ui_state *state)
@@ -223,7 +224,6 @@ static void render_metadata_tabs(ui_state *state)
 
 static void render_overlay(ui_state *state)
 {
-
 }
 
 void ui_render(ui_state *state)
