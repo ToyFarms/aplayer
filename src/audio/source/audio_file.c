@@ -93,6 +93,7 @@ static int audio_file_init(audio_source *audio)
 
     audio->duration = ctx->ic->duration;
     audio->timestamp = 0;
+
     log_debug("Duration: %lu\n", audio->duration);
 
     log_debug("Allocating AVCodecContext\n");
@@ -137,6 +138,8 @@ static void audio_file_free(audio_source *audio)
         return;
     }
 
+    pthread_mutex_lock(&audio->ctx_mutex);
+
     free(ctx->filename);
 
     swr_free(&ctx->resampl.swr);
@@ -153,6 +156,8 @@ static void audio_file_free(audio_source *audio)
 
     free(ctx);
     audio->ctx = NULL;
+
+    pthread_mutex_unlock(&audio->ctx_mutex);
 
     audio_common_free(audio);
 }
@@ -266,20 +271,31 @@ static int audio_resample(audio_source *audio, uint8_t **data,
     } while (n && nb_samples);
 
     return 0;
+
 fail:
     return -1;
 }
 
 static int audio_file_update(audio_source *audio)
 {
+    pthread_mutex_lock(&audio->ctx_mutex);
+
     audio_file *ctx = audio->ctx;
+    if (ctx == NULL)
+        return EOF;
+
     int ret = 0, decoded_length = 0, pre_length = 0;
 
-    if (audio->is_eof)
-        return 0;
+    bool is_eof = audio->is_eof;
 
-    while ((ret = avcodec_receive_frame(ctx->avctx, ctx->frame)) ==
-           AVERROR(EAGAIN))
+    if (is_eof)
+    {
+        pthread_mutex_unlock(&audio->ctx_mutex);
+        return 0;
+    }
+
+    while (ctx && (ret = avcodec_receive_frame(ctx->avctx, ctx->frame)) ==
+                      AVERROR(EAGAIN))
     {
         ret = av_read_frame(ctx->ic, ctx->pkt);
         if (ret == AVERROR(EAGAIN))
@@ -287,8 +303,10 @@ static int audio_file_update(audio_source *audio)
         else if (ret == AVERROR_EOF)
         {
             audio->is_eof = true;
+
             av_frame_unref(ctx->frame);
             av_packet_unref(ctx->pkt);
+            pthread_mutex_unlock(&audio->ctx_mutex);
             return EOF;
         }
         else if (ret < 0)
@@ -303,10 +321,13 @@ static int audio_file_update(audio_source *audio)
             continue;
         }
 
-        audio->timestamp = (ctx->pkt->pts *
-                            ctx->ic->streams[ctx->audio_stream]->time_base.num *
-                            AV_TIME_BASE) /
-                           ctx->ic->streams[ctx->audio_stream]->time_base.den;
+        int64_t new_timestamp =
+            (ctx->pkt->pts *
+             ctx->ic->streams[ctx->audio_stream]->time_base.num *
+             AV_TIME_BASE) /
+            ctx->ic->streams[ctx->audio_stream]->time_base.den;
+
+        audio->timestamp = new_timestamp;
 
         ret = avcodec_send_packet(ctx->avctx, ctx->pkt);
         av_packet_unref(ctx->pkt);
@@ -338,38 +359,44 @@ static int audio_file_update(audio_source *audio)
     decoded_length = audio->buffer.length - pre_length;
 
     av_frame_unref(ctx->frame);
+    pthread_mutex_unlock(&audio->ctx_mutex);
     return decoded_length;
 
 error:
     av_frame_unref(ctx->frame);
     av_packet_unref(ctx->pkt);
+    pthread_mutex_unlock(&audio->ctx_mutex);
     return -2;
 }
 
 static void audio_file_seek(audio_source *audio, int64_t ms, int whence)
 {
-    audio->buffer.write_idx = 0;
-    audio->buffer.read_idx = 0;
-    audio->buffer.length = 0;
+    pthread_mutex_lock(&audio->ctx_mutex);
+
+    ring_buf_reset(&audio->buffer);
 
     audio_file *file = audio->ctx;
 
     int64_t pos = ((double)ms / 1000.0) * (double)AV_TIME_BASE;
-    int64_t abs_pos = audio->timestamp;
+
+    int64_t timestamp = audio->timestamp;
+    int64_t duration = audio->duration;
+
+    int64_t abs_pos = timestamp;
     switch (whence)
     {
     case SEEK_SET:
         abs_pos = pos;
         break;
     case SEEK_CUR:
-        abs_pos = audio->timestamp + pos;
+        abs_pos = timestamp + pos;
         break;
     case SEEK_END:
-        abs_pos = audio->duration - pos;
+        abs_pos = duration - pos;
         break;
     }
 
-    abs_pos = MATH_CLAMP(abs_pos, 0, audio->duration);
+    abs_pos = MATH_CLAMP(abs_pos, 0, duration);
     int err = avformat_seek_file(file->ic, -1, INT64_MIN, abs_pos, INT64_MAX,
                                  AVSEEK_FLAG_BACKWARD | AVSEEK_FLAG_ANY);
 
@@ -378,10 +405,14 @@ static void audio_file_seek(audio_source *audio, int64_t ms, int whence)
         log_error("Could not seek to %.2fs. %s.\n",
                   (double)abs_pos / (double)AV_TIME_BASE, av_err2str(err));
     }
+
+    pthread_mutex_unlock(&audio->ctx_mutex);
 }
 
 static void audio_file_get_arts(audio_source *audio, array(image_t) * out)
 {
+    pthread_mutex_lock(&audio->ctx_mutex);
+
     audio_file *file = audio->ctx;
 
     for (int i = 0; i < file->ic->nb_streams; i++)
@@ -418,6 +449,8 @@ static void audio_file_get_arts(audio_source *audio, array(image_t) * out)
             array_append(out, &img, 1);
         }
     }
+
+    pthread_mutex_unlock(&audio->ctx_mutex);
 }
 
 static int audio_file_get_frame(audio_source *audio, int req_sample, float *out)
@@ -426,9 +459,12 @@ static int audio_file_get_frame(audio_source *audio, int req_sample, float *out)
         req_sample = audio->buffer.length;
 
     int ret = ring_buf_read(&audio->buffer, req_sample, out);
-    if (audio->is_eof && ret == -ENODATA)
+
+    bool is_eof = audio->is_eof;
+
+    if (is_eof && ret == -ENODATA)
         return EOF;
-    else if (!audio->is_eof && ret == -ENODATA)
+    else if (!is_eof && ret == -ENODATA)
         return -ENODATA;
 
     return req_sample;
@@ -446,6 +482,7 @@ int audio_set_info(audio_source *audio, int nb_channels, int sample_rate,
     audio->target_nb_channels = nb_channels;
     audio->target_sample_rate = sample_rate;
     audio->target_sample_fmt = audio_format_to_av_variant(sample_fmt);
+
     if (audio->target_sample_fmt < 0)
     {
         log_error("Invalid sample format: %s (%d)",
@@ -551,6 +588,7 @@ audio_source audio_from_file(const char *filename, int nb_channels,
     if ((ret = audio_common_init(&audio)) < 0)
     {
         log_error("audio_common_init() failed with %s\n", strerror(ret));
+        pthread_mutex_destroy(&audio.ctx_mutex);
         errno = ret;
         goto exit;
     }

@@ -78,7 +78,7 @@ int app_init()
         // return errnb;
     }
 
-    audio_analyzer rms = audio_analyzer_rms(false, rms_callback, NULL);
+    audio_analyzer rms = audio_analyzer_rms(rms_callback, NULL);
     array_append(&app->audio->mixer.analyzer, &rms, 1);
 
     audio_effect autogain = audio_eff_autogain();

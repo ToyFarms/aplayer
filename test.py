@@ -823,7 +823,7 @@ def main() -> None:
         for target in targets:
             if not target.endswith(".c"):
                 target = f"{target}.c"
-            p = "tests" / Path(target)
+            p = Path(target)
             if not p.exists():
                 raise FileNotFoundError(f"Path {str(p)!r} doesn't exists!")
             files.append(p)

@@ -1,5 +1,6 @@
 #include "_math.h"
 #include "clock.h"
+#include "logger.h"
 #include "widgets.h"
 #include <math.h>
 #include <string.h>
@@ -206,7 +207,8 @@ void render_vu_meter(ui_state *state, vec2 pos, vec2 size)
             if (isnan(rms_raw))
                 continue;
 
-            float dbfs_raw = 20 * log10f(rms_raw / PEAK_RMS);
+            float dbfs_raw = -0.691f + 10.0f * log10f(rms_raw);
+
             float dbfs = lerp(ARR_AS(state->vu_meter_st.easing_bars, float)[ch],
                               dbfs_raw, 0.5);
             if (isinf(dbfs) || isnan(dbfs) || dbfs < -100)

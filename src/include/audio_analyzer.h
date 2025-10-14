@@ -3,6 +3,7 @@
 
 #include "audio_callback.h"
 
+#include <ebur128.h>
 #include <stdbool.h>
 
 typedef void (*analyzer_callback)(void *actx, void *userdata);
@@ -10,7 +11,6 @@ typedef void (*analyzer_callback)(void *actx, void *userdata);
 enum audio_analyzer_type
 {
     AUDIO_ANALYZER_RMS,
-    AUDIO_ANALYZER_RMS_HUMAN,
     AUDIO_ANALYZER_FFT,
 };
 
@@ -31,9 +31,7 @@ typedef struct analyzer_rms_ctx
     int nb_channels;
 } analyzer_rms_ctx;
 
-// adjust_human: apply K-weighting to closely match human hearing
-audio_analyzer audio_analyzer_rms(bool adjust_human, analyzer_callback callback,
-                                  void *userdata);
+audio_analyzer audio_analyzer_rms(analyzer_callback callback, void *userdata);
 
 #define ANALYZER_FFT_FREQ_SIZE (1 << 13)
 

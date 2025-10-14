@@ -88,14 +88,26 @@ int mixer_get_frame(audio_mixer *mixer, int req_sample, float *out)
 
     pthread_mutex_lock(&mixer->source_mutex);
     audio_source *src;
-    float gain = powf(10, mixer->master_gain / 20);
+    float master_gain = powf(10, mixer->master_gain / 20);
     ARR_FOREACH_BYREF(mixer->sources, src, i)
     {
         if (src->is_finished)
             continue;
 
-        while (!src->is_eof && src->buffer.length < req_sample)
+        while (!src->is_eof && src->buffer.length < req_sample && ret >= 0)
             ret = src->update(src);
+
+        if (ret == EOF)
+        {
+            src->is_finished = true;
+            array_remove(&mixer->sources, i, 1);
+            continue;
+        }
+        else if (ret < 0)
+        {
+            log_error("Failed to update source: %s\n", strerror(ret));
+            continue;
+        }
 
         mixer->scratch.length = 0;
         ret = len = src->get_frame(src, req_sample, mixer->scratch.data);
@@ -123,35 +135,6 @@ int mixer_get_frame(audio_mixer *mixer, int req_sample, float *out)
 
     // TODO: fix order, make all changeable
 
-    float peak = 0.0f;
-    for (int sample = 0; sample < max_len; sample++)
-    {
-        float a = fabsf(out[sample]);
-        if (a > peak)
-            peak = a;
-    }
-
-    const float target_peak = 0.95f;
-    float desired_gain = 1.0f;
-    if (peak > 1e-12f)
-        desired_gain = (peak > target_peak) ? (target_peak / peak) : 1.0f;
-
-    const float attack = 0.2f;
-    const float release = 0.99f;
-
-    if (mixer->norm_gain <= 0.0f)
-        mixer->norm_gain = 1.0f;
-
-    if (desired_gain < mixer->norm_gain)
-        mixer->norm_gain =
-            mixer->norm_gain * (1.0f - attack) + desired_gain * attack;
-    else
-        mixer->norm_gain =
-            mixer->norm_gain * release + desired_gain * (1.0f - release);
-
-    for (int sample = 0; sample < max_len; sample++)
-        out[sample] *= mixer->norm_gain;
-
     audio_effect *eff;
     ARR_FOREACH_BYREF(mixer->effects, eff, i)
     {
@@ -161,7 +144,7 @@ int mixer_get_frame(audio_mixer *mixer, int req_sample, float *out)
     }
 
     for (int sample = 0; sample < max_len; sample++)
-        out[sample] *= gain;
+        out[sample] *= master_gain;
 
     audio_analyzer *analyzer;
     ARR_FOREACH_BYREF(mixer->analyzer, analyzer, i)

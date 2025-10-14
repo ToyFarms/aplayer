@@ -173,13 +173,13 @@ TEST_BEGIN(read_null2, EXPECT_FAIL)
 }
 TEST_END()
 
-TEST_BEGIN(read_illegal_size, EXPECT_FAIL)
+TEST_BEGIN(read_illegal_size)
 {
     ring_buf_t rbuf = ring_buf_create(8, sizeof(int));
 
     int out[8] = {0};
     int ret = ring_buf_read(&rbuf, -1, out);
-    (void)ret;
+    ASSERT_INT_EQ(ret, -ENODATA);
 }
 TEST_END()
 

@@ -228,8 +228,8 @@ void logger_logv(int level, const char *filename, const char *fn_name, int line,
 
         fprintf(out.fd, "%.*s", prefix_size, prefix);
         vfprintf(out.fd, fmt, args_copy);
-        if (fmt[strlen(fmt) - 1] != '\n')
-            fputc('\n', out.fd);
+        // if (fmt[strlen(fmt) - 1] != '\n')
+        //     fputc('\n', out.fd);
         fflush(out.fd);
 
         va_end(args_copy);
