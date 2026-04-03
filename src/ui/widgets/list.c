@@ -38,6 +38,9 @@ static void style_line_end(ui_state *state, str_t *buf, int32_t line)
 
 void render_list(ui_state *state, vec2 pos, vec2 size)
 {
+    if (state->app->playlist.files.length == 0)
+        return;
+
     bool redraw = state->term->resized || state->playlist_st.redraw;
     if (state->playlist_st.lines.data == NULL)
         state->playlist_st.lines =

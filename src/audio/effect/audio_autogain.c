@@ -55,6 +55,10 @@ static void *_compute(void *arg)
 
     ebur128_state *st = ebur128_init(src->target_nb_channels,
                                      src->target_sample_rate, EBUR128_MODE_I);
+    if (st == NULL)
+        return NULL;
+
+    ebur128_set_max_window(st, 400.0f);
 
     int ret = 0, len = 0;
     int req_sample = src->target_sample_rate * 0.1;
