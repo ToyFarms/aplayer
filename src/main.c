@@ -25,7 +25,12 @@ int main(int argc, char **argv)
 
     app_instance *app = app_get();
 
-    if (path_exists(".session.json"))
+    if (argc > 1)
+    {
+        for (int i = 1; i < argc; i++)
+            playlist_add(&app->playlist, argv[i]);
+    }
+    else if (path_exists(".session.json"))
     {
         FILE *f = fopen(".session.json", "r");
         fseek(f, 0, SEEK_END);
@@ -39,11 +44,6 @@ int main(int argc, char **argv)
 
         session_deserialize(app, buf, size);
         app->ui.playlist_st.recenter = true;
-    }
-    else
-    {
-        for (int i = 1; i < argc; i++)
-            playlist_add(&app->playlist, argv[i]);
     }
 
     clock_highres_t clock = {0};
