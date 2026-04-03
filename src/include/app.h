@@ -11,6 +11,8 @@ typedef struct app_instance
     playlist_manager playlist;
     ui_state ui;
     term_state term;
+
+    int64_t want_to_seek_ms;
 } app_instance;
 
 int app_init();

@@ -1,4 +1,5 @@
 #include "app.h"
+#include "array.h"
 #include "audio.h"
 #include "audio_mixer.h"
 #include "audio_source.h"
@@ -14,6 +15,7 @@
 #include "utils.h"
 
 #include <assert.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
 
@@ -93,6 +95,19 @@ int main(int argc, char **argv)
 
         if (app->term.resized)
             term_draw_clear(&app->term.buf);
+
+        {
+            if (app->want_to_seek_ms != 0 &&
+                app->audio->mixer.sources.length > 0)
+            {
+                audio_source *src;
+                ARR_FOREACH_BYREF(app->audio->mixer.sources, src, i)
+                {
+                    src->seek(src, app->want_to_seek_ms, SEEK_SET);
+                }
+                app->want_to_seek_ms = 0;
+            }
+        }
 
         ui_render(&app->ui);
         term_write(app->term.buf.buf, app->term.buf.len);

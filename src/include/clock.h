@@ -21,6 +21,9 @@ typedef struct clock_highres_t
 
 #define S2NS(n)  ((uint64_t)(n) * 1000000000ULL)
 #define MS2NS(n) ((uint64_t)(n) * 1000000ULL)
+#define NS2MS(n) ((uint64_t)(n) / 1000000ULL)
+#define US2MS(n) ((uint64_t)(n) / 1000ULL)
+#define MS2US(n) ((uint64_t)(n) * 1000ULL)
 
 void clock_init(clock_highres_t *clk);
 void clock_free(clock_highres_t *clk);

@@ -1,6 +1,11 @@
 #include "playlist.h"
+#include "app.h"
+#include "array.h"
+#include "audio_source.h"
+#include "clock.h"
 #include "logger.h"
 #include "pathlib.h"
+#include "ui.h"
 #include <locale.h>
 #include <stddef.h>
 #include <string.h>
@@ -293,6 +298,24 @@ cJSON *playlist_serialize(playlist_manager *pl)
         if (!cJSON_AddItemToObject(info, "current_idx", current_idx))
             goto err;
 
+        // TODO: figure out a way to handle multiple sources here
+        app_instance *app = app_get();
+        if (app->audio->mixer.sources.length > 0)
+        {
+            audio_source *src =
+                &ARR_AS(app->audio->mixer.sources, audio_source)[0];
+            if (!src->is_realtime)
+            {
+                cJSON *current_playhead =
+                    cJSON_CreateNumber((int64_t)US2MS(src->timestamp));
+                if (current_playhead == NULL)
+                    goto err;
+                if (!cJSON_AddItemToObject(info, "current_playhead",
+                                           current_playhead))
+                    goto err;
+            }
+        }
+
         cJSON *is_shuffled = cJSON_CreateBool(pl->is_shuffled);
         if (is_shuffled == NULL)
             goto err;
@@ -350,61 +373,72 @@ err:
 int playlist_deserialize(playlist_manager *pl, cJSON *root)
 {
     // TODO: default value
-    cJSON *info = cJSON_GetObjectItem(root, "info");
-    if (info == NULL || !cJSON_IsObject(info))
-        goto err;
-
-    cJSON *loop = cJSON_GetObjectItem(info, "loop");
-    if (loop == NULL || !cJSON_IsNumber(loop))
-        goto err;
-    pl->loop = cJSON_GetNumberValue(loop);
-
-    cJSON *sort = cJSON_GetObjectItem(info, "sort");
-    if (sort == NULL || !cJSON_IsNumber(sort))
-        goto err;
-    pl->sort = cJSON_GetNumberValue(sort);
-
-    cJSON *sort_direction = cJSON_GetObjectItem(info, "sort_direction");
-    if (sort_direction == NULL || !cJSON_IsNumber(sort_direction))
-        goto err;
-    pl->sort_direction = cJSON_GetNumberValue(sort_direction);
-
-    cJSON *current_idx = cJSON_GetObjectItem(info, "current_idx");
-    if (current_idx == NULL || !cJSON_IsNumber(current_idx))
-        goto err;
-    pl->current_idx = cJSON_GetNumberValue(current_idx);
-
-    cJSON *is_shuffled = cJSON_GetObjectItem(info, "is_shuffled");
-    if (is_shuffled == NULL || !cJSON_IsBool(is_shuffled))
-        goto err;
-    pl->is_shuffled = cJSON_IsTrue(is_shuffled);
-
-    cJSON *files = cJSON_GetObjectItem(root, "files");
-    if (files == NULL || !cJSON_IsArray(files))
-        goto err;
-    cJSON *file;
-    cJSON_ArrayForEach(file, files)
     {
-        char *s = cJSON_GetStringValue(file);
-        if (s == NULL)
+        cJSON *info = cJSON_GetObjectItem(root, "info");
+        if (info == NULL || !cJSON_IsObject(info))
             goto err;
 
-        fs_entry_t ent = {0};
-        ent.path = str_new(s);
-        ent.name = path_name(ent.path.buf);
-        array_append(&pl->files, &ent, 1);
+        cJSON *loop = cJSON_GetObjectItem(info, "loop");
+        if (loop == NULL || !cJSON_IsNumber(loop))
+            goto err;
+        pl->loop = cJSON_GetNumberValue(loop);
+
+        cJSON *sort = cJSON_GetObjectItem(info, "sort");
+        if (sort == NULL || !cJSON_IsNumber(sort))
+            goto err;
+        pl->sort = cJSON_GetNumberValue(sort);
+
+        cJSON *sort_direction = cJSON_GetObjectItem(info, "sort_direction");
+        if (sort_direction == NULL || !cJSON_IsNumber(sort_direction))
+            goto err;
+        pl->sort_direction = cJSON_GetNumberValue(sort_direction);
+
+        cJSON *current_idx = cJSON_GetObjectItem(info, "current_idx");
+        if (current_idx == NULL || !cJSON_IsNumber(current_idx))
+            goto err;
+        pl->current_idx = cJSON_GetNumberValue(current_idx);
+
+        cJSON *current_playhead = cJSON_GetObjectItem(info, "current_playhead");
+        if (current_playhead == NULL)
+            goto err;
+        app_instance *app = app_get();
+        app->want_to_seek_ms = (int64_t)cJSON_GetNumberValue(current_playhead);
+
+        cJSON *is_shuffled = cJSON_GetObjectItem(info, "is_shuffled");
+        if (is_shuffled == NULL || !cJSON_IsBool(is_shuffled))
+            goto err;
+        pl->is_shuffled = cJSON_IsTrue(is_shuffled);
     }
 
-    cJSON *indices = cJSON_GetObjectItem(root, "indices");
-    if (indices == NULL || !cJSON_IsArray(indices))
-        goto err;
-    cJSON *idx;
-    cJSON_ArrayForEach(idx, indices)
     {
-        int i = cJSON_GetNumberValue(idx);
-        array_append(&pl->indices, &(int){i}, 1);
+        cJSON *files = cJSON_GetObjectItem(root, "files");
+        if (files == NULL || !cJSON_IsArray(files))
+            goto err;
+        cJSON *file;
+        cJSON_ArrayForEach(file, files)
+        {
+            char *s = cJSON_GetStringValue(file);
+            if (s == NULL)
+                goto err;
+
+            fs_entry_t ent = {0};
+            ent.path = str_new(s);
+            ent.name = path_name(ent.path.buf);
+            array_append(&pl->files, &ent, 1);
+        }
     }
 
+    {
+        cJSON *indices = cJSON_GetObjectItem(root, "indices");
+        if (indices == NULL || !cJSON_IsArray(indices))
+            goto err;
+        cJSON *idx;
+        cJSON_ArrayForEach(idx, indices)
+        {
+            int i = cJSON_GetNumberValue(idx);
+            array_append(&pl->indices, &(int){i}, 1);
+        }
+    }
     return 0;
 err:
     return -1;
