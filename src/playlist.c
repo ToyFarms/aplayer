@@ -343,6 +343,7 @@ cJSON *playlist_serialize(playlist_manager *pl)
             }
         }
 
+        JSON_ADD_NUM(info, "gain", app->audio->mixer.master_gain);
         JSON_ADD_BOOL(info, "is_shuffled", pl->is_shuffled);
 
         if (!cJSON_AddItemToObject(root, "info", info))
@@ -399,15 +400,16 @@ int playlist_deserialize(playlist_manager *pl, cJSON *root)
         JSON_GET_NUM(info, "sort_direction", pl->sort_direction);
         JSON_GET_NUM(info, "current_idx", pl->current_idx);
 
+        app_instance *app = app_get();
         cJSON *current_playhead = NULL;
         if ((current_playhead =
                  cJSON_GetObjectItem(info, "current_playhead")) != NULL)
         {
-            app_instance *app = app_get();
             app->want_to_seek_ms =
                 (int64_t)cJSON_GetNumberValue(current_playhead);
         }
 
+        JSON_GET_NUM(info, "gain", app->audio->mixer.master_gain);
         JSON_GET_BOOL(info, "is_shuffled", pl->is_shuffled);
     }
 
