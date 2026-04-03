@@ -60,7 +60,7 @@ void render_media_control(ui_state *state, vec2 pos, vec2 size)
     if (state->media_ctl_st.prev_hovered)
         term_draw_color(buf, GET_THEMECOLOR(state, "MEDIA_CONTROL_BG"),
                         GET_THEMECOLOR(state, "MEDIA_CONTROL_FG"));
-    str_catwcs(buf, L" ⏮  ");
+    str_catwcs(buf, L"  <<  ");
     if (state->media_ctl_st.prev_hovered)
         term_draw_reset(buf);
 
@@ -71,9 +71,9 @@ void render_media_control(ui_state *state, vec2 pos, vec2 size)
                         GET_THEMECOLOR(state, "MEDIA_CONTROL_FG"));
     if (state->app->audio->mixer.paused ||
         state->app->audio->mixer.sources.length == 0)
-        str_catwcs(buf, L"  ⏵  ");
+        str_catwcs(buf, L"  |>  ");
     else
-        str_catwcs(buf, L"  ⏸  ");
+        str_catwcs(buf, L"  ||  ");
     if (state->media_ctl_st.play_hovered)
         term_draw_reset(buf);
 
@@ -82,7 +82,7 @@ void render_media_control(ui_state *state, vec2 pos, vec2 size)
     if (state->media_ctl_st.next_hovered)
         term_draw_color(buf, GET_THEMECOLOR(state, "MEDIA_CONTROL_BG"),
                         GET_THEMECOLOR(state, "MEDIA_CONTROL_FG"));
-    str_catwcs(buf, L" ⏭  ");
+    str_catwcs(buf, L"  >>  ");
     if (state->media_ctl_st.next_hovered)
         term_draw_reset(buf);
 

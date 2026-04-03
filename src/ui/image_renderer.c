@@ -182,7 +182,7 @@ static void image_render_sixel(str_t *str_out, image_t *img)
         goto cleanup;
 
     result =
-        sixel_dither_initialize(dither, img->data, img->height, img->height,
+        sixel_dither_initialize(dither, img->data, img->width, img->height,
                                 SIXEL_PIXELFORMAT_RGB888, 0, 0, 3);
     if (SIXEL_FAILED(result))
         goto cleanup;

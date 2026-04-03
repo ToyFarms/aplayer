@@ -644,10 +644,13 @@ imgconv_frame imgconv_filter_chain(const uint8_t *buf, int width, int height,
         goto cleanup;
     }
 
+#if LIBAVUTIL_VERSION_MAJOR >= 59
     av_opt_set_array(buffersink_ctx, "pix_fmts", AV_OPT_SEARCH_CHILDREN, 0, 2,
                      AV_OPT_TYPE_FLAG_ARRAY | AV_OPT_TYPE_INT, NULL);
-    // ret = av_opt_set_int_list(buffersink_ctx, "pix_fmts", pix_fmts,
-    //                           AV_PIX_FMT_NONE, AV_OPT_SEARCH_CHILDREN);
+#else
+    ret = av_opt_set_int_list(buffersink_ctx, "pix_fmts", pix_fmts,
+                              AV_PIX_FMT_NONE, AV_OPT_SEARCH_CHILDREN);
+#endif
     if (ret < 0)
     {
         log_error("Failed to set pix_fmts to output: %s\n", av_err2str(ret));

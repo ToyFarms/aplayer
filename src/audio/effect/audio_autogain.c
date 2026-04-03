@@ -55,6 +55,9 @@ static void *_compute(void *arg)
 
     ebur128_state *st = ebur128_init(src->target_nb_channels,
                                      src->target_sample_rate, EBUR128_MODE_I);
+    if (st == NULL)
+        return NULL;
+
     ebur128_set_max_window(st, 400.0f);
 
     int ret = 0, len = 0;
@@ -79,7 +82,7 @@ static void *_compute(void *arg)
         ebur128_add_frames_float(st, buf, len / src->target_nb_channels);
 
         double measured_lufs = 0.0;
-        int ret =ebur128_loudness_global(st, &measured_lufs);
+        int ret = ebur128_loudness_global(st, &measured_lufs);
 
         ctx->current_gain = target_lufs - measured_lufs;
     }
