@@ -72,6 +72,7 @@ static ui_setting ui_default_setting()
     s.vu_meter.render_marks = true;
     s.vu_meter.render_numeric = true;
     s.vu_meter.render_peak = true;
+    s.vu_meter.discrete = false;
     s.vu_meter.peak_decay = 0.995;
     s.vu_meter.style = VU_METER_ANALOG_BAR;
 

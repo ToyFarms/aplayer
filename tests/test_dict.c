@@ -41,7 +41,7 @@ TEST_BEGIN(free_null)
 }
 TEST_END()
 
-TEST_BEGIN(free_null2, EXPECT_FAIL)
+TEST_BEGIN(free_null2)
 {
     dict_free(NULL);
 }

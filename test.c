@@ -1,5 +1,7 @@
-// NOTE: still wip, not functional, still a little messy
-// use python version instead (for now)
+/* simple testunit for C. the final goal is: easy to compile (should be
+ * compilable with `cc test.c -o test`), no external dependency, fully cross
+ * platform, should be simple enough to compile with not so latest C standard or
+ * gcc extension */
 #include <assert.h>
 #include <ctype.h>
 #include <errno.h>
@@ -11,11 +13,13 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <time.h>
 
 // TODO: use dict for params
 // TODO: use double linked list for ator
 // TODO: convert any string building to using str_t, also arrayof(char *) ->
 // arrayof(str_t)
+// TODO: customizable compiler (cross compile, multiple target)
 
 // #define ATOR_TRACE
 #define DEBUG
@@ -43,6 +47,47 @@
 #else
 #  include <io.h>
 #endif // OS == OS_LINUX
+
+static inline double _mth_fmin(double a, double b)
+{
+    return a < b ? a : b;
+}
+
+static inline double _mth_fmod360(double v)
+{
+    return v >= 360.0 ? v - 360.0 : v;
+}
+
+static double _mth_atan2(double y, double x)
+{
+    static const double pi = 3.14159265358979323846;
+    if (x == 0.0)
+    {
+        if (y > 0.0)
+            return pi / 2.0;
+        if (y < 0.0)
+            return -pi / 2.0;
+        return 0.0;
+    }
+    double t = y / x;
+    double abs_t = t < 0.0 ? -t : t;
+    double a;
+    if (abs_t <= 1.0)
+    {
+        a = t / (1.0 + 0.28125 * t * t);
+    }
+    else
+    {
+        double inv = 1.0 / t;
+        double sign_hpi = t > 0.0 ? pi / 2.0 : -pi / 2.0;
+        a = sign_hpi - inv / (1.0 + 0.28125 * inv * inv);
+    }
+    if (x < 0.0)
+        a += (y >= 0.0) ? pi : -pi;
+    return a;
+}
+
+// TODO: remove this shit
 
 /* TW: MACRO
  * https://mailund.dk/posts/macro-metaprogramming/
@@ -496,6 +541,12 @@ typedef struct testcase
     char *src_path;
     char *bin_path;
     char *repr_name;
+
+    int build_status;
+    int run_status;
+    int retcode;
+    uint64_t build_time_ms;
+    uint64_t run_time_ms;
 } testcase;
 
 #define PARAM_LIST(DO)                                                         \
@@ -681,6 +732,7 @@ void gen_cc_args(testunit *unit, testcase *tcase, arrayof(char *) * out,
                  ator_t *ator);
 void gen_cc_argstr(str_t *out, arrayof(char *) * args_optional, testunit *unit,
                    testcase *tcase, ator_t *ator);
+static void print_summary(arrayof(testunit) * units);
 void *build_and_run(void *arg);
 void *run(void *arg);
 
@@ -691,6 +743,7 @@ enum telemetry_event_type
     TELEMETRY_EVENT_TASK_REGISTER,
     TELEMETRY_EVENT_TASK_UNREGISTER,
     TELEMETRY_EVENT_THREAD_REGISTER,
+    TELEMETRY_EVENT_ACTIVITY,
     TELEMETRY_EVENT_LOG,
 };
 
@@ -733,8 +786,10 @@ void *telemetry_thread(void *arg);
     _telemetry_send((telemetry_event){.sender = pthread_self(), __VA_ARGS__})
 void _telemetry_send(telemetry_event ev);
 void __attribute__((format(printf, 1, 2))) telemetry_log(char *fmt, ...);
+void __attribute__((format(printf, 1, 2))) telemetry_activity(char *fmt, ...);
 
 int program_shutdown = 0;
+int nb_threads = 1;
 
 int main(int argc, char **argv)
 {
@@ -752,10 +807,12 @@ int main(int argc, char **argv)
         return EXIT_FAILURE;
     }
 
-    ebus = new (ebus, &ator);
+    nb_threads = args.jobs;
+
+    ebus = new(ebus, &ator);
     pthread_create(&telemetry_tid, NULL, telemetry_thread, &ebus);
 
-    arrayof(testunit) units = new (units, &ator);
+    arrayof(testunit) units = new(units, &ator);
 
 #if 0
     {
@@ -832,6 +889,8 @@ int main(int argc, char **argv)
     queue_terminate(&ebus);
     pthread_join(telemetry_tid, NULL);
 
+    print_summary(&units);
+
     ator_free(&ator);
     return 0;
 }
@@ -852,124 +911,145 @@ char *telekey(int64_t num, char *buf)
 
 typedef struct thread_state
 {
+    unsigned long sender;
     int thread_id;
     int status;
+    char activity[128];
 } thread_state;
 
 typedef struct telemetry_state
 {
     int nb_thread;
     dictof(thread_state) threads;
-    arrayof(int) nb_tasks;
-    char *log;
+    size_t total_task[TELEMETRY_TASK_LEN];
+    size_t done_task[TELEMETRY_TASK_LEN];
+    uint64_t started_ms;
+    size_t rendered_rows;
+    size_t rendered_first_row;
 } telemetry_state;
 
-void catpad(str_t *str, char *s)
+static thread_state *telemetry_find_thread_by_id(telemetry_state *state,
+                                                 int thread_id)
 {
-    // va_list args;
-    //
-    // va_start(args, fmt);
-    // size_t needed = vsnprintf(NULL, 0, fmt, args);
-    // va_end(args);
-    //
-    // char src[needed + 1];
-    // memset(src, 0, needed + 1);
-    //
-    // va_start(args, fmt);
-    // vsprintf(src, fmt, args);
-    // va_end(args);
-    //
-    // src[needed] = '\0';
-    //
-    // if (src[needed - 1] == '\n')
-    //     str_catlen(str, src, --needed);
-    // else
-    //     str_cat(str, src);
+    thread_state *th;
+    DICT_FOREACH(state->threads, key, th, i)
+    {
+        if (th->thread_id == thread_id)
+            return th;
+    }
+    DICT_FOREACH_END()
 
-    str_cat(str, s);
-
-    struct winsize w = {0};
-    ioctl(STDOUT_FILENO, TIOCGWINSZ, &w);
-
-    str_pad(str, ' ', w.ws_col - strlen(s));
+    return NULL;
 }
+
+static void telemetry_format_bar(str_t *out, size_t total, size_t done,
+                                 int width)
+{
+    if (width < 10)
+        width = 10;
+
+    int fill = 0;
+    if (total > 0)
+        fill = (int)((done * (size_t)width) / total);
+
+    str_catch(out, '[');
+    for (int i = 0; i < width; i++)
+        str_catch(out, i < fill ? '#' : '-');
+    str_catch(out, ']');
+}
+
+static void telemetry_print_bar(size_t total, size_t done, int width)
+{
+    str_t tmp = {0};
+    str_init(&tmp);
+    telemetry_format_bar(&tmp, total, done, width);
+    fwrite(tmp.buf, 1, tmp.len, stdout);
+    str_free(&tmp);
+}
+
+static uint64_t telemetry_now_ms(void);
+static void telemetry_format_duration(char *buf, size_t size, uint64_t ms);
+static int term_cols(void);
+static int term_rows(void);
 
 void telemetry_update(telemetry_state *state)
 {
-    ator_t ator = {0};
-    str_t str = new (str, &ator);
+    int cols = term_cols();
+    int rows = term_rows();
 
-    struct winsize w;
-    ioctl(STDOUT_FILENO, TIOCGWINSZ, &w);
-
-    int height = 0;
-
-    if (state->log)
-        catpad(&str, state->log);
-
-    str_pad(&str, ' ', w.ws_col - 1);
-    str_catch(&str, '\n');
-    height++;
-
+    size_t lines = 0;
+    for (int id = 0; id < state->nb_thread; id++)
     {
-        str_t temp = new (temp, NULL);
-
-        thread_state *th;
-        size_t start_pos = temp.len;
-        DICT_FOREACH(state->threads, key, th, i)
-        {
-            size_t before_concat = temp.len;
-            str_catf(&temp, "[THREAD%d: %s]    ", th->thread_id,
-                     telemetry_status_str[th->status]);
-
-            if (temp.len - start_pos > w.ws_col)
-            {
-                temp.len = before_concat;
-                temp.buf[temp.len] = '\0';
-                catpad(&str, temp.buf);
-                height++;
-
-                temp.len = 0;
-                str_catf(&temp, "[THREAD%d: %s]    ", th->thread_id,
-                         telemetry_status_str[th->status]);
-
-                start_pos = 0;
-            }
-        }
-        DICT_FOREACH_END()
-
-        if (temp.len > 0)
-        {
-            catpad(&str, temp.buf);
-            str_catch(&str, '\n');
-            height++;
-        }
-
-        str_free(&temp);
+        if (telemetry_find_thread_by_id(state, id) != NULL)
+            lines++;
     }
+    lines++;
 
+    if (lines >= (size_t)rows)
+        lines = (size_t)rows - 1;
+
+    size_t first_row = (size_t)rows - lines + 1;
+    size_t scroll_bottom = first_row > 1 ? first_row - 1 : 1;
+
+    size_t total = 0;
+    size_t done = 0;
     for (int i = 0; i < TELEMETRY_TASK_LEN; i++)
     {
-        str_t temp = new (temp, NULL);
-
-        int nb_task = ARR_AS(state->nb_tasks, int)[i];
-
-        str_catf(&temp, "TASK %s: ", telemetry_task_str[i]);
-        str_pad(&temp, '#', nb_task);
-
-        catpad(&str, temp.buf);
-        str_catch(&str, '\n');
-        height++;
-
-        str_free(&temp);
+        total += state->total_task[i];
+        done += state->done_task[i];
     }
 
-    str_catf(&str, "\x1b[%dF", height);
+    uint64_t now = telemetry_now_ms();
+    uint64_t elapsed = now - state->started_ms;
+    uint64_t eta = 0;
+    if (done > 0 && total > done)
+        eta = (elapsed * (uint64_t)(total - done)) / (uint64_t)done;
 
-    printf("%s", str.buf);
+    char elapsed_buf[32] = {0};
+    char eta_buf[32] = {0};
+    telemetry_format_duration(elapsed_buf, sizeof(elapsed_buf), elapsed);
+    telemetry_format_duration(eta_buf, sizeof(eta_buf), eta);
+
+    double percent = total > 0 ? (100.0 * (double)done / (double)total) : 0.0;
+    int used =
+        snprintf(NULL, 0, "elapsed %s  eta %s  total %zu  done %zu  %3.0f%% ",
+                 elapsed_buf, eta_buf, total, done, percent);
+    int bar_width = cols - used - 1;
+    if (bar_width < 10)
+        bar_width = 10;
+
+    str_t hud = {0};
+    str_init(&hud);
+
+    str_catf(&hud, "\x1b[1;%zur", scroll_bottom);
+    str_catf(&hud, "\x1b[%zu;1H\x1b[J", first_row);
+
+    size_t row = first_row;
+    for (int id = 0; id < state->nb_thread; id++)
+    {
+        thread_state *th = telemetry_find_thread_by_id(state, id);
+        if (th == NULL)
+            continue;
+
+        str_catf(&hud, "\x1b[%zu;1H\x1b[2K[T%02d] %-6s %s", row++,
+                 th->thread_id, telemetry_status_str[th->status],
+                 th->activity[0] ? th->activity : "");
+    }
+
+    str_catf(
+        &hud,
+        "\x1b[%zu;1H\x1b[2Kelapsed %s  eta %s  total %zu  done %zu  %3.0f%% ",
+        row, elapsed_buf, eta_buf, total, done, percent);
+    telemetry_format_bar(&hud, total, done, bar_width);
+
+    state->rendered_rows = lines;
+    state->rendered_first_row = first_row;
+
+    str_catf(&hud, "\x1b[%zu;1H", scroll_bottom);
+
+    fwrite(hud.buf, 1, hud.len, stdout);
     fflush(stdout);
-
-    ator_free(&ator);
+    str_free(&hud);
 }
 
 void *telemetry_thread(void *arg)
@@ -978,10 +1058,8 @@ void *telemetry_thread(void *arg)
 
     ator_t ator = {0};
     telemetry_state state = {0};
-    state.threads = new (state.threads, &ator);
-    state.nb_tasks = new (state.nb_tasks, &ator);
-    array_init_n(&state.nb_tasks, sizeof(int),
-                 TELEMETRY_TASK_LEN > 32 ? TELEMETRY_TASK_LEN : 32);
+    state.threads = new(state.threads, &ator);
+    state.started_ms = telemetry_now_ms();
 
     char key[16] = {0};
 
@@ -1000,44 +1078,74 @@ void *telemetry_thread(void *arg)
             if (thread == NULL)
             {
                 fprintf(stderr, "Thread is not registered\n");
-                continue;
+                break;
             }
             thread->status = event->status;
             break;
         case TELEMETRY_EVENT_BUILD_TIME:
-            printf("%lu BUILD TIME: %lu\n", event->sender, event->build_time);
             break;
         case TELEMETRY_EVENT_TASK_REGISTER:
-            ARR_AS(state.nb_tasks, int)[event->task_type]++;
+            if (event->task_type >= 0 && event->task_type < TELEMETRY_TASK_LEN)
+                state.total_task[event->task_type]++;
             break;
         case TELEMETRY_EVENT_TASK_UNREGISTER:
             if (thread == NULL)
             {
                 fprintf(stderr, "Thread is not registered\n");
-                continue;
+                break;
             }
             thread->status = TELEMETRY_STATUS_IDLE;
-            ARR_AS(state.nb_tasks, int)[event->task_type]--;
+            if (event->task_type >= 0 && event->task_type < TELEMETRY_TASK_LEN)
+                state.done_task[event->task_type]++;
             break;
         case TELEMETRY_EVENT_THREAD_REGISTER:
             dict_insert_copy(&state.threads, telekey(event->sender, key),
-                             &(thread_state){.thread_id = state.nb_thread++},
+                             &(thread_state){
+                                 .sender = event->sender,
+                                 .thread_id = state.nb_thread++,
+                                 .status = TELEMETRY_STATUS_IDLE,
+                                 .activity = {0},
+                             },
                              sizeof(thread_state));
             break;
+        case TELEMETRY_EVENT_ACTIVITY:
+            if (thread == NULL)
+            {
+                fprintf(stderr, "Thread is not registered\n");
+                break;
+            }
+            if (event->log)
+            {
+                strncpy(thread->activity, event->log,
+                        sizeof(thread->activity) - 1);
+                thread->activity[sizeof(thread->activity) - 1] = '\0';
+            }
+            break;
         case TELEMETRY_EVENT_LOG:
-            state.log = event->log;
+            if (event->log)
+            {
+                printf("%s\n", event->log);
+                fflush(stdout);
+                free(event->log);
+            }
             break;
         }
 
         free(event);
 
         telemetry_update(&state);
-        if (state.log)
-        {
-            free(state.log);
-            state.log = NULL;
-        }
     }
+
+    if (state.rendered_first_row > 0)
+    {
+        printf("\x1b[%zu;1H\x1b[J", state.rendered_first_row);
+        fflush(stdout);
+    }
+    printf("\x1b[r");
+    if (state.rendered_first_row > 0)
+        printf("\x1b[%zu;1H", state.rendered_first_row);
+
+    fflush(stdout);
 
     ator_free(&ator);
     return NULL;
@@ -1067,6 +1175,24 @@ void telemetry_log(char *fmt, ...)
     va_end(args);
 
     telemetry_send(.type = TELEMETRY_EVENT_LOG, .log = buffer);
+}
+
+void telemetry_activity(char *fmt, ...)
+{
+    va_list args;
+
+    va_start(args, fmt);
+    size_t needed = vsnprintf(NULL, 0, fmt, args);
+    va_end(args);
+
+    va_start(args, fmt);
+
+    char *buffer = malloc(needed + 1);
+    vsnprintf(buffer, needed + 1, fmt, args);
+
+    va_end(args);
+
+    telemetry_send(.type = TELEMETRY_EVENT_ACTIVITY, .log = buffer);
 }
 
 // clang-format off
@@ -1135,6 +1261,7 @@ const char *test_base =
 "    }\n"
 "\n"
 "#define ASSERT_TRUE(a) _assert(a)\n"
+"#define ASSERT_FALSE(a) _assert(!(a))\n"
 "#define _ASSERT_NUM(a, b, fmt, nop, name)                                      \\\n"
 "    if ((a)nop(b))                                                             \\\n"
 "    {                                                                          \\\n"
@@ -1237,20 +1364,20 @@ void generate_source(testunit *unit, testcase *tcase)
                                tcase->file->buffer_size + 1, NULL, 0);
     source[skip_whitespace_reversed(source) + 1] = '\0';
 
-    arrayof(char *) source_lines = new (source_lines, &ator);
+    arrayof(char *) source_lines = new(source_lines, &ator);
     splitlines(source, &source_lines, &ator);
 
-    arrayof(char *) source_map = new (source_map, &ator);
+    arrayof(char *) source_map = new(source_map, &ator);
 
     char *line;
     ARR_FOREACH(source_lines, line, i)
     {
-        char *sm = ator_snprintf(&ator, "%-80s // SM^ %s:%zu $", line,
+        char *sm = ator_snprintf(&ator, "%-80s // SM: ^ %s:%zu $", line,
                                  tcase->file->path, tcase->pos.start + i + 1);
         array_append(&source_map, &sm, sizeof(char *));
     }
 
-    str_t init = new (init, &ator);
+    str_t init = new(init, &ator);
 
     char *param;
     ARR_FOREACH(tcase->params, param, i)
@@ -1263,7 +1390,7 @@ void generate_source(testunit *unit, testcase *tcase)
         // param++;
         // param[skip_whitespace_reversed(param) + 1] = '\0';
 
-        str_t param_sb = new (param_sb, NULL);
+        str_t param_sb = new(param_sb, NULL);
         while (*param != '\0')
         {
             char c = *param++;
@@ -1327,7 +1454,7 @@ uint64_t testcase_hash(testunit *unit, testcase *tcase)
     pthread_mutex_lock(&tcase->file->mutex);
 
     ator_t ator = {0};
-    str_t args = new (args, &ator);
+    str_t args = new(args, &ator);
     gen_cc_argstr(&args, NULL, unit, tcase, &ator);
 
     // named_filepos cfg;
@@ -1457,7 +1584,7 @@ void gen_cc_args(testunit *unit, testcase *tcase, arrayof(char *) * out,
     array_append(out, &(char *){"-o"}, sizeof(char *));
     array_append(out, &(char *){tcase->bin_path}, sizeof(char *));
 
-    arrayof(char *) cflags = new (cflags, &temp);
+    arrayof(char *) cflags = new(cflags, &temp);
     named_filepos cfg;
     ARR_FOREACH(*unit->config, cfg, i)
     {
@@ -1492,7 +1619,7 @@ void gen_cc_argstr(str_t *out, arrayof(char *) * args_optional, testunit *unit,
     {
         ator_t temp = {0};
 
-        arrayof(char *) args = new (args, NULL);
+        arrayof(char *) args = new(args, NULL);
         gen_cc_args(unit, tcase, &args, ator);
         str_join(out, &args, &str_c(" "));
 
@@ -1502,44 +1629,1484 @@ void gen_cc_argstr(str_t *out, arrayof(char *) * args_optional, testunit *unit,
         str_join(out, args_optional, &str_c(" "));
 }
 
+typedef struct process_capture
+{
+    int retcode;
+    char *stdout_buf;
+    char *stderr_buf;
+} process_capture;
+
+static uint64_t telemetry_now_ms(void)
+{
+    struct timespec ts = {0};
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return (uint64_t)ts.tv_sec * 1000ull + (uint64_t)ts.tv_nsec / 1000000ull;
+}
+
+static void telemetry_format_duration(char *buf, size_t size, uint64_t ms)
+{
+    uint64_t total_s = ms / 1000ull;
+    uint64_t h = total_s / 3600ull;
+    uint64_t m = (total_s % 3600ull) / 60ull;
+    uint64_t s = total_s % 60ull;
+
+    if (h > 0)
+        snprintf(buf, size, "%02" PRIu64 ":%02" PRIu64 ":%02" PRIu64, h, m, s);
+    else
+        snprintf(buf, size, "%02" PRIu64 ":%02" PRIu64, m, s);
+}
+
+static int term_cols(void)
+{
+    struct winsize w = {0};
+    ioctl(STDOUT_FILENO, TIOCGWINSZ, &w);
+    return w.ws_col > 0 ? (int)w.ws_col : 80;
+}
+
+static int term_rows(void)
+{
+    struct winsize w = {0};
+    ioctl(STDOUT_FILENO, TIOCGWINSZ, &w);
+    return w.ws_row > 0 ? (int)w.ws_row : 24;
+}
+
+static int dots_padding(int used, int cols)
+{
+    int p = (cols - 18) - used;
+    return p > 0 ? p : 0;
+}
+
+static void print_center(const char *text)
+{
+    size_t width = (size_t)term_cols();
+    size_t len = strlen(text);
+    if (len >= width)
+    {
+        printf("%s\n", text);
+        return;
+    }
+
+    size_t left = (width - len) / 2;
+    size_t right = width - len - left;
+    printf("%*s%s%*s\n", (int)left, "", text, (int)right, "");
+}
+
+static double clamp01(double v)
+{
+    if (v < 0.0)
+        return 0.0;
+    if (v > 1.0)
+        return 1.0;
+    return v;
+}
+
+static void gradient_2(const int c1[3], const int c2[3], double t, int out[3])
+{
+    t = clamp01(t);
+    for (int i = 0; i < 3; i++)
+        out[i] = (int)(c1[i] + (c2[i] - c1[i]) * t);
+}
+
+static char *read_fd_all(int fd)
+{
+    size_t cap = 4096;
+    size_t len = 0;
+    char *buf = malloc(cap + 1);
+    if (!buf)
+        return NULL;
+
+    for (;;)
+    {
+        if (len + 1024 + 1 > cap)
+        {
+            cap *= 2;
+            char *nbuf = realloc(buf, cap + 1);
+            if (!nbuf)
+            {
+                free(buf);
+                return NULL;
+            }
+            buf = nbuf;
+        }
+
+        ssize_t n = read(fd, buf + len, 1024);
+        if (n < 0)
+        {
+            if (errno == EINTR)
+                continue;
+            free(buf);
+            return NULL;
+        }
+        if (n == 0)
+            break;
+        len += (size_t)n;
+    }
+
+    buf[len] = '\0';
+    return buf;
+}
+
+static int spawn_process_capture(arrayof(char *) * args, process_capture *cap)
+{
+    int out_pipe[2] = {-1, -1};
+    int err_pipe[2] = {-1, -1};
+
+    cap->retcode = -1;
+    cap->stdout_buf = NULL;
+    cap->stderr_buf = NULL;
+
+    if (pipe(out_pipe) < 0 || pipe(err_pipe) < 0)
+        goto fail;
+
+    pid_t pid = fork();
+    if (pid < 0)
+        goto fail;
+
+    if (pid == 0)
+    {
+        dup2(out_pipe[1], STDOUT_FILENO);
+        dup2(err_pipe[1], STDERR_FILENO);
+        close(out_pipe[0]);
+        close(out_pipe[1]);
+        close(err_pipe[0]);
+        close(err_pipe[1]);
+
+        char **argv = ARR_AS(*args, char *);
+        execvp(argv[0], argv);
+        perror("execvp");
+        _exit(127);
+    }
+
+    close(out_pipe[1]);
+    close(err_pipe[1]);
+
+    cap->stdout_buf = read_fd_all(out_pipe[0]);
+    cap->stderr_buf = read_fd_all(err_pipe[0]);
+
+    close(out_pipe[0]);
+    close(err_pipe[0]);
+
+    int status = 0;
+    waitpid(pid, &status, 0);
+    if (WIFEXITED(status))
+        cap->retcode = WEXITSTATUS(status);
+    else if (WIFSIGNALED(status))
+        cap->retcode = 128 + WTERMSIG(status);
+    else
+        cap->retcode = -1;
+
+    if (!cap->stdout_buf)
+        cap->stdout_buf = strdup("");
+    if (!cap->stderr_buf)
+        cap->stderr_buf = strdup("");
+
+    return 0;
+
+fail:
+    if (out_pipe[0] != -1)
+        close(out_pipe[0]);
+    if (out_pipe[1] != -1)
+        close(out_pipe[1]);
+    if (err_pipe[0] != -1)
+        close(err_pipe[0]);
+    if (err_pipe[1] != -1)
+        close(err_pipe[1]);
+    free(cap->stdout_buf);
+    free(cap->stderr_buf);
+    cap->stdout_buf = NULL;
+    cap->stderr_buf = NULL;
+    return -1;
+}
+
+static void free_process_capture(process_capture *cap)
+{
+    if (!cap)
+        return;
+    free(cap->stdout_buf);
+    free(cap->stderr_buf);
+    cap->stdout_buf = NULL;
+    cap->stderr_buf = NULL;
+}
+
+static int is_mem_eq_dump(const char *dump)
+{
+    return dump && strncmp(dump, "MEM_EQ(", 7) == 0;
+}
+
+static char *escape_str(const char *s)
+{
+    size_t len = strlen(s);
+    char *out = malloc(len * 4 + 1);
+    if (!out)
+        return NULL;
+
+    char *p = out;
+    for (const char *c = s; *c; c++)
+    {
+        unsigned char ch = (unsigned char)*c;
+        if (ch == '\x1b')
+        {
+            *p++ = '\\';
+            *p++ = 'e';
+        }
+        else if (ch == '\r')
+        {
+            *p++ = '\\';
+            *p++ = 'r';
+        }
+        else if (ch < 0x20 && ch != '\n' && ch != '\t')
+        {
+            p += sprintf(p, "\\x%02x", ch);
+        }
+        else
+        {
+            *p++ = (char)ch;
+        }
+    }
+    *p = '\0';
+    return out;
+}
+
+static unsigned char *mem_tokens_to_bytes(const char *tokens, size_t *out_len)
+{
+    size_t cap = 64, len = 0;
+    unsigned char *buf = malloc(cap);
+    if (!buf)
+        return NULL;
+
+    const char *p = tokens;
+    while (*p)
+    {
+        while (*p == ' ')
+            p++;
+        if (!*p)
+            break;
+
+        if (len >= cap)
+        {
+            cap *= 2;
+            unsigned char *nb = realloc(buf, cap);
+            if (!nb)
+            {
+                free(buf);
+                return NULL;
+            }
+            buf = nb;
+        }
+
+        char tok[4] = {0};
+        int tlen = 0;
+        while (*p && *p != ' ' && tlen < 2)
+            tok[tlen++] = *p++;
+
+        if (tlen == 1 && isprint((unsigned char)tok[0]))
+            buf[len++] = (unsigned char)tok[0];
+        else
+        {
+            char *end = tok;
+            unsigned long v = strtoul(tok, &end, 16);
+            buf[len++] = (end > tok) ? (unsigned char)v : (unsigned char)'?';
+        }
+    }
+    *out_len = len;
+    return buf;
+}
+
+static void format_memory_diff(str_t *out, const char *dump)
+{
+    if (!is_mem_eq_dump(dump))
+        return;
+
+    const char *part1_start = strstr(dump, "<[");
+    const char *mid = strstr(dump, "]> != ");
+    const char *part2_start = mid ? strstr(mid + 6, "<[") : NULL;
+    const char *tail = part2_start ? strstr(part2_start, "]>) ") : NULL;
+
+    if (!part1_start || !mid || !part2_start || !tail)
+    {
+        str_catf(out, "%s\n", dump);
+        return;
+    }
+
+    char *name1 = strndup(dump + 7, (size_t)(part1_start - (dump + 7)));
+    char *name2 = strndup(mid + 6, (size_t)(part2_start - (mid + 6)));
+    char *tok1 = strndup(part1_start + 2, (size_t)(mid - (part1_start + 2)));
+    char *tok2 = strndup(part2_start + 2, (size_t)(tail - (part2_start + 2)));
+
+    if (!name1 || !name2 || !tok1 || !tok2)
+    {
+        free(name1);
+        free(name2);
+        free(tok1);
+        free(tok2);
+        str_catf(out, "%s\n", dump);
+        return;
+    }
+
+    size_t len1 = 0, len2 = 0;
+    unsigned char *b1 = mem_tokens_to_bytes(tok1, &len1);
+    unsigned char *b2 = mem_tokens_to_bytes(tok2, &len2);
+
+    free(tok1);
+    free(tok2);
+
+    if (!b1 || !b2)
+    {
+        free(name1);
+        free(name2);
+        free(b1);
+        free(b2);
+        str_catf(out, "%s\n", dump);
+        return;
+    }
+
+    size_t max_len = len1 > len2 ? len1 : len2;
+    const int W = 16;
+
+    str_catf(out, "--- a/%s\n+++ b/%s\n", name1, name2);
+
+    for (size_t off = 0; off < max_len; off += (size_t)W)
+    {
+        size_t n = (max_len - off < (size_t)W) ? (max_len - off) : (size_t)W;
+
+        int same = (off + n <= len1 && off + n <= len2);
+        if (same)
+            for (size_t i = 0; i < n; i++)
+                if (b1[off + i] != b2[off + i])
+                {
+                    same = 0;
+                    break;
+                }
+        if (off + n > len1 || off + n > len2)
+            same = 0;
+        if (same)
+            continue;
+
+        str_catf(out, "@@ 0x%08zx @@\n", off);
+
+        for (int side = 0; side < 2; side++)
+        {
+            const unsigned char *bytes = side == 0 ? b1 : b2;
+            size_t blen = side == 0 ? len1 : len2;
+            const unsigned char *other = side == 0 ? b2 : b1;
+            size_t olen = side == 0 ? len2 : len1;
+            const char *prefix = side == 0 ? "-" : "+";
+            const char *color = side == 0 ? "\x1b[31m" : "\x1b[32m";
+
+            str_catf(out, "%s%08zx: ", prefix, off);
+
+            for (int i = 0; i < W; i++)
+            {
+                if (i > 0 && i % 2 == 0)
+                    str_catch(out, ' ');
+
+                size_t idx = off + (size_t)i;
+                int absent = idx >= blen;
+                int diff = absent || idx >= olen || bytes[idx] != other[idx];
+
+                if (diff)
+                    str_cat(out, color);
+
+                if (absent || idx >= max_len)
+                    str_cat(out, "  ");
+                else
+                    str_catf(out, "%02x", bytes[idx]);
+
+                if (diff)
+                    str_cat(out, "\x1b[0m");
+            }
+
+            int full_rows = W / 2;
+            int present = (int)(n + 1) / 2;
+            for (int i = 0; i < full_rows - present; i++)
+                str_cat(out, "   ");
+
+            str_cat(out, "  |");
+            for (int i = 0; i < W; i++)
+            {
+                size_t idx = off + (size_t)i;
+                if (idx >= max_len)
+                {
+                    str_catch(out, ' ');
+                }
+                else if (idx >= blen)
+                {
+                    str_catch(out, '.');
+                }
+                else
+                {
+                    unsigned char b = bytes[idx];
+                    str_catch(out, (b >= 0x20 && b < 0x7f) ? (char)b : '.');
+                }
+            }
+            str_cat(out, "|\n");
+        }
+    }
+
+    free(name1);
+    free(name2);
+    free(b1);
+    free(b2);
+}
+
+typedef enum
+{
+    CTOK_WHITESPACE,
+    CTOK_COMMENT,
+    CTOK_PREPROC,
+    CTOK_STRING,
+    CTOK_CHAR,
+    CTOK_NUMBER,
+    CTOK_KEYWORD,
+    CTOK_TYPE,
+    CTOK_FUNCTION,
+    CTOK_IDENTIFIER,
+    CTOK_OPERATOR,
+    CTOK_PUNCT,
+} c_tok_kind;
+
+typedef struct
+{
+    c_tok_kind kind;
+    size_t len;
+} c_tok;
+
+static const char *const c_keywords[] = {
+    "auto",
+    "break",
+    "case",
+    "const",
+    "continue",
+    "default",
+    "do",
+    "else",
+    "enum",
+    "extern",
+    "for",
+    "goto",
+    "if",
+    "inline",
+    "register",
+    "restrict",
+    "return",
+    "sizeof",
+    "static",
+    "struct",
+    "switch",
+    "typedef",
+    "union",
+    "volatile",
+    "while",
+    "_Alignas",
+    "_Alignof",
+    "_Atomic",
+    "_Generic",
+    "_Noreturn",
+    "_Static_assert",
+    "_Thread_local",
+    "typeof",
+    "__attribute__",
+    "__extension__",
+    "asm",
+    "__asm__",
+    "NULL",
+    "true",
+    "false",
+    "TRUE",
+    "FALSE",
+};
+
+static const char *const c_types[] = {
+    "void",      "char",    "short",    "int",      "long",      "float",
+    "double",    "signed",  "unsigned", "_Bool",    "bool",      "size_t",
+    "ssize_t",   "wchar_t", "FILE",     "va_list",  "ptrdiff_t", "time_t",
+    "mode_t",    "pid_t",   "off_t",    "int8_t",   "int16_t",   "int32_t",
+    "int64_t",   "uint8_t", "uint16_t", "uint32_t", "uint64_t",  "intptr_t",
+    "uintptr_t",
+};
+
+#define C_LIST_LEN(arr) (sizeof(arr) / sizeof((arr)[0]))
+
+static int c_word_in_list(const char *word, size_t len, const char *const *list,
+                          size_t n)
+{
+    for (size_t i = 0; i < n; i++)
+        if (strlen(list[i]) == len && strncmp(list[i], word, len) == 0)
+            return 1;
+    return 0;
+}
+
+static int c_is_ident_start(char c)
+{
+    return isalpha((unsigned char)c) || c == '_';
+}
+
+static int c_is_ident_char(char c)
+{
+    return isalnum((unsigned char)c) || c == '_';
+}
+
+static c_tok c_lex_next(const char *s, int at_line_start)
+{
+    if (*s == '\0')
+        return (c_tok){CTOK_WHITESPACE, 0};
+
+    if (isspace((unsigned char)*s))
+    {
+        size_t len = 0;
+        while (isspace((unsigned char)s[len]))
+            len++;
+        return (c_tok){CTOK_WHITESPACE, len};
+    }
+
+    if (at_line_start && s[0] == '#')
+    {
+        size_t len = 1;
+        while (c_is_ident_char(s[len]))
+            len++;
+        return (c_tok){CTOK_PREPROC, len};
+    }
+
+    if (s[0] == '/' && s[1] == '/')
+        return (c_tok){CTOK_COMMENT, strlen(s)};
+
+    if (s[0] == '/' && s[1] == '*')
+    {
+        const char *end = strstr(s + 2, "*/");
+        size_t len = end ? (size_t)(end - s) + 2 : strlen(s);
+        return (c_tok){CTOK_COMMENT, len};
+    }
+
+    if (s[0] == '"' || s[0] == '\'')
+    {
+        char quote = s[0];
+        size_t len = 1;
+        while (s[len] && s[len] != quote)
+        {
+            if (s[len] == '\\' && s[len + 1])
+                len++;
+            len++;
+        }
+        if (s[len] == quote)
+            len++;
+        return (c_tok){quote == '"' ? CTOK_STRING : CTOK_CHAR, len};
+    }
+
+    if (isdigit((unsigned char)s[0]) ||
+        (s[0] == '.' && isdigit((unsigned char)s[1])))
+    {
+        size_t len = 0;
+        if (s[0] == '0' && (s[1] == 'x' || s[1] == 'X'))
+        {
+            len = 2;
+            while (isxdigit((unsigned char)s[len]))
+                len++;
+        }
+        else
+        {
+            while (isdigit((unsigned char)s[len]))
+                len++;
+            if (s[len] == '.')
+            {
+                len++;
+                while (isdigit((unsigned char)s[len]))
+                    len++;
+            }
+            if (s[len] == 'e' || s[len] == 'E')
+            {
+                size_t save = len;
+                len++;
+                if (s[len] == '+' || s[len] == '-')
+                    len++;
+                if (isdigit((unsigned char)s[len]))
+                    while (isdigit((unsigned char)s[len]))
+                        len++;
+                else
+                    len = save;
+            }
+        }
+        while (s[len] && strchr("uUlLfF", s[len]))
+            len++;
+        return (c_tok){CTOK_NUMBER, len};
+    }
+
+    if (c_is_ident_start(s[0]))
+    {
+        size_t len = 0;
+        while (c_is_ident_char(s[len]))
+            len++;
+
+        if (c_word_in_list(s, len, c_keywords, C_LIST_LEN(c_keywords)))
+            return (c_tok){CTOK_KEYWORD, len};
+        if (c_word_in_list(s, len, c_types, C_LIST_LEN(c_types)))
+            return (c_tok){CTOK_TYPE, len};
+
+        if (len > 2 && s[len - 2] == '_' && s[len - 1] == 't')
+            return (c_tok){CTOK_TYPE, len};
+
+        size_t peek = len;
+        while (isspace((unsigned char)s[peek]))
+            peek++;
+        if (s[peek] == '(')
+            return (c_tok){CTOK_FUNCTION, len};
+
+        return (c_tok){CTOK_IDENTIFIER, len};
+    }
+
+    static const char *const multi_ops[] = {
+        "<<=", ">>=", "...", "->", "++", "--", "<<", ">>",
+        "<=",  ">=",  "==",  "!=", "&&", "||", "+=", "-=",
+        "*=",  "/=",  "%=",  "&=", "|=", "^=", "::",
+    };
+    for (size_t i = 0; i < C_LIST_LEN(multi_ops); i++)
+    {
+        size_t l = strlen(multi_ops[i]);
+        if (strncmp(s, multi_ops[i], l) == 0)
+            return (c_tok){CTOK_OPERATOR, l};
+    }
+
+    if (strchr("+-*/%=<>!&|^~?:.", s[0]))
+        return (c_tok){CTOK_OPERATOR, 1};
+
+    return (c_tok){CTOK_PUNCT, 1};
+}
+
+static void c_tok_color(c_tok_kind kind, int col[3])
+{
+    switch (kind)
+    {
+    case CTOK_COMMENT:
+        col[0] = 117;
+        col[1] = 113;
+        col[2] = 94;
+        break;
+    case CTOK_PREPROC:
+    case CTOK_FUNCTION:
+        col[0] = 166;
+        col[1] = 226;
+        col[2] = 46;
+        break;
+    case CTOK_STRING:
+    case CTOK_CHAR:
+        col[0] = 230;
+        col[1] = 219;
+        col[2] = 116;
+        break;
+    case CTOK_NUMBER:
+        col[0] = 174;
+        col[1] = 129;
+        col[2] = 255;
+        break;
+    case CTOK_KEYWORD:
+    case CTOK_OPERATOR:
+        col[0] = 249;
+        col[1] = 38;
+        col[2] = 114;
+        break;
+    case CTOK_TYPE:
+        col[0] = 102;
+        col[1] = 217;
+        col[2] = 239;
+        break;
+    case CTOK_IDENTIFIER:
+    case CTOK_PUNCT:
+    case CTOK_WHITESPACE:
+    default:
+        col[0] = 248;
+        col[1] = 248;
+        col[2] = 242;
+        break;
+    }
+}
+
+static char *c_highlight_line(const char *line)
+{
+    str_t out = {0};
+    size_t i = 0, len = strlen(line);
+    int at_line_start = 1;
+    int prev_was_include = 0;
+
+    while (i < len)
+    {
+        if (prev_was_include && line[i] == '<')
+        {
+            const char *close = strchr(line + i + 1, '>');
+            size_t blen =
+                close ? (size_t)(close - (line + i)) + 1 : strlen(line + i);
+            int col[3] = {0};
+            c_tok_color(CTOK_STRING, col);
+            str_catf(&out, "\x1b[38;2;%d;%d;%dm", col[0], col[1], col[2]);
+            str_catlen(&out, line + i, blen);
+            i += blen;
+            prev_was_include = 0;
+            at_line_start = 0;
+            continue;
+        }
+
+        c_tok tok = c_lex_next(line + i, at_line_start);
+        if (tok.len == 0)
+            break;
+
+        if (tok.kind == CTOK_PREPROC)
+            prev_was_include =
+                (tok.len == 8 && strncmp(line + i, "#include", 8) == 0);
+        else if (tok.kind != CTOK_WHITESPACE)
+            prev_was_include = 0;
+
+        if (tok.kind != CTOK_WHITESPACE)
+        {
+            int rgb[3];
+            c_tok_color(tok.kind, rgb);
+            str_catf(&out, "\x1b[38;2;%d;%d;%dm", rgb[0], rgb[1], rgb[2]);
+            at_line_start = 0;
+        }
+        str_catlen(&out, line + i, tok.len);
+
+        i += tok.len;
+    }
+
+    char *result = strdup(out.buf ? out.buf : "");
+    str_free(&out);
+    return result;
+}
+
+typedef struct
+{
+    char *text;
+    long lineno;
+} mapped_line;
+
+static int read_lines(const char *path, char ***out_lines, size_t *out_count)
+{
+    FILE *fp = fopen(path, "rb");
+    if (!fp)
+        return 0;
+
+    char **lines = NULL;
+    size_t count = 0, cap = 0;
+    char *buf = NULL;
+    size_t bufcap = 0;
+    ssize_t n;
+
+    while ((n = getline(&buf, &bufcap, fp)) != -1)
+    {
+        while (n > 0 && (buf[n - 1] == '\n' || buf[n - 1] == '\r'))
+            n--;
+
+        if (count >= cap)
+        {
+            cap = cap ? cap * 2 : 64;
+            char **nlines = realloc(lines, cap * sizeof(char *));
+            if (!nlines)
+            {
+                free(buf);
+                fclose(fp);
+                for (size_t i = 0; i < count; i++)
+                    free(lines[i]);
+                free(lines);
+                return 0;
+            }
+            lines = nlines;
+        }
+
+        char *dup = malloc((size_t)n + 1);
+        if (dup)
+        {
+            memcpy(dup, buf, (size_t)n);
+            dup[n] = '\0';
+        }
+        lines[count++] = dup;
+    }
+
+    free(buf);
+    fclose(fp);
+
+    *out_lines = lines;
+    *out_count = count;
+    return 1;
+}
+
+static void free_lines(char **lines, size_t count)
+{
+    for (size_t i = 0; i < count; i++)
+        free(lines[i]);
+    free(lines);
+}
+
+static char *file_get_line(const char *path, long lineno)
+{
+    if (lineno < 0)
+        return NULL;
+
+    FILE *fp = fopen(path, "rb");
+    if (!fp)
+        return NULL;
+
+    char *buf = NULL;
+    size_t cap = 0;
+    long current = 0;
+    char *result = NULL;
+    ssize_t n;
+
+    while ((n = getline(&buf, &cap, fp)) != -1)
+    {
+        if (current == lineno)
+        {
+            while (n > 0 && (buf[n - 1] == '\n' || buf[n - 1] == '\r'))
+                n--;
+            result = malloc((size_t)n + 1);
+            if (result)
+            {
+                memcpy(result, buf, (size_t)n);
+                result[n] = '\0';
+            }
+            break;
+        }
+        current++;
+    }
+
+    free(buf);
+    fclose(fp);
+    return result;
+}
+
+static char *find_path_and_read(const char *string, const char *test_name)
+{
+    size_t slen = strlen(string);
+    const char *path_ptr;
+    size_t path_len;
+
+    if (slen > 0 && (string[slen - 1] == '"' || string[slen - 1] == '\''))
+    {
+        char quote = string[slen - 1];
+        size_t trimmed_len = slen - 1;
+        const char *last = NULL;
+        for (size_t k = 0; k < trimmed_len; k++)
+            if (string[k] == quote)
+                last = string + k;
+
+        path_ptr = last ? last + 1 : string;
+        path_len = (size_t)((string + trimmed_len) - path_ptr);
+    }
+    else
+    {
+        const char *last_space = NULL;
+        for (size_t k = 0; k < slen; k++)
+            if (string[k] == ' ')
+                last_space = string + k;
+
+        path_ptr = last_space ? last_space + 1 : string;
+        path_len = (size_t)((string + slen) - path_ptr);
+    }
+
+    const char *colon1 = memchr(path_ptr, ':', path_len);
+    if (!colon1)
+        return NULL;
+
+    size_t file_len = (size_t)(colon1 - path_ptr);
+    const char *row_start = colon1 + 1;
+    size_t row_avail = path_len - file_len - 1;
+    const char *colon2 = memchr(row_start, ':', row_avail);
+    size_t row_len = colon2 ? (size_t)(colon2 - row_start) : row_avail;
+
+    if (row_len == 0)
+        return NULL;
+    for (size_t k = 0; k < row_len; k++)
+        if (!isdigit((unsigned char)row_start[k]))
+            return NULL;
+
+    long row_num = 0;
+    for (size_t k = 0; k < row_len; k++)
+        row_num = row_num * 10 + (row_start[k] - '0');
+    long row = row_num - 1;
+
+    if (file_len == 0 || row < 0)
+        return NULL;
+
+    char *file_path = malloc(file_len + 1);
+    if (!file_path)
+        return NULL;
+    memcpy(file_path, path_ptr, file_len);
+    file_path[file_len] = '\0';
+
+    struct stat st;
+    if (stat(file_path, &st) != 0 || S_ISDIR(st.st_mode))
+    {
+        free(file_path);
+        return NULL;
+    }
+
+    char **lines = NULL;
+    size_t nb_lines = 0;
+    if (!read_lines(file_path, &lines, &nb_lines))
+    {
+        free(file_path);
+        return NULL;
+    }
+
+    if ((size_t)row > nb_lines)
+    {
+        free(file_path);
+        free_lines(lines, nb_lines);
+        return NULL;
+    }
+
+    const long margin = 5;
+    long start = row - margin;
+    if (start < 0)
+        start = 0;
+    long end = row + margin + 1;
+    if (end > (long)nb_lines)
+        end = (long)nb_lines;
+
+    static const char sm_marker[] = "// SM: ^ ";
+    const size_t sm_marker_len = sizeof(sm_marker) - 1;
+
+    array_t mapped = {0};
+    char *original_file = strdup(file_path);
+    long original_row = row;
+    size_t max_length = 0;
+
+    for (long i = start; i < end; i++)
+    {
+        const char *line = lines[i];
+        size_t line_len = strlen(line);
+
+        if (line_len < sm_marker_len + 2 || line[line_len - 1] != '$' ||
+            line[line_len - 2] != ' ')
+            continue;
+
+        const char *marker = NULL;
+        for (size_t k = 0; k + sm_marker_len <= line_len; k++)
+            if (strncmp(line + k, sm_marker, sm_marker_len) == 0)
+                marker = line + k;
+        if (!marker)
+            continue;
+
+        const char *map_start = marker + sm_marker_len;
+        size_t map_len = (size_t)((line + line_len - 2) - map_start);
+
+        const char *sep = NULL;
+        for (size_t k = 0; k < map_len; k++)
+            if (map_start[k] == ':')
+                sep = map_start + k;
+        if (!sep)
+            continue;
+
+        size_t mfile_len = (size_t)(sep - map_start);
+        const char *mlineno_start = sep + 1;
+        size_t mlineno_len = (size_t)((map_start + map_len) - mlineno_start);
+        if (mfile_len == 0 || mlineno_len == 0)
+            continue;
+
+        int numeric = 1;
+        for (size_t k = 0; k < mlineno_len; k++)
+            if (!isdigit((unsigned char)mlineno_start[k]))
+            {
+                numeric = 0;
+                break;
+            }
+        if (!numeric)
+            continue;
+
+        long mlineno = 0;
+        for (size_t k = 0; k < mlineno_len; k++)
+            mlineno = mlineno * 10 + (mlineno_start[k] - '0');
+        mlineno -= 1;
+
+        char *mfile = malloc(mfile_len + 1);
+        if (!mfile)
+            continue;
+        memcpy(mfile, map_start, mfile_len);
+        mfile[mfile_len] = '\0';
+
+        struct stat mst;
+        if (stat(mfile, &mst) != 0)
+        {
+            free(mfile);
+            continue;
+        }
+
+        free(original_file);
+        original_file = mfile;
+
+        if (i == row)
+            original_row = mlineno;
+
+        char *orig_line = file_get_line(original_file, mlineno);
+        if (orig_line)
+        {
+            mapped_line entry = {.text = orig_line, .lineno = mlineno};
+            array_append(&mapped, &entry, sizeof(mapped_line));
+            size_t l = strlen(orig_line);
+            if (l > max_length)
+                max_length = l;
+        }
+    }
+
+    free(file_path);
+    free_lines(lines, nb_lines);
+
+    if (mapped.len == 0)
+    {
+        array_free(&mapped);
+        free(original_file);
+        return NULL;
+    }
+
+    str_t result = {0};
+    str_catf(&result,
+             "@@@ \x1b[38;2;138;183;255;48;2;30;30;30m%s:%ld (%s)\x1b[0m",
+             original_file, original_row + 1, test_name);
+
+    mapped_line entry;
+    ARR_FOREACH(mapped, entry, i)
+    {
+        size_t pad = max_length - strlen(entry.text);
+
+        int bg[3] = {30, 30, 30};
+        const char *swap = "";
+        if (entry.lineno == original_row)
+        {
+            bg[0] = 150;
+            bg[1] = 17;
+            bg[2] = 13;
+            swap = ";7";
+        }
+
+        char *highlighted = c_highlight_line(entry.text);
+
+        str_catf(&result, "\n\x1b[38;2;224;198;29%sm%4ld \x1b[0m", swap,
+                 entry.lineno + 1);
+        str_catf(&result, "\x1b[48;2;%d;%d;%dm%s", bg[0], bg[1], bg[2],
+                 highlighted);
+        for (size_t p = 0; p < pad; p++)
+            str_catch(&result, ' ');
+        str_cat(&result, "\x1b[0m");
+
+        free(highlighted);
+        free(entry.text);
+    }
+
+    array_free(&mapped);
+    free(original_file);
+
+    char *out = strdup(result.buf ? result.buf : "");
+    str_free(&result);
+    return out;
+}
+
+static char *path_stem_dup(const char *path)
+{
+    const char *name = path_name(path);
+    char *dup = strdup(name ? name : "");
+    if (!dup)
+        return NULL;
+    char *dot = strrchr(dup, '.');
+    if (dot)
+        *dot = '\0';
+    return dup;
+}
+
+static void unit_case_counts(const testunit *unit, size_t *success,
+                             size_t *fails, size_t *build_failed,
+                             uint64_t *build_ms, uint64_t *run_ms)
+{
+    if (!unit || !unit->cases)
+        return;
+
+    testcase *tcase;
+    ARR_FOREACH_BYREF(*unit->cases, tcase, i)
+    {
+        if (build_ms)
+            *build_ms += tcase->build_time_ms;
+        if (run_ms)
+            *run_ms += tcase->run_time_ms;
+
+        if (tcase->build_status != 0)
+            (*build_failed)++;
+        else if (tcase->run_status != 0)
+            (*fails)++;
+        else
+            (*success)++;
+    }
+}
+
+static void print_unit_chart(arrayof(testunit) * units, int diameter)
+{
+    size_t total = 0, success = 0, fails = 0, build_failed = 0;
+    testunit *unit;
+    ARR_FOREACH_BYREF(*units, unit, i)
+    total += unit->cases ? unit->cases->len : 0;
+
+    ARR_FOREACH_BYREF(*units, unit, i)
+    unit_case_counts(unit, &success, &fails, &build_failed, NULL, NULL);
+
+    struct
+    {
+        const char *name;
+        double ratio;
+        int color[3];
+    } items[3] = {
+        {"SUCCESS",      total ? (double)success / (double)total : 0.0, {0, 255, 0}},
+        {"FAIL",         total ? (double)fails / (double)total : 0.0,   {255, 0, 0}},
+        {"BUILD_FAILED",
+         total ? (double)build_failed / (double)total : 0.0,
+         {150, 150, 150}                                                           },
+    };
+
+    for (int i = 0; i < 3; i++)
+        for (int j = i + 1; j < 3; j++)
+            if (items[j].ratio < items[i].ratio)
+            {
+                typeof(items[0]) tmp = items[i];
+                items[i] = items[j];
+                items[j] = tmp;
+            }
+
+    int cols = term_cols();
+
+    int px_d = diameter;
+    if (px_d < 2)
+        px_d = 2;
+    int px = px_d * 2;
+
+    typedef struct
+    {
+        int r, g, b;
+    } rgb_t;
+    rgb_t *pix = calloc((size_t)px * (size_t)px, sizeof(rgb_t));
+    unsigned char *fill = calloc((size_t)px * (size_t)px, 1);
+    if (!pix || !fill)
+    {
+        free(pix);
+        free(fill);
+        return;
+    }
+
+    double cuts[3] = {0};
+    int cut_color[3][3] = {0};
+    int n_cuts = 0;
+    double cumulative = 0.0;
+    for (int i = 0; i < 3; i++)
+    {
+        if (items[i].ratio == 0.0)
+            continue;
+        cumulative += items[i].ratio;
+        cuts[n_cuts] = cumulative;
+        memcpy(cut_color[n_cuts], items[i].color, sizeof(items[i].color));
+        n_cuts++;
+    }
+
+    for (int y = 0; y < px; y++)
+    {
+        for (int x = 0; x < px; x++)
+        {
+            double dx = x - px / 2.0;
+            double dy = y - px / 2.0;
+            double r = px / 2.0;
+            if (dx * dx + dy * dy >= r * r)
+                continue;
+
+            double angle = _mth_fmod360(90.0 +
+                                        _mth_atan2(dy, dx) *
+                                            (180.0 / 3.14159265358979323846) +
+                                        360.0) /
+                           360.0;
+            int idx = 0;
+            while (idx < n_cuts && angle > cuts[idx])
+                idx++;
+            if (idx >= n_cuts)
+                idx = n_cuts - 1;
+            if (idx < 0)
+                idx = 0;
+
+            pix[y * px + x] = (rgb_t){cut_color[idx][0], cut_color[idx][1],
+                                      cut_color[idx][2]};
+            fill[y * px + x] = 1;
+        }
+    }
+
+    size_t indent = (size_t)(cols * 0.1);
+    for (int y = 0; y < px; y += 2)
+    {
+        printf("%*s", (int)indent, "");
+        for (int x = 0; x < px; x++)
+        {
+            int top = y * px + x;
+            int bot = (y + 1 < px) ? ((y + 1) * px + x) : -1;
+            int has_top = fill[top];
+            int has_bot = bot >= 0 && fill[bot];
+            if (has_top && has_bot)
+            {
+                rgb_t t = pix[top], b = pix[bot];
+                printf("\x1b[38;2;%d;%d;%d;48;2;%d;%d;%dm▀\x1b[0m", t.r, t.g,
+                       t.b, b.r, b.g, b.b);
+            }
+            else if (has_top)
+            {
+                rgb_t t = pix[top];
+                printf("\x1b[38;2;%d;%d;%dm▀\x1b[0m", t.r, t.g, t.b);
+            }
+            else if (has_bot)
+            {
+                rgb_t b = pix[bot];
+                printf("\x1b[38;2;%d;%d;%dm▄\x1b[0m", b.r, b.g, b.b);
+            }
+            else
+                printf(" ");
+        }
+        printf("\n");
+    }
+
+    free(pix);
+    free(fill);
+
+    for (int i = 0; i < 3; i++)
+        printf("    \x1b[38;2;%d;%d;%dm■ %s (%.1f %%)\x1b[0m",
+               items[i].color[0], items[i].color[1], items[i].color[2],
+               items[i].name, items[i].ratio * 100.0);
+    printf("\n");
+}
+
+static void print_stats(arrayof(testunit) * units)
+{
+    size_t total_tests = 0;
+    size_t rebuilt = 0;
+    uint64_t build_ms = 0;
+    uint64_t run_ms = 0;
+
+    testunit *unit;
+    ARR_FOREACH_BYREF(*units, unit, i)
+    {
+        if (unit->cases)
+            total_tests += unit->cases->len;
+
+        testcase *tcase;
+        ARR_FOREACH_BYREF(*unit->cases, tcase, j)
+        {
+            build_ms += tcase->build_time_ms;
+            run_ms += tcase->run_time_ms;
+            if (tcase->build_status != 0)
+                rebuilt++;
+        }
+    }
+
+    uint64_t total = build_ms + run_ms;
+    printf(" * Using %d thread\n", nb_threads);
+    printf(" * Rebuilt %zu tests out of %zu tests\n", rebuilt, total_tests);
+    printf(" * %zu tests done in %" PRIu64 " ms\n"
+           "   ├─ %.2f ms in execution\n"
+           "   ├─ %.2f ms in building\n"
+           "   └─ %.2f ms / test average\n",
+           total_tests, total, (double)run_ms, (double)build_ms,
+           total_tests ? (double)total / (double)total_tests : 0.0);
+}
+
+static void print_table(arrayof(testunit) * units)
+{
+    size_t total_tests = 0;
+    testunit *unit;
+    ARR_FOREACH_BYREF(*units, unit, i)
+    total_tests += unit->cases ? unit->cases->len : 0;
+
+    size_t max_length = 0;
+    ARR_FOREACH_BYREF(*units, unit, i)
+    {
+        char *stem = path_stem_dup(unit->file.path);
+        if (stem)
+        {
+            size_t n = strlen(stem);
+            if (n > max_length)
+                max_length = n;
+            free(stem);
+        }
+    }
+
+    uint64_t max_total_time = 1;
+    ARR_FOREACH_BYREF(*units, unit, i)
+    {
+        size_t s = 0, f = 0, b = 0;
+        uint64_t build_ms = 0, run_ms = 0;
+        unit_case_counts(unit, &s, &f, &b, &build_ms, &run_ms);
+        if (build_ms + run_ms > max_total_time)
+            max_total_time = build_ms + run_ms;
+    }
+
+    int idx = 1;
+    int idx_width = (int)snprintf(NULL, 0, "%zu", units->len);
+    if (idx_width < 1)
+        idx_width = 1;
+
+    ARR_FOREACH_BYREF(*units, unit, i)
+    {
+        char *stem = path_stem_dup(unit->file.path);
+        size_t s = 0, f = 0, b = 0;
+        uint64_t build_ms = 0, run_ms = 0;
+        unit_case_counts(unit, &s, &f, &b, &build_ms, &run_ms);
+        size_t group_tests = unit->cases ? unit->cases->len : 0;
+        double success_ratio =
+            group_tests ? 1.0 - ((double)s / (double)group_tests) : 0.0;
+        double influence =
+            total_tests ? 1.0 - ((double)group_tests / (double)total_tests)
+                        : 0.0;
+        double time_ratio =
+            (double)(build_ms + run_ms) / (double)max_total_time;
+        int g2r[3], w2b[3], time_g2r[3];
+        gradient_2((int[]){0, 255, 0}, (int[]){255, 0, 0}, success_ratio, g2r);
+        gradient_2((int[]){255, 255, 255}, (int[]){0, 0, 0}, influence, w2b);
+        gradient_2((int[]){0, 255, 0}, (int[]){255, 0, 0}, time_ratio,
+                   time_g2r);
+
+        printf("%*d    %-*s  %5zu tests  \x1b[48;2;%d;%d;%dm  \x1b[0m  %5zu "
+               "success  \x1b[48;2;%d;%d;%dm  \x1b[0m  %5zu failed  %5zu "
+               "build_failed%15.2f ms  \x1b[48;2;%d;%d;%dm  \x1b[0m\n",
+               idx_width, idx++, (int)max_length, stem ? stem : "", group_tests,
+               w2b[0], w2b[1], w2b[2], s, g2r[0], g2r[1], g2r[2], f, b,
+               (double)(build_ms + run_ms), time_g2r[0], time_g2r[1],
+               time_g2r[2]);
+
+        free(stem);
+
+        if (!unit->cases)
+            continue;
+
+        testcase *tcase;
+        int last = -1;
+        ARR_FOREACH_BYREF(*unit->cases, tcase, j)
+        {
+            if (tcase->build_status == 0 && tcase->run_status == 0)
+                continue;
+            last = j;
+        }
+
+        ARR_FOREACH_BYREF(*unit->cases, tcase, j)
+        {
+            if (tcase->build_status == 0 && tcase->run_status == 0)
+                continue;
+            size_t padding = strlen(tcase->repr_name) < 35
+                                 ? 35 - strlen(tcase->repr_name)
+                                 : 0;
+            const char *reason =
+                (tcase->build_status != 0 && tcase->run_status != 0)
+                    ? "failed_both "
+                    : (tcase->run_status != 0 ? "failed_exec "
+                                              : "failed_build");
+            printf(
+                "          %s─ %s %.*s %s (%d)\n", (j == last) ? "└" : "├",
+                tcase->repr_name, (int)padding,
+                "............................................................",
+                reason, tcase->retcode);
+        }
+    }
+
+    size_t s = 0, f = 0, b = 0;
+    uint64_t build_ms = 0, run_ms = 0;
+    ARR_FOREACH_BYREF(*units, unit, i)
+    unit_case_counts(unit, &s, &f, &b, &build_ms, &run_ms);
+    double success_ratio =
+        total_tests ? 1.0 - ((double)s / (double)total_tests) : 0.0;
+    double influence = 0.0;
+    int g2r[3], w2b[3], time_g2r[3];
+    gradient_2((int[]){0, 255, 0}, (int[]){255, 0, 0}, success_ratio, g2r);
+    gradient_2((int[]){255, 255, 255}, (int[]){0, 0, 0}, influence, w2b);
+    gradient_2((int[]){0, 255, 0}, (int[]){255, 0, 0},
+               (double)(build_ms + run_ms) / (double)max_total_time, time_g2r);
+    printf("%*d    %-*s  %5zu tests  \x1b[48;2;%d;%d;%dm  \x1b[0m  %5zu "
+           "success  \x1b[48;2;%d;%d;%dm  \x1b[0m  %5zu failed  %5zu "
+           "build_failed%15.2f ms  \x1b[48;2;%d;%d;%dm  \x1b[0m\n",
+           idx_width, idx, (int)max_length, "all", total_tests, w2b[0], w2b[1],
+           w2b[2], s, g2r[0], g2r[1], g2r[2], f, b, (double)(build_ms + run_ms),
+           time_g2r[0], time_g2r[1], time_g2r[2]);
+}
+
+static void print_summary(arrayof(testunit) * units)
+{
+    print_center("-- Summary --");
+    printf("\n");
+
+    int diameter = (int)_mth_fmin(term_rows() / 2.0, term_cols() / 4.0);
+    print_unit_chart(units, diameter);
+    print_stats(units);
+
+    printf("\n");
+    print_center("-- Unit Status --");
+    printf("\n");
+    print_table(units);
+}
+
 void *build_and_run(void *arg)
 {
     _build_params_tuple *params = (_build_params_tuple *)arg;
     testcase *tcase = params->tcase;
     testunit *unit = params->unit;
     ator_t ator = {0};
+    process_capture cap = {0};
 
     TRUTHY_OR_PANIC(tcase->src_path != NULL);
 
     telemetry_send(.type = TELEMETRY_EVENT_STATUS,
                    .status = TELEMETRY_STATUS_BUILD);
+    telemetry_activity("building %s", tcase->repr_name);
+
+    uint64_t started = telemetry_now_ms();
 
     if (!params->rebuild && !testcase_needs_rebuild(unit, tcase))
     {
-        telemetry_log("Using cached version of '%s'", tcase->repr_name);
+        telemetry_activity("building %s (cached)", tcase->repr_name);
+        tcase->build_status = 0;
+        tcase->build_time_ms = telemetry_now_ms() - started;
+        telemetry_log("Using \x1b[1m%s\x1b[0m cached build", tcase->repr_name);
         goto no_rebuild;
     }
 
-    arrayof(char *) args = new (args, &ator);
+    arrayof(char *) args = new(args, &ator);
     gen_cc_args(unit, tcase, &args, &ator);
 
+    char *command = join(&args, " ", &ator);
+    int spawn_ok = spawn_process_capture(&args, &cap);
+    int build_ok = !(spawn_ok < 0 || cap.retcode != 0);
+
+    tcase->build_status = build_ok ? 0 : 1;
+    tcase->build_time_ms = telemetry_now_ms() - started;
+
     {
-        str_t args_str = new (args_str, &ator);
-        gen_cc_argstr(&args_str, &args, NULL, NULL, NULL);
-        telemetry_log("+ %s", args_str.buf);
+        int used = snprintf(NULL, 0, "\x1b[1mBuilding\x1b[0m '%s': '%s'",
+                            tcase->repr_name, command ? command : "");
+        int padding = dots_padding(used, term_cols());
+        telemetry_log(
+            "\x1b[1mBuilding\x1b[0m '%s': '%s' %.*s build@%.2f ms",
+            tcase->repr_name, command ? command : "", padding,
+            "................................................................"
+            "................................................................"
+            "................................................................"
+            "................................................................",
+            (double)tcase->build_time_ms);
     }
 
-    if (spawn_process(&args) < 0)
+    if (!build_ok)
+    {
         telemetry_send(.type = TELEMETRY_EVENT_STATUS,
                        .status = TELEMETRY_STATUS_FAIL);
+        if (cap.stderr_buf && cap.stderr_buf[0] != '\0')
+        {
+            char *esc = escape_str(cap.stderr_buf);
+            telemetry_log("%s", esc ? esc : cap.stderr_buf);
+            free(esc);
+        }
+        telemetry_log("\x1b[31mFailed to build %s\x1b[0m", tcase->repr_name);
+    }
     else
     {
         testcase_update_hash(unit, tcase);
+
     no_rebuild:
         telemetry_send(.type = TELEMETRY_EVENT_TASK_REGISTER,
                        .task_type = TELEMETRY_TASK_RUN);
         pool_enqueue_task(params->pool, run, params);
     }
+
+    free_process_capture(&cap);
 
     telemetry_send(.type = TELEMETRY_EVENT_TASK_UNREGISTER,
                    .task_type = TELEMETRY_TASK_BUILD);
@@ -1548,25 +3115,32 @@ void *build_and_run(void *arg)
     return NULL;
 }
 
+typedef enum
+{
+    TEST_OK,
+    TEST_FAIL,
+    TEST_XOK,  // expected failure occurred
+    TEST_XPAS, // expected failure but passed
+    TEST_EXEC, // couldn't execute
+} test_status;
+
 void *run(void *arg)
 {
     _build_params_tuple *params = (_build_params_tuple *)arg;
     testcase *tcase = params->tcase;
-    // testunit *unit = params->unit;
     ator_t ator = {0};
 
     telemetry_send(.type = TELEMETRY_EVENT_STATUS,
                    .status = TELEMETRY_STATUS_RUN);
+    telemetry_activity("running %s", tcase->repr_name);
 
-    telemetry_log("Running '%s'", tcase->repr_name);
+    uint64_t started = telemetry_now_ms();
 
-    arrayof(char *) args = new (args, &ator);
+    arrayof(char *) args = new(args, &ator);
     array_append(&args, &(char *){tcase->bin_path}, sizeof(char *));
 
     int expect_fail = 0;
     int debug = 0;
-    (void)debug;
-    (void)expect_fail;
 
     char *param;
     ARR_FOREACH(tcase->params, param, i)
@@ -1577,12 +3151,137 @@ void *run(void *arg)
             debug = 1;
     }
 
-    if (spawn_process(&args) < 0)
-        telemetry_send(.type = TELEMETRY_EVENT_STATUS,
-                       .status = TELEMETRY_STATUS_FAIL);
+    if (debug)
+    {
+        tcase->run_status = 0;
+        tcase->retcode = 0;
+        tcase->run_time_ms = telemetry_now_ms() - started;
+        telemetry_log("    \x1b[34mDEBUG\x1b[0m %s", tcase->repr_name);
+        telemetry_log("[  \x1b[32mOK\x1b[0m  ] %s debug@%.5f ms",
+                      tcase->repr_name, (double)tcase->run_time_ms);
+        telemetry_send(.type = TELEMETRY_EVENT_TASK_UNREGISTER,
+                       .task_type = TELEMETRY_TASK_RUN);
+        ator_free(&ator);
+        return NULL;
+    }
+
+    process_capture cap = {0};
+    int process_ok = spawn_process_capture(&args, &cap);
+    tcase->retcode = cap.retcode;
+    tcase->run_time_ms = telemetry_now_ms() - started;
+
+    const char *status = "EXEC";
+    const char *status_color = "\x1b[31m";
+    int ok = 0;
+
+    if (process_ok < 0)
+    {
+        status = "EXEC";
+        status_color = "\x1b[31m";
+        ok = 0;
+    }
+    else if (expect_fail)
+    {
+        if (cap.retcode != 0)
+        {
+            status = "XOK ";
+            status_color = "\x1b[32m";
+            ok = 1;
+        }
+        else
+        {
+            status = "XPAS";
+            status_color = "\x1b[33m";
+            ok = 0;
+        }
+    }
+    else
+    {
+        if (cap.retcode == 0)
+        {
+            status = " OK ";
+            status_color = "\x1b[32m";
+            ok = 1;
+        }
+        else
+        {
+            status = "FAIL";
+            status_color = "\x1b[31m";
+            ok = 0;
+        }
+    }
+
+    tcase->run_status = ok ? 0 : 1;
+
+    {
+        int prefix_len, padding;
+        static const char dots[] =
+            "................................................................"
+            "................................................................"
+            "................................................................"
+            "................................................................";
+
+        prefix_len = snprintf(NULL, 0, "[ %.4s ] %s", status, tcase->repr_name);
+        padding = dots_padding(prefix_len, term_cols());
+        if (padding > (int)(sizeof(dots) - 1))
+            padding = (int)(sizeof(dots) - 1);
+
+        if (ok)
+        {
+            telemetry_log("[%s %.4s \x1b[0m] %s %.*s %" PRIu64 " ms",
+                          status_color, status, tcase->repr_name, padding, dots,
+                          tcase->run_time_ms);
+        }
+        else
+        {
+            telemetry_send(.type = TELEMETRY_EVENT_STATUS,
+                           .status = TELEMETRY_STATUS_FAIL);
+
+            telemetry_log("[%s %.4s \x1b[0m] %s (%d) %.*s %" PRIu64 " ms",
+                          status_color, status, tcase->repr_name,
+                          tcase->retcode, padding, dots, tcase->run_time_ms);
+
+            if (cap.stdout_buf && cap.stdout_buf[0] != '\0')
+                telemetry_log("@@@ stdout=\x1b[1m%s\x1b[0m", cap.stdout_buf);
+
+            if (cap.stderr_buf && cap.stderr_buf[0] != '\0')
+            {
+                if (is_mem_eq_dump(cap.stderr_buf))
+                {
+                    size_t n = strlen(cap.stderr_buf);
+                    size_t show = n > 100 ? 100 : n;
+                    telemetry_log("@@@ stderr=\x1b[1m%.*s%s\x1b[0m", (int)show,
+                                  cap.stderr_buf, n > 100 ? " ..." : "");
+
+                    str_t diff = new(diff, NULL);
+                    format_memory_diff(&diff, cap.stderr_buf);
+                    if (diff.len > 0)
+                        telemetry_log("@@@ Memory Diff View\n%s", diff.buf);
+                    str_free(&diff);
+                }
+                else
+                {
+                    char *esc = escape_str(cap.stderr_buf);
+                    telemetry_log("@@@ stderr=\x1b[1m%s\x1b[0m",
+                                  esc ? esc : cap.stderr_buf);
+                    free(esc);
+                }
+
+                char *src_ctx =
+                    find_path_and_read(cap.stderr_buf, tcase->repr_name);
+                if (src_ctx)
+                {
+                    telemetry_log("%s", src_ctx);
+                    free(src_ctx);
+                }
+            }
+        }
+    }
+
+    free_process_capture(&cap);
 
     telemetry_send(.type = TELEMETRY_EVENT_TASK_UNREGISTER,
-                   .status = TELEMETRY_STATUS_RUN);
+                   .task_type = TELEMETRY_TASK_RUN);
     ator_free(&ator);
 
     return NULL;
@@ -1972,10 +3671,10 @@ testcase *testcase_parse_def(testunit *unit, ator_t *ator)
     int sp = 0;
 
     testcase *tcase = ator_alloc(ator, sizeof(testcase), NULL, ATOR_MEMZERO);
-    new (tcase->params, ator);
+    new(tcase->params, ator);
 
     tcase->file = &unit->file;
-    arrayof(char) param_temp = new (param_temp, &tmp);
+    arrayof(char) param_temp = new(param_temp, &tmp);
 
     file_skip_ch(&unit->file, ' ');
     file_skip_until_str(&unit->file, "TEST_BEGIN", 1);
@@ -2580,7 +4279,7 @@ arrayof(dict_item) * buckets_alloc(int length)
     {
         arrayof(dict_item) *bkt = &buckets[i];
 
-        *bkt = new (*bkt, NULL);
+        *bkt = new(*bkt, NULL);
     }
 
     return buckets;
@@ -3068,8 +4767,8 @@ char *_path_join(ator_t *ator, int count, ...)
 
     ator_t tmp = {0};
 
-    arrayof(path_segment) segments = new (segments, &tmp);
-    arrayof(path_segment) each_segments = new (each_segments, &tmp);
+    arrayof(path_segment) segments = new(segments, &tmp);
+    arrayof(path_segment) each_segments = new(each_segments, &tmp);
 
     for (int i = 0; i < count; i++)
     {
@@ -3300,8 +4999,8 @@ int path_isdir(const char *path)
 int path_mkdir(char *path, mode_t mode, int exists_ok)
 {
     ator_t ator = {0};
-    arrayof(path_segment) segments = new (segments, &ator);
-    arrayof(char) buffer = new (buffer, &ator);
+    arrayof(path_segment) segments = new(segments, &ator);
+    arrayof(char) buffer = new(buffer, &ator);
 
     path_split(path, &segments);
 
