@@ -1,3 +1,8 @@
+#if 0
+EXEC=${0%.*}
+test -x "$EXEC" || gcc -O3 -static "$0" -o "$EXEC"
+exec "$EXEC"
+#endif
 /* simple testunit for C. the final goal is: easy to compile (should be
  * compilable with `cc test.c -o test`), no external dependency, fully cross
  * platform, should be simple enough to compile with not so latest C standard or
@@ -4516,7 +4521,6 @@ str_t str_from_view(strview_t view, ator_t *ator)
     str_catlen(&str, view.start, view.size);
 
     ator_ref(ator, str.buf, free, 0);
-    (void)ator;
 
     return str;
 }
@@ -4549,6 +4553,9 @@ str_t *str_catch(str_t *str, char ch)
 str_t *str_catlen(str_t *str, const char *s, size_t len)
 {
     assert(str && s);
+
+    if (len > SIZE_MAX - 1)
+        abort();
 
     ensure_size(str, len + 1);
     memcpy(stroffset(str), s, len);
