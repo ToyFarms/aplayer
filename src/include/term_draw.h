@@ -15,7 +15,8 @@ str_t *term_draw_pos(str_t *buf, vec2 pos);
 str_t *term_draw_move(str_t *buf, vec2 pos);
 str_t *term_draw_color(str_t *buf, color_t bg, color_t fg);
 int term_draw_strwidth(str_t *buf);
-size_t term_draw_truncate(str_t *dst, str_t *buf, size_t width);
+size_t term_draw_truncate(str_t *dst, const char *buf, size_t width);
+size_t term_draw_truncate_str(str_t *dst, str_t *buf, size_t width);
 size_t term_draw_truncate_termchar(str_t *dst, str_t *buf, wchar_t end_char,
                                    size_t width);
 str_t *term_draw_reset(str_t *buf);

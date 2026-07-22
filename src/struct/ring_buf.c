@@ -188,12 +188,19 @@ int ring_buf_try_read(ring_buf_t *rbuf, int req_item, void *out)
 
 void ring_buf_reset(ring_buf_t *rbuf)
 {
-    if (rbuf == NULL)
+    if (rbuf == NULL || rbuf->buf == NULL)
         return;
 
     pthread_mutex_lock(&rbuf->mutex);
+
     rbuf->write_idx = 0;
     rbuf->read_idx = 0;
     rbuf->length = 0;
+
+    memset(rbuf->buf, 0, (size_t)rbuf->capacity * (size_t)rbuf->item_size);
+
+    pthread_cond_broadcast(&rbuf->cond_not_empty);
+    pthread_cond_broadcast(&rbuf->cond_not_full);
+
     pthread_mutex_unlock(&rbuf->mutex);
 }

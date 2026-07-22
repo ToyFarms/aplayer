@@ -8,36 +8,37 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#define TESC          "\x1b"
-#define TPOS00        "[1;1H"
-#define TPOSYX        "[%d;%dH"
-#define TNDOWN        "[%dB"
-#define TNUP          "[%dA"
-#define TNRIGHT       "[%dC"
-#define TNLEFT        "[%dD"
-#define TDOWN         "[B"
-#define TUP           "[A"
-#define TRIGHT        "[C"
-#define TLEFT         "[D"
-#define TBG           "[48;2;%d;%d;%dm"
-#define TFG           "[38;2;%d;%d;%dm"
-#define TBGFG         "[48;2;%d;%d;%d;38;2;%d;%d;%dm"
-#define TBG8          "[48;5;%dm"
-#define TFG8          "[38;5;%dm"
-#define TBGFG8        "[48;5;%d;38;5;%dm"
-#define TRESET        "[0m"
-#define TRESETBG      "[49m"
-#define TRESETFG      "[39m"
-#define THLINE        "[%dX"
-#define TMAINBUF      "[?1049l"
-#define TALTBUF       "[?1049h"
-#define TCURSORSHOW   "[?25h"
-#define TCURSORHIDE   "[?25l"
-#define TMOUSEENABLE  "[?1003h"
-#define TMOUSEDISABLE "[?1003l"
-#define TNEGATIVE     "[7m"
-#define TPOSITIVE     "[7m"
-#define TCLEAR        "[2J"
+#define TESC           "\x1b"
+#define TPOS00         "[1;1H"
+#define TPOSYX         "[%d;%dH"
+#define TNDOWN         "[%dB"
+#define TNUP           "[%dA"
+#define TNRIGHT        "[%dC"
+#define TNLEFT         "[%dD"
+#define TDOWN          "[B"
+#define TUP            "[A"
+#define TRIGHT         "[C"
+#define TLEFT          "[D"
+#define TBG            "[48;2;%d;%d;%dm"
+#define TFG            "[38;2;%d;%d;%dm"
+#define TBGFG          "[48;2;%d;%d;%d;38;2;%d;%d;%dm"
+#define TBG8           "[48;5;%dm"
+#define TFG8           "[38;5;%dm"
+#define TBGFG8         "[48;5;%d;38;5;%dm"
+#define TRESET         "[0m"
+#define TRESETBG       "[49m"
+#define TRESETFG       "[39m"
+#define THLINE         "[%dX"
+#define TMAINBUF       "[?1049l"
+#define TALTBUF        "[?1049h"
+#define TCURSORSHOW    "[?25h"
+#define TCURSORHIDE    "[?25l"
+#define TMOUSEENABLE   "[?1003h"
+#define TMOUSEDISABLE  "[?1003l"
+#define TNEGATIVE      "[7m"
+#define TPOSITIVE      "[7m"
+#define TSTRIKETHROUGH "[9m"
+#define TCLEAR         "[2J"
 
 #define TERM_KMOD_SHIFT   (1 << 0)
 #define TERM_KMOD_CTRL    (1 << 1)
@@ -46,7 +47,45 @@
 #define TERM_MAX_MOUSEKEY 8
 
 #ifdef _WIN32
-#  error Key remapping not defined
+#  define TERM_KEY_BACKSPACE   0x08
+#  define TERM_KEY_TAB         0x09
+#  define TERM_KEY_ENTER       0x0D
+#  define TERM_KEY_ESC         0x1B
+#  define TERM_KEY_PAGEUP      0x21
+#  define TERM_KEY_PAGEDOWN    0x22
+#  define TERM_KEY_END         0x23
+#  define TERM_KEY_END_SHIFT   TERM_KEY_END
+#  define TERM_KEY_HOME        0x24
+#  define TERM_KEY_HOME_SHIFT  TERM_KEY_HOME
+#  define TERM_KEY_LEFT        0x25
+#  define TERM_KEY_LEFT_SHIFT  TERM_KEY_LEFT
+#  define TERM_KEY_UP          0x26
+#  define TERM_KEY_RIGHT       0x27
+#  define TERM_KEY_RIGHT_SHIFT TERM_KEY_RIGHT
+#  define TERM_KEY_DOWN        0x28
+#  define TERM_KEY_INS         0x2D
+#  define TERM_KEY_INS_SHIFT   TERM_KEY_INS
+#  define TERM_KEY_DEL         0x2E
+#  define TERM_KEY_DEL_SHIFT   TERM_KEY_DEL
+#  define TERM_KEY_PAD_1       0x61
+#  define TERM_KEY_PAD_3       0x63
+#  define TERM_KEY_PAD_5       0x65
+#  define TERM_KEY_PAD_7       0x67
+#  define TERM_KEY_PAD_9       0x69
+#  define TERM_KEY_F0          0x6F
+#  define TERM_KEY_F(n)        (TERM_KEY_F0 + (n))
+#  define TERM_KEY_F1          0x70
+#  define TERM_KEY_F2          0x71
+#  define TERM_KEY_F3          0x72
+#  define TERM_KEY_F4          0x73
+#  define TERM_KEY_F5          0x74
+#  define TERM_KEY_F6          0x75
+#  define TERM_KEY_F7          0x76
+#  define TERM_KEY_F8          0x77
+#  define TERM_KEY_F9          0x78
+#  define TERM_KEY_F10         0x79
+#  define TERM_KEY_F11         0x7A
+#  define TERM_KEY_F12         0x7B
 #elif defined(__linux__)
 #  include "ncurses.h"
 #  define TERM_KEY_ESC         27
@@ -156,9 +195,9 @@ static const char *term_color_mode_name(enum term_color_mode mode)
     switch (mode)
     {
     case TERM_COLOR_24BIT:
-        return "TRUE_COLOR";
+        return "TRUECOLOR";
     case TERM_COLOR_256:
-        return "8 BIT";
+        return "256";
     case TERM_COLOR_MONO:
         return "MONO";
     default:

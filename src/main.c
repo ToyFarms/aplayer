@@ -1,11 +1,13 @@
 #include "app.h"
 #include "array.h"
 #include "audio.h"
+#include "audio_effect.h"
 #include "audio_mixer.h"
 #include "audio_source.h"
 #include "clock.h"
 #include "ds.h"
 #include "logger.h"
+#include "metagen.h"
 #include "pathlib.h"
 #include "queue.h"
 #include "session.h"
@@ -18,6 +20,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
+
+static void print_opt_double(const char *label, opt_double_t v)
+{
+    if (v.has_value)
+        printf("  %s: %.4f\n", label, v.value);
+}
 
 int main(int argc, char **argv)
 {
@@ -45,6 +53,7 @@ int main(int argc, char **argv)
         fclose(f);
 
         session_deserialize(app, buf, size);
+        free(buf);
         app->ui.playlist_st.recenter = true;
     }
 

@@ -59,7 +59,6 @@ void render_list(ui_state *state, vec2 pos, vec2 size)
                    state->app->playlist.files.length - 1);
 
     int leftover = MATH_MAX(state->app->playlist.files.length - size.y, 0);
-
     int prev_offset = state->playlist_st.viewport_offset;
 
     if (state->playlist_st.hovered_idx - state->playlist_st.viewport_offset >
@@ -127,7 +126,7 @@ void render_list(ui_state *state, vec2 pos, vec2 size)
             playlist_get_at_index(&state->app->playlist, abs_idx);
         str_cat(&line, entry->name.buf);
 
-        size_t width = term_draw_truncate(buf, &line, left);
+        size_t width = term_draw_truncate_str(buf, &line, left);
         term_draw_padding(buf, left - width);
 
         str_free(&line);

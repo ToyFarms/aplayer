@@ -97,7 +97,7 @@ int term_draw_strwidth(str_t *buf)
     return size;
 }
 
-size_t term_draw_truncate(str_t *dst, str_t *buf, size_t width)
+size_t term_draw_truncate_str(str_t *dst, str_t *buf, size_t width)
 {
     mbstate_t st = {0};
     const char *p = buf->buf;
@@ -140,6 +140,53 @@ size_t term_draw_truncate(str_t *dst, str_t *buf, size_t width)
     }
 
     str_cat_strlen(dst, buf, total_bytes);
+
+    return used;
+}
+
+size_t term_draw_truncate(str_t *dst, const char *buf, size_t width)
+{
+    mbstate_t st = {0};
+    size_t used = 0;
+    size_t total_bytes = 0;
+    const char *p = buf;
+
+    while (*p)
+    {
+        wchar_t wc;
+        size_t clen = mbrtowc(&wc, p, MB_CUR_MAX, &st);
+        if (clen == (size_t)-2)
+        {
+            clen = 1;
+            wc = L'?';
+            memset(&st, 0, sizeof st);
+        }
+        else if (clen == (size_t)-1)
+        {
+            clen = 1;
+            wc = L'?';
+            memset(&st, 0, sizeof st);
+        }
+        else if (clen == 0)
+        {
+            break;
+        }
+
+        int w = mk_wcwidth(wc);
+        if (w < 0)
+            w = 0;
+
+        if (used + (size_t)w > width)
+        {
+            break;
+        }
+
+        used += (size_t)w;
+        total_bytes += clen;
+        p += clen;
+    }
+
+    str_catlen(dst, buf, total_bytes);
 
     return used;
 }

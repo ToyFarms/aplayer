@@ -127,69 +127,6 @@ void logger_log(int level, const char *filename, const char *fn_name, int line,
     va_end(args);
 }
 
-// void logger_logv(int level, const char *filename, const char *fn_name, int
-// line,
-//                  const char *fmt, va_list args)
-// {
-//     if (level > LOG_DEBUG)
-//         level = LOG_DEBUG;
-//
-//     if (level <= LOG_QUIET || level > g_ctx.level)
-//         return;
-//
-//     time_t t = time(NULL);
-//     char timestr[64] = {0};
-//     strftime(timestr, sizeof(timestr), "%F %T", localtime(&t));
-//
-//     va_list args_copy;
-//     for (int i = 0; i < g_ctx.nb_outputs; i++)
-//     {
-//         logger_output out = g_ctx.out[i];
-//         if (level > out.level)
-//             continue;
-//
-//         va_copy(args_copy, args);
-//
-//         bool use_color = g_ctx.use_color && (out.flags & LOG_USE_COLOR);
-//
-//         fprintf(out.fd, "%s %s%-7s%s [%s] %s:%d: ", timestr,
-//                 use_color ? log_level_col[level] : "", log_level_str[level],
-//                 use_color ? "\x1b[0m" : "", fn_name, filename, line);
-//         vfprintf(out.fd, fmt, args_copy);
-//         fflush(out.fd);
-//
-//         va_end(args_copy);
-//     }
-//
-//     for (int i = 0; i < g_ctx.nb_callbacks; i++)
-//     {
-//         logger_callback cb = g_ctx.cb[i];
-//         if (level > cb.level)
-//             continue;
-//
-//         va_copy(args_copy, args);
-//
-//         bool use_color = g_ctx.use_color && (cb.flags & LOG_USE_COLOR);
-//
-//         char prefix[1024];
-//         int prefix_size = snprintf(
-//             prefix, 1024, "%s %s%-7s%s [%s] %s:%d: ", timestr,
-//             use_color ? log_level_col[level] : "", log_level_str[level],
-//             use_color ? "\x1b[0m" : "", fn_name, filename, line);
-//
-//         int needed = vsnprintf(NULL, 0, fmt, args_copy) + prefix_size;
-//         char log[needed + 1];
-//         memset(log, 0, needed + 1);
-//
-//         int log_size = vsnprintf(log + prefix_size, needed + 1, fmt,
-//         args_copy); memcpy(log + prefix_size, log, log_size);
-//
-//         cb.callback(log);
-//
-//         va_end(args_copy);
-//     }
-// }
-
 void logger_logv(int level, const char *filename, const char *fn_name, int line,
                  const char *fmt, va_list args)
 {

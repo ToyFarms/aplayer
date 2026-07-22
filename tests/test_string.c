@@ -804,6 +804,29 @@ TEST_BEGIN(tokenizer_no_delim)
 
     strview_t token = {0};
 
+    ASSERT_TRUE(str_tokenizer_next(&tok, &token));
+    ASSERT_INT_EQ((int)token.len, 5);
+    ASSERT_STR_EQ(token.buf, "1,2,3", 5);
+
+    ASSERT_FALSE(str_tokenizer_next(&tok, &token));
+    ASSERT_INT_EQ((int)token.len, 0);
+    ASSERT_NULL(token.buf);
+}
+TEST_END()
+
+TEST_BEGIN(tokenizer_single_char_no_delim)
+{
+    str_t s = str_new("x");
+
+    str_tokenizer_t tok = {0};
+    str_tokenizer_init(&tok, &s, ",");
+
+    strview_t token = {0};
+
+    ASSERT_TRUE(str_tokenizer_next(&tok, &token));
+    ASSERT_INT_EQ((int)token.len, 1);
+    ASSERT_INT_EQ(token.buf[0], 'x');
+
     ASSERT_FALSE(str_tokenizer_next(&tok, &token));
     ASSERT_INT_EQ((int)token.len, 0);
     ASSERT_NULL(token.buf);
@@ -973,6 +996,33 @@ TEST_BEGIN(tokenizer_emoji)
     ASSERT_FALSE(str_tokenizer_next(&tok, &token));
     ASSERT_INT_EQ((int)token.len, 0);
     ASSERT_NULL(token.buf);
+}
+TEST_END()
+
+TEST_BEGIN(tokenizer_does_not_mutate_source)
+{
+    const char *original = "12,,,34,";
+    str_t s = str_new(original);
+
+    size_t total_len = strlen(original) + 1;
+    char *snapshot = malloc(total_len);
+    memcpy(snapshot, s.buf, total_len);
+
+    str_tokenizer_t tok = {0};
+    str_tokenizer_init(&tok, &s, ",");
+
+    strview_t token = {0};
+    int count = 0;
+    while (str_tokenizer_next(&tok, &token))
+    {
+        count++;
+    }
+
+    ASSERT_TRUE(count > 0);
+    ASSERT_MEM_EQ(s.buf, snapshot, total_len);
+    ASSERT_MEM_EQ(s.buf, original, strlen(original));
+
+    free(snapshot);
 }
 TEST_END()
 

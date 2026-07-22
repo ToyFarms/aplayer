@@ -18,4 +18,4 @@ UseTab: Never
 IndentWidth: 4
 PointerAlignment: Right
 SpaceAroundPointerQualifiers: After
-AllowShortBlocksOnASingleLine: true
+AllowShortBlocksOnASingleLine: Never

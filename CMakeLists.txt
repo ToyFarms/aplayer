@@ -1,14 +1,40 @@
-cmake_minimum_required(VERSION 3.10)
-project(audio_player)
+cmake_minimum_required(VERSION 3.14)
+project(audio_player C CXX)
 
 string(LENGTH "${CMAKE_SOURCE_DIR}/" SOURCE_PATH_SIZE)
 add_definitions("-DLOGGER_BASEPATH_LENGTH=${SOURCE_PATH_SIZE}")
-
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 include(FindPkgConfig)
 find_package(PkgConfig REQUIRED)
 string(APPEND CMAKE_C_FLAGS " -Wall -Werror -pg -Wno-unused-but-set-variable -Wno-unused-variable -Wno-unused-function")
+
+include(FetchContent)
+
+set(BUILD_TESTING OFF CACHE BOOL "" FORCE)
+set(BUILD_BINDINGS ON CACHE BOOL "" FORCE)
+set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
+set(WITH_ZLIB ON CACHE BOOL "" FORCE)
+
+FetchContent_Declare(
+  taglib
+  GIT_REPOSITORY https://github.com/taglib/taglib.git
+  GIT_TAG v2.0.2
+  GIT_SHALLOW TRUE
+)
+FetchContent_MakeAvailable(taglib)
+
+set(TAGLIB_LOCAL_PREFIX ${CMAKE_BINARY_DIR}/taglib-local)
+add_custom_command(
+  OUTPUT ${TAGLIB_LOCAL_PREFIX}/include/taglib/tag_c.h
+  COMMAND ${CMAKE_COMMAND} --install ${taglib_BINARY_DIR} --prefix ${TAGLIB_LOCAL_PREFIX}
+  DEPENDS tag tag_c
+  COMMENT "Installing vendored taglib headers/libs into build tree"
+)
+add_custom_target(taglib_local_install DEPENDS ${TAGLIB_LOCAL_PREFIX}/include/taglib/tag_c.h)
 
 add_executable(aplayer
     ./src/main.c
@@ -22,6 +48,8 @@ add_executable(aplayer
     ./src/imgconv.c
     ./src/image.c
     ./src/session.c
+    ./src/metagen.c
+    ./src/metagen_lyrics.cpp
 
     ./src/struct/array.c
     ./src/struct/dict.c
@@ -65,10 +93,12 @@ add_executable(aplayer
     ./src/ui/widgets/statusline.c
     ./src/ui/widgets/tabs.c
     ./src/ui/widgets/art.c
+    ./src/ui/widgets/lyrics.c
 
     ./thirdparty/wcwidth.c
     ./thirdparty/cJSON.c
 )
+add_dependencies(aplayer taglib_local_install)
 
 target_link_libraries(aplayer PRIVATE m pthread fftw3 portaudio)
 
@@ -80,6 +110,9 @@ pkg_check_modules(LIBAV REQUIRED libavformat libavcodec libavutil libswresample 
 target_include_directories(aplayer PRIVATE ${LIBAV_INCLUDE_DIRS})
 target_link_directories(aplayer PRIVATE ${LIBAV_LIBRARY_DIRS})
 target_link_libraries(aplayer PRIVATE ${LIBAV_LIBRARIES})
+
+target_link_libraries(aplayer PRIVATE tag tag_c)
+target_include_directories(aplayer PRIVATE ${TAGLIB_LOCAL_PREFIX}/include)
 
 target_include_directories(aplayer PRIVATE
   ./src/include

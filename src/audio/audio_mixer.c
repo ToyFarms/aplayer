@@ -85,6 +85,11 @@ int mixer_get_frame(audio_mixer *mixer, int req_sample, float *out)
     int ret = 0, len = 0, max_len = 0;
     if (mixer->paused)
         return 0;
+    if (mixer->muted)
+    {
+        memset(out, 0, req_sample);
+        return 0;
+    }
 
     pthread_mutex_lock(&mixer->source_mutex);
     audio_source *src;

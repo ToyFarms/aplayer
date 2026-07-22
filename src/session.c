@@ -1,6 +1,5 @@
 #include "session.h"
 #include "cJSON.h"
-#include "audio_source.h"
 
 int session_deserialize(app_instance *app, const char *data, size_t size)
 {
@@ -15,6 +14,7 @@ char *session_serialize(app_instance *app)
 {
     cJSON *root = playlist_serialize(&app->playlist);
     char *s = cJSON_Print(root);
+    cJSON_Delete(root);
 
     // audio_source *src;
     // ARR_FOREACH_BYREF(app->audio->mixer.sources, src, i)

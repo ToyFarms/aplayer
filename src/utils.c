@@ -1,4 +1,5 @@
 #include "utils.h"
+#include "array.h"
 #include "audio_effect.h"
 #include "audio_source.h"
 #include "ds.h"
@@ -108,13 +109,6 @@ void play_at_index(app_instance *app, int index)
 
     char *file = entry->path.buf;
 
-    audio_source src_autogain =
-        audio_from_file(file, app->audio->nb_channels, app->audio->sample_rate,
-                        app->audio->sample_fmt);
-    audio_effect *autogain =
-        &ARR_AS(app->audio->mixer.effects, audio_effect)[0];
-    audio_eff_autogain_set(autogain, &src_autogain);
-
     audio_source src =
         audio_from_file(file, app->audio->nb_channels, app->audio->sample_rate,
                         app->audio->sample_fmt);
@@ -126,7 +120,26 @@ void play_at_index(app_instance *app, int index)
     }
 
     mixer_clear(&app->audio->mixer);
-    array_append(&app->audio->mixer.sources, &src, 1);
+
+    // TODO: these could be refactored as an "attach" callback when an effect
+    // attached initially to an audio source
+    audio_effect *eff;
+    ARR_FOREACH_BYREF(app->audio->mixer.effects, eff, i)
+    {
+        switch (eff->type)
+        {
+        case AUDIO_EFF_AUTOGAIN:
+            audio_eff_autogain_initial(eff, &src);
+            break;
+        case AUDIO_EFF_GAIN:
+        case AUDIO_EFF_PAN:
+        case AUDIO_EFF_FILTER:
+            break;
+        }
+    };
+
+    int idx = array_append(&app->audio->mixer.sources, &src, 1);
+
     app->ui.playlist_st.hovered_idx = app->playlist.current_idx;
     app->ui.art_st.initialized = false;
 }

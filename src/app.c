@@ -51,7 +51,7 @@ int app_init()
 
     app->term.capability = term_query_capability();
     log_debug("Term capability: is_tmux=%d, supports_sixel=%d, "
-              "supports_tgp=%d, cell_width=%d, cell_height=%d, color_mode=%s",
+              "supports_tgp=%d, cell_width=%d, cell_height=%d, color_mode=%s\n",
               app->term.capability.is_tmux, app->term.capability.supports_sixel,
               app->term.capability.supports_tgp,
               app->term.capability.cell_width, app->term.capability.cell_height,
@@ -61,8 +61,8 @@ int app_init()
     term_altbuf();
 
     log_debug("Initializing exception context\n");
-    exception_init();
-    exception_panic(term_mainbuf);
+    // exception_init();
+    // exception_panic(term_mainbuf);
     atexit(term_mainbuf);
 
     log_debug("Initializing playlist\n");

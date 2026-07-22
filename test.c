@@ -1,7 +1,8 @@
 #if 0
 EXEC=${0%.*}
-test -x "$EXEC" || gcc -O3 -static "$0" -o "$EXEC"
-exec "$EXEC"
+test "$0" -nt "$EXEC" && rm -f "$EXEC"
+test -x "$EXEC" || gcc -O3 -static "$0" -o "$EXEC" || exit $?
+exec "$EXEC" "$@"
 #endif
 /* simple testunit for C. the final goal is: easy to compile (should be
  * compilable with `cc test.c -o test`), no external dependency, fully cross
@@ -119,7 +120,7 @@ static double _mth_atan2(double y, double x)
 
 #define PP_END_OF_ARGUMENTS() 0
 #define PP_IS_NULL(...)       PP_EXPR_TO_BIN(PP_FIRST(PP_IS_TRUE __VA_ARGS__)())
-#define PP_HAS_ARGS(...)      PP_BOOL(PP_FIRST(PP_END_OF_ARGUMENTS __VA_ARGS__)())
+#define PP_HAS_ARGS(...) PP_BOOL(PP_FIRST(PP_END_OF_ARGUMENTS __VA_ARGS__)())
 
 #define PP_EXPAND_1(...)  __VA_ARGS__
 #define PP_EXPAND_2(...)  PP_EXPAND_1(PP_EXPAND_1(__VA_ARGS__))
@@ -1391,7 +1392,9 @@ void generate_source(testunit *unit, testcase *tcase)
         if (strncmp(param, "INIT", 4) != 0)
             continue;
 
-        while (*param++ != ':') { /* pass */ }
+        while (*param++ != ':')
+        { /* pass */
+        }
         // param++;
         // param[skip_whitespace_reversed(param) + 1] = '\0';
 
@@ -4979,7 +4982,9 @@ const char *path_stem(ator_t *ator, const char *path)
     const char *name = path_name(path);
 
     const char *from = name;
-    while (*from++ != '.') { /* pass */ }
+    while (*from++ != '.')
+    { /* pass */
+    }
 
     return ator_strndup(ator, name, (size_t)(from - name) - 1);
 }
@@ -5466,7 +5471,9 @@ void _ator_free(ator_t *ator)
         return;
 
     ator_t *item = _ator_reverse(ator);
-    while ((item = ator_free_single(&item))) { /* pass */ }
+    while ((item = ator_free_single(&item)))
+    { /* pass */
+    }
 }
 
 void _ator_free_until(ator_t **start, ator_t *end)

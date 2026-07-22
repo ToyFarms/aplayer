@@ -13,6 +13,7 @@
 
 static void term_prepare()
 {
+    term_write(TESC TALTBUF, -1);
     initscr();
     noecho();
     nodelay(stdscr, true);
@@ -35,8 +36,8 @@ static void term_reset()
     noraw();
     nocbreak();
     curs_set(true);
-    delwin(stdscr);
     endwin();
+    term_write(TESC TMAINBUF, -1);
 }
 
 handle_t term_handle(enum handle_type type)
@@ -92,7 +93,7 @@ vec2 term_size_update(term_state *term)
     if (w.ws_xpixel > 0 && w.ws_ypixel > 0)
     {
         term->capability.cell_width = w.ws_xpixel / w.ws_col;
-        term->capability.cell_width = w.ws_xpixel / w.ws_row;
+        term->capability.cell_height = w.ws_ypixel / w.ws_row;
     }
 
     return VEC(w.ws_col, w.ws_row);
@@ -100,10 +101,6 @@ vec2 term_size_update(term_state *term)
 
 void term_get_events(queue_t *out)
 {
-    // BUG: on xterm, or atleast any terminal on linux, mouse button is highly
-    // likely to get stuck when moving, and clicking at the same time, because
-    // apparently xterm can't do it, nothing i can do about it (ask x
-    // server/wayland for mouse state?)
     static int prev_mouse_pos[2] = {0, 0};
     static bool button_state[TERM_MAX_MOUSEKEY] = {0};
     static uint64_t button_last_pressed[TERM_MAX_MOUSEKEY] = {0};
@@ -282,92 +279,140 @@ void term_get_events(queue_t *out)
     prev_size[1] = size.y;
 }
 
+static enum term_color_mode detect_color_mode(void)
+{
+    const char *colorterm = getenv("COLORTERM");
+    const char *term = getenv("TERM");
+
+    if (colorterm && (!strcasecmp(colorterm, "truecolor") ||
+                      !strcasecmp(colorterm, "24bit")))
+    {
+        return TERM_COLOR_24BIT;
+    }
+
+    if (term && (strstr(term, "direct") || strstr(term, "truecolor")))
+    {
+        return TERM_COLOR_24BIT;
+    }
+
+    if (term && strstr(term, "256color"))
+        return TERM_COLOR_256;
+
+    return TERM_COLOR_MONO;
+}
+
 static void read_response(str_t *out)
 {
     int ch;
+
     while ((ch = getch()) != ERR)
         str_catch(out, ch);
 }
 
+static bool contains_bytes(const str_t *s, const char *needle, size_t nlen)
+{
+    if (!s || !needle || nlen == 0 || s->len < nlen)
+        return false;
+
+    for (size_t i = 0; i + nlen <= s->len; ++i)
+    {
+        if (memcmp(s->buf + i, needle, nlen) == 0)
+            return true;
+    }
+
+    return false;
+}
+
 static void get_cell_size(str_t *resp, int *width, int *height)
 {
-    struct winsize w;
-    ioctl(STDOUT_FILENO, TIOCGWINSZ, &w);
+    struct winsize w = {0};
 
-    if (w.ws_xpixel > 0 && w.ws_ypixel > 0)
+    if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &w) == 0 && w.ws_xpixel > 0 &&
+        w.ws_ypixel > 0 && w.ws_col > 0 && w.ws_row > 0)
     {
-        *width = w.ws_xpixel / w.ws_col;
-        *height = w.ws_ypixel / w.ws_row;
+        *width = (int)(w.ws_xpixel / w.ws_col);
+        *height = (int)(w.ws_ypixel / w.ws_row);
+        return;
     }
-    else
+
+    flushinp();
+    term_write("\x1b[16t", -1);
+    refresh();
+    read_response(resp);
+
+    if (resp->len < 4 || resp->buf[0] != '\x1b' || resp->buf[1] != '[' ||
+        resp->buf[resp->len - 1] != 't')
     {
-        term_write("\x1b[16t", -1);
-        refresh();
+        log_error(
+            "Unexpected response from terminal, defaulting size to 10x20\n");
+        *width = 10;
+        *height = 20;
+        return;
+    }
 
-        read_response(resp);
+    int i = 0;
+    bool failed = false;
 
-        bool failed = false;
-        failed |= resp->len >= 2 && resp->buf[0] != '\x1b';
-        failed |= resp->len >= 2 && resp->buf[1] != '[';
-        failed |= resp->len >= 1 && resp->buf[resp->len - 1] != 't';
-
-        if (failed)
+    STR_SPLIT(*resp, token, ";")
+    {
+        if (i == 0)
         {
-            log_error("Unexpected response from terminal, defaulting size to "
-                      "10,20\n");
-            *width = 8;
-            *height = 16;
+            i++;
+            continue;
         }
-        else
+        else if (i == 1)
         {
-            int i = 0;
-            STR_SPLIT(*resp, token, ";")
+            errno = 0;
+            *height = str_parse(token, 10);
+            if (errno != 0)
             {
-                if (i == 0)
-                    continue;
-                else if (i == 1)
-                    *height = str_parse(token, 10);
-                else if (i == 2)
-                {
-                    token.len -= 1; // for the last t
-                    *width = str_parse(token, 10);
-                }
-
-                if (errno != 0)
-                {
-                    log_error("Failed to parse number: %s\n", strerror(errno));
-                    failed = true;
-                    break;
-                }
-
-                i++;
-            }
-
-            if (failed)
-            {
-                *width = 10;
-                *height = 20;
+                log_error("Failed to parse height: %s\n", strerror(errno));
+                failed = true;
+                break;
             }
         }
+        else if (i == 2)
+        {
+            token.len -= 1; // strip trailing 't'
+            errno = 0;
+            *width = str_parse(token, 10);
+            if (errno != 0)
+            {
+                log_error("Failed to parse width: %s\n", strerror(errno));
+                failed = true;
+                break;
+            }
+        }
+
+        i++;
+    }
+
+    if (failed)
+    {
+        *width = 10;
+        *height = 20;
     }
 }
 
 static bool supports_sixel(str_t *resp)
 {
+    flushinp();
     term_write("\x1b[c", -1);
     refresh();
 
     read_response(resp);
-    if (resp->len <= 3)
+
+    if (resp->len < 3)
         return false;
 
-    print_raw(resp->buf);
     if (resp->buf[0] != '\x1b' || resp->buf[1] != '[' ||
         resp->buf[resp->len - 1] != 'c')
+    {
         return false;
+    }
 
-    // skip \x1b[? and c
-    strview_t v = (strview_t){.buf = resp->buf + 2, .len = resp->len - 1};
+    strview_t v = (strview_t){.buf = resp->buf + 2, .len = resp->len - 3};
+
     STR_SPLIT(strv(v), token, ";")
     {
         if (token.len > 0 && token.buf[0] == '4')
@@ -379,44 +424,51 @@ static bool supports_sixel(str_t *resp)
 
 static bool supports_tgp(str_t *resp, bool is_tmux)
 {
+    flushinp();
+
     if (is_tmux)
+    {
         term_write("\x1bPtmux;\x1b"
-                   "\x1b_Gi=1;\x1b\\\x1b[c"
+                   "\x1b_Gi=1;\x1b\\"
+                   "\x1b[c"
                    "\\\x1b\\\x1b[c",
                    -1);
+    }
     else
+    {
         term_write("\x1b_Gi=1;\x1b\\\x1b[c", -1);
-    refresh();
+    }
 
+    refresh();
     read_response(resp);
-    return strstr(resp->buf, "\x1b_G") != NULL;
+
+    return contains_bytes(resp, "\x1b_G", 3);
 }
 
-term_capability term_query_capability()
+static void begin_term_probe(void)
 {
-    term_capability cap = {0};
-
     initscr();
     cbreak();
     noecho();
     timeout(100);
+    flushinp();
+}
+
+static void end_term_probe(void)
+{
+    flushinp();
+    endwin();
+}
+
+term_capability term_query_capability(void)
+{
+    term_capability cap = {0};
+    str_t resp = str_create();
+
+    begin_term_probe();
 
     cap.is_tmux = getenv("TMUX") != NULL;
-
-    if (!has_colors())
-        cap.color = TERM_COLOR_MONO;
-    else
-    {
-        start_color();
-        if (COLORS >= 256 && getenv("COLORTERM"))
-            cap.color = TERM_COLOR_24BIT;
-        else if (COLORS >= 256)
-            cap.color = TERM_COLOR_256;
-        else
-            cap.color = TERM_COLOR_MONO;
-    }
-
-    str_t resp = str_create();
+    cap.color = detect_color_mode();
 
     cap.supports_tgp = supports_tgp(&resp, cap.is_tmux);
     resp.len = 0;
@@ -428,6 +480,7 @@ term_capability term_query_capability()
     resp.len = 0;
 
     str_free(&resp);
+    end_term_probe();
 
     return cap;
 }

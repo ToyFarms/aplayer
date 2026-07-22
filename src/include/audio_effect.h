@@ -54,6 +54,7 @@ void audio_eff_filter_set(audio_effect *eff, enum audio_filt_type type,
                           float freq, int sample_rate, filter_param *param);
 
 audio_effect audio_eff_autogain();
-void audio_eff_autogain_set(audio_effect *eff, audio_source *src);
+float audio_eff_autogain_get_gain(audio_effect *eff);
+void audio_eff_autogain_initial(audio_effect *eff, audio_source *src);
 
 #endif /* __AUDIO_EFFECT_H */

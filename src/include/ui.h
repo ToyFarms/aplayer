@@ -47,6 +47,21 @@ enum vu_meter_style
     VU_METER_ANALOG_BAR,
 };
 
+enum ui_anchor
+{
+    UI_ANCHOR_TOP_LEFT,
+    UI_ANCHOR_TOP,
+    UI_ANCHOR_TOP_RIGHT,
+
+    UI_ANCHOR_LEFT,
+    UI_ANCHOR_CENTER,
+    UI_ANCHOR_RIGHT,
+
+    UI_ANCHOR_BOTTOM_LEFT,
+    UI_ANCHOR_BOTTOM,
+    UI_ANCHOR_BOTTOM_RIGHT,
+};
+
 typedef struct ui_setting
 {
     int scrolloff;
@@ -113,6 +128,9 @@ typedef struct ui_vu_meter_state
     int mark_yellow;
     array(float) peaks;
     array(uint64_t) peak_set;
+    array(int) anchor_rows;
+    array(float) anchor_dbfs;
+    int anchor_count;
 } ui_vu_meter_state;
 
 typedef struct ui_tabs_state
@@ -121,9 +139,28 @@ typedef struct ui_tabs_state
     enum tab_type selected;
 } ui_tabs_state;
 
+typedef struct ui_lyrics_state
+{
+    int viewport_offset;
+    int hovered_idx;
+    array(int32_t) lines;
+    bool redraw;
+    bool recenter;
+} ui_lyrics_state;
+
+enum ui_art_size_mode
+{
+    UI_ART_SIZE_AUTO,
+    UI_ART_SIZE_EXACT,   // use both requested axes as-is
+    UI_ART_SIZE_WIDTH,   // use requested width, derive height from aspect
+    UI_ART_SIZE_HEIGHT,  // use requested height, derive width from aspect
+    UI_ART_SIZE_CONTAIN, // fit inside requested box, preserve aspect
+    UI_ART_SIZE_COVER,   // fill requested box, preserve aspect
+};
+
 typedef struct ui_art_image
 {
-    int ref_index;
+    image_t *img;
     str_t rendered;
     int width;
     int height;
@@ -132,8 +169,7 @@ typedef struct ui_art_image
 
 typedef struct ui_art_state
 {
-    array(image_t) images;
-    array(ui_art_image) images_state;
+    array(ui_art_image) images;
     bool initialized;
     enum image_render_method method;
 } ui_art_state;
@@ -160,6 +196,7 @@ typedef struct ui_state
     ui_tabs_state tabs_st;
     ui_art_state art_st;
     ui_overlay_state overlay_st;
+    ui_lyrics_state lyrics_st;
 
     ui_setting opt;
 } ui_state;

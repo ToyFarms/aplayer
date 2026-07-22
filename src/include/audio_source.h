@@ -3,6 +3,7 @@
 
 #include "array.h"
 #include "audio_format.h"
+#include "metagen.h"
 #include "ring_buf.h"
 #include <pthread.h>
 #include <stdint.h>
@@ -10,11 +11,15 @@
 typedef struct audio_source
 {
     void *ctx;
+    // TODO: normalize time unit
     int (*update)(struct audio_source *);
     void (*free)(struct audio_source *);
     int (*get_frame)(struct audio_source *, int req_sample, float *out);
-    void (*seek)(struct audio_source *, int64_t pos, int whence);
+    void (*seek)(struct audio_source *, int64_t ms, int whence);
+
+    // optional, callee needs to check if its implemented before calling it
     void (*get_arts)(struct audio_source *, array(image_t) * out);
+    metadata_t *(*get_metadata)(struct audio_source *);
 
     int stream_nb_channels;
     int stream_sample_rate;
@@ -33,6 +38,7 @@ typedef struct audio_source
     // true if source is finished (eof && buffer empty)
     bool is_finished;
 
+    // this is in microsecond
     int64_t timestamp;
     int64_t duration;
 

@@ -22,7 +22,6 @@ typedef struct strview_t
 
 typedef struct str_tokenizer_t
 {
-    bool initial;
     char *next;
     const char *delim;
     size_t delim_len;

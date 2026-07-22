@@ -7,6 +7,7 @@
 #include "libavutil/log.h"
 #include "libswresample/swresample.h"
 #include "logger.h"
+#include "metagen.h"
 #include "ring_buf.h"
 
 #include <assert.h>
@@ -31,6 +32,7 @@ typedef struct audio_file
     AVCodecContext *avctx;
     const AVCodec *codec;
     resampler resampl;
+    metadata_t *meta;
 
     AVFrame *frame;
     AVFrame *resampl_frame;
@@ -126,6 +128,9 @@ static int audio_file_init(audio_source *audio)
     audio_set_stream_metadata(audio, ctx->avctx->ch_layout.nb_channels,
                               ctx->avctx->sample_rate, ctx->avctx->sample_fmt);
 
+    log_debug("Reading metadata\n");
+    ctx->meta = metadata_read(ctx->filename);
+
     return 0;
 }
 
@@ -153,6 +158,9 @@ static void audio_file_free(audio_source *audio)
     av_frame_free(&ctx->frame);
     av_frame_free(&ctx->resampl_frame);
     av_packet_free(&ctx->pkt);
+
+    metadata_free(ctx->meta);
+    ctx->meta = NULL;
 
     free(ctx);
     audio->ctx = NULL;
@@ -282,7 +290,10 @@ static int audio_file_update(audio_source *audio)
 
     audio_file *ctx = audio->ctx;
     if (ctx == NULL)
+    {
+        pthread_mutex_unlock(&audio->ctx_mutex);
         return EOF;
+    }
 
     int ret = 0, decoded_length = 0, pre_length = 0;
 
@@ -406,6 +417,10 @@ static void audio_file_seek(audio_source *audio, int64_t ms, int whence)
                   (double)abs_pos / (double)AV_TIME_BASE, av_err2str(err));
     }
 
+    audio->timestamp = abs_pos;
+    audio->is_eof = false;
+    avcodec_flush_buffers(file->avctx);
+
     pthread_mutex_unlock(&audio->ctx_mutex);
 }
 
@@ -451,6 +466,15 @@ static void audio_file_get_arts(audio_source *audio, array(image_t) * out)
     }
 
     pthread_mutex_unlock(&audio->ctx_mutex);
+}
+
+static metadata_t *audio_file_get_metadata(audio_source *audio)
+{
+    audio_file *ctx = audio->ctx;
+    if (ctx == NULL)
+        return NULL;
+
+    return ctx->meta;
 }
 
 static int audio_file_get_frame(audio_source *audio, int req_sample, float *out)
@@ -515,27 +539,28 @@ audio_source audio_from_file(const char *filename, int nb_channels,
 {
     errno = 0;
     audio_source audio = {0};
+    audio_file *ctx = NULL;
 
     if (filename == NULL)
     {
         log_error("Failed to initialize audio: filename could not be NULL\n");
         errno = -EINVAL;
-        goto exit;
+        goto fail;
     }
 
     audio.ctx = calloc(1, sizeof(audio_file));
-    audio_file *ctx = audio.ctx;
+    ctx = audio.ctx;
     if (ctx == NULL)
     {
         errno = -ENOMEM;
-        goto exit;
+        goto fail;
     }
 
     ctx->filename = strdup(filename);
     if (ctx->filename == NULL)
     {
         errno = -EINVAL;
-        goto exit;
+        goto fail;
     }
 
     audio.is_realtime = false;
@@ -544,12 +569,13 @@ audio_source audio_from_file(const char *filename, int nb_channels,
     audio.get_frame = audio_file_get_frame;
     audio.seek = audio_file_seek;
     audio.get_arts = audio_file_get_arts;
+    audio.get_metadata = audio_file_get_metadata;
 
     if (audio_file_init(&audio) < 0)
     {
         log_error("Failed to initialize audio source: %s\n", filename);
         errno = -1;
-        goto exit;
+        goto fail;
     }
 
     ctx->frame = av_frame_alloc();
@@ -557,7 +583,7 @@ audio_source audio_from_file(const char *filename, int nb_channels,
     {
         log_error("Failed to initialize audio: cannot allocate AVFrame\n");
         errno = -ENOMEM;
-        goto exit;
+        goto fail;
     }
 
     ctx->resampl_frame = av_frame_alloc();
@@ -565,7 +591,7 @@ audio_source audio_from_file(const char *filename, int nb_channels,
     {
         log_error("Failed to initialize audio: cannot allocate AVFrame\n");
         errno = -ENOMEM;
-        goto exit;
+        goto fail;
     }
 
     ctx->pkt = av_packet_alloc();
@@ -573,7 +599,7 @@ audio_source audio_from_file(const char *filename, int nb_channels,
     {
         log_error("Failed to initialize audio: cannot allocate AVPacket\n");
         errno = -ENOMEM;
-        goto exit;
+        goto fail;
     }
 
     if (audio_set_info(&audio, nb_channels, sample_rate, sample_fmt) < 0)
@@ -581,7 +607,7 @@ audio_source audio_from_file(const char *filename, int nb_channels,
         log_error("Cannot set audio info to %d:%d:%s\n", nb_channels,
                   sample_rate, audio_format_str(sample_fmt));
         errno = -EINVAL;
-        goto exit;
+        goto fail;
     }
 
     int ret;
@@ -590,9 +616,12 @@ audio_source audio_from_file(const char *filename, int nb_channels,
         log_error("audio_common_init() failed with %s\n", strerror(ret));
         pthread_mutex_destroy(&audio.ctx_mutex);
         errno = ret;
-        goto exit;
+        goto fail;
     }
 
-exit:
+    return audio;
+
+fail:
+    audio_file_free(&audio);
     return audio;
 }

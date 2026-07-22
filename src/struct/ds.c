@@ -547,7 +547,6 @@ void str_tokenizer_init(str_tokenizer_t *tok, const str_t *s, const char *delim)
     tok->next = s->buf;
     tok->delim = delim;
     tok->delim_len = strlen(delim);
-    tok->initial = true;
 }
 
 bool str_tokenizer_next(str_tokenizer_t *tok, strview_t *view)
@@ -561,25 +560,18 @@ bool str_tokenizer_next(str_tokenizer_t *tok, strview_t *view)
 
     char *start = tok->next;
     char *pos = strstr(start, tok->delim);
+
     if (pos)
     {
         view->buf = start;
         view->len = (size_t)(pos - start);
-        *pos = '\0';
         tok->next = pos + tok->delim_len;
-        tok->initial = false;
     }
-    else if (!tok->initial)
+    else
     {
         view->buf = start;
         view->len = strlen(start);
         tok->next = NULL;
-    }
-    else
-    {
-        view->buf = NULL;
-        view->len = 0;
-        return false;
     }
 
     return true;

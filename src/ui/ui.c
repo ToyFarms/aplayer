@@ -1,9 +1,12 @@
 #include "ui.h"
 #include "_math.h"
 #include "app.h"
+#include "array.h"
+#include "audio_effect.h"
 #include "audio_source.h"
 #include "clock.h"
 #include "color.h"
+#include "ds.h"
 #include "image.h"
 #include "image_renderer.h"
 #include "term_draw.h"
@@ -27,25 +30,33 @@ static ui_setting ui_default_setting()
         color_t v;
     } kv_pair;
 
+    // TODO: generalized theme system
+    const color_t PRIMARY = COLOR(230, 200, 150);
+
     kv_pair themes[] = {
+        {"PRIMARY", PRIMARY},
+        {"PRIMARY_DIM", COLOR(138, 120, 90)},
+
         {"CONTROL_BG", COLOR(10, 10, 10)},
         {"LIST_NORMAL_BG", COLOR(30, 30, 30)},
         {"LIST_NORMAL_FG", COLOR_NONE},
         {"LIST_PLAYING_BG", COLOR(91, 201, 77)},
         {"LIST_PLAYING_FG", COLOR(30, 30, 30)},
         {"LIST_NUMBER_BG", COLOR(10, 10, 10)},
-        {"LIST_NUMBER_FG", COLOR(230, 200, 150)},
+        {"LIST_NUMBER_FG", PRIMARY},
 
         {"VOLUME_BG", COLOR(10, 10, 10)},
-        {"VOLUME_FG", COLOR(230, 200, 150)},
+        {"VOLUME_FG", PRIMARY},
+        {"VOLUME_BG_MUTED", COLOR(10, 10, 10)},
+        {"VOLUME_FG_MUTED", COLOR(245, 90, 60)},
         {"TIMESTAMP_BG", COLOR(10, 10, 10)},
-        {"TIMESTAMP_FG", COLOR(230, 200, 150)},
+        {"TIMESTAMP_FG", PRIMARY},
         {"PROGRESS_BG", COLOR(30, 30, 30)},
         {"PROGRESS_FG", COLOR(255, 0, 0)},
         {"MEDIA_CONTROL_BG", COLOR(255, 255, 255)},
         {"MEDIA_CONTROL_FG", COLOR(0, 0, 0)},
         {"STATUSLINE_BG", COLOR(10, 10, 10)},
-        {"STATUSLINE_FG", COLOR(230, 200, 150)},
+        {"STATUSLINE_FG", PRIMARY},
 
         {"VU_METER_LOW_FG", COLOR(0, 255, 0)},
         {"VU_METER_MID_FG", COLOR(255, 255, 0)},
@@ -55,7 +66,7 @@ static ui_setting ui_default_setting()
         {"VU_METER_HIGH_BG", COLOR(100, 0, 0)},
         {"VU_METER_SEP", COLOR(10, 10, 10)},
         {"VU_METER_BG", COLOR(10, 10, 10)},
-        {"VU_METER_FG", COLOR(230, 200, 150)},
+        {"VU_METER_FG", PRIMARY},
     };
 
     for (int i = 0; i < sizeof(themes) / sizeof(themes[0]); i++)
@@ -97,6 +108,8 @@ void ui_init(ui_state *state, term_state *term, app_instance *app)
     state->vu_meter_st.easing_bars = array_create(8, sizeof(float));
     state->vu_meter_st.peaks = array_create(8, sizeof(float));
     state->vu_meter_st.peak_set = array_create(8, sizeof(uint64_t));
+    state->vu_meter_st.anchor_rows = array_create(8, sizeof(int));
+    state->vu_meter_st.anchor_dbfs = array_create(8, sizeof(float));
 
     state->tabs_st.tabs = array_create(8, sizeof(str_t));
     for (int i = 0; i < TAB_LEN; i++)
@@ -105,9 +118,8 @@ void ui_init(ui_state *state, term_state *term, app_instance *app)
         array_append(&state->tabs_st.tabs, &s, 1);
     }
 
-    state->art_st.images = array_create(8, sizeof(image_t));
-    state->art_st.images_state = array_create(8, sizeof(ui_art_image));
-    state->art_st.method = IMAGE_RENDER_BRAILLE;
+    state->art_st.images = array_create(8, sizeof(ui_art_image));
+    state->art_st.method = IMAGE_RENDER_GLYPH;
 }
 
 void ui_free(ui_state *state)
@@ -120,6 +132,8 @@ void ui_free(ui_state *state)
     array_free(&state->vu_meter_st.easing_bars);
     array_free(&state->vu_meter_st.peaks);
     array_free(&state->vu_meter_st.peak_set);
+    array_free(&state->vu_meter_st.anchor_rows);
+    array_free(&state->vu_meter_st.anchor_dbfs);
 
     str_t *s;
     ARR_FOREACH_BYREF(state->tabs_st.tabs, s, i)
@@ -128,19 +142,14 @@ void ui_free(ui_state *state)
     }
     array_free(&state->tabs_st.tabs);
 
-    image_t *img;
-    ARR_FOREACH_BYREF(state->art_st.images, img, i)
+    ui_art_image *ui_img;
+    ARR_FOREACH_BYREF(state->art_st.images, ui_img, i)
     {
-        image_free(img);
+        image_free(ui_img->img);
+        free(ui_img->img);
+        str_free(&ui_img->rendered);
     }
     array_free(&state->art_st.images);
-
-    ui_art_image *img_state;
-    ARR_FOREACH_BYREF(state->art_st.images_state, img_state, i)
-    {
-        str_free(&img_state->rendered);
-    }
-    array_free(&state->art_st.images_state);
 }
 
 static void ui_update(ui_state *state)
@@ -184,8 +193,27 @@ static void render_playlist_tabs(ui_state *state)
     widget volume = {VEC(hprogress.pos.x + hprogress.size.x + 1, control_mid_y),
                      VEC(10, 1)};
 
-    volume.size.x = render_volume(state, volume.pos, volume.size,
-                                  state->app->audio->mixer.master_gain);
+    render_volume(state, volume.pos, volume.size,
+                  state->app->audio->mixer.master_gain);
+
+    audio_effect *eff;
+    ARR_FOREACH_BYREF(state->app->audio->mixer.effects, eff, i)
+    {
+        switch (eff->type)
+        {
+        case AUDIO_EFF_AUTOGAIN:
+            render_volume_color(state, VEC(volume.pos.x - 1, volume.pos.y + 1),
+                                volume.size,
+                                20 * log10f(audio_eff_autogain_get_gain(eff)),
+                                GET_THEMECOLOR(state, "VOLUME_BG"),
+                                GET_THEMECOLOR(state, "PRIMARY_DIM"));
+            break;
+        case AUDIO_EFF_GAIN:
+        case AUDIO_EFF_PAN:
+        case AUDIO_EFF_FILTER:
+            break;
+        }
+    }
 
     widget media_control = {VEC(state->term->width / 2 - 9, control_mid_y + 1),
                             VEC(17, 1)};
@@ -208,19 +236,49 @@ static void render_playlist_tabs(ui_state *state)
 static void render_visual_tabs(ui_state *state)
 {
     if (!state->art_st.initialized)
+    {
         term_draw_clear(&state->term->buf);
+        art_init(state, state->art_st.method);
+        state->term->resized = true;
+    }
 
-    int width = state->term->width * 0.3;
-    int height = state->term->height * 0.5;
-    render_art(state,
-               VEC(state->term->width / 2 - width / 2,
-                   state->term->height / 2 - height / 2),
-               VEC(width, height), state->art_st.method);
-    // render_art(state, VEC(0, 0), VEC(1, height), state->art_st.method);
+    int total_width = 0;
+    ui_art_image *img;
+    ARR_FOREACH_BYREF(state->art_st.images, img, i)
+    {
+        vec2 size = art_resolve_size(img->img, state->art_st.method, VEC(-1, state->term->height / 2), UI_ART_SIZE_AUTO);
+        total_width += size.x;
+    }
+
+    int x = 0;
+    ARR_FOREACH_BYREF(state->art_st.images, img, i)
+    {
+        vec2 size = render_art_image(
+            state,
+            VEC((state->term->width / 2 - total_width) + x, state->term->height / 2), i,
+            VEC(-1, state->term->height / 2), UI_ART_SIZE_AUTO,
+            UI_ANCHOR_BOTTOM_LEFT, state->art_st.method, &state->term->capability);
+        x += size.x;
+    }
+
+    int width = state->term->width * 0.5;
+    render_lyrics(state,
+                  VEC(state->term->width / 2 - width / 2, state->term->height / 2 + 1),
+                  VEC(width, 5));
+    // audio_source src =
+    //     ARR_AS(state->app->audio->mixer.sources, audio_source)[0];
+
+    // widget hprogress = {VEC(state->term->width / 2 - art.size.x / 2,
+    //                         art.pos.y + art.size.y + 1),
+    //                     VEC(art.size.x, 1)};
+    // render_hprogress(state, hprogress.pos, hprogress.size,
+    //                  (double)src.timestamp / (double)src.duration);
 }
 
 static void render_metadata_tabs(ui_state *state)
 {
+    render_lyrics(state, VEC(0, 0),
+                  VEC(state->term->width, state->term->height));
 }
 
 static void render_overlay(ui_state *state)
@@ -327,6 +385,10 @@ void ui_event(ui_state *state, term_event *e)
             state->playlist_st.hovered_idx = MATH_MIN(
                 state->playlist_st.hovered_idx + state->term->height * 0.5,
                 state->app->playlist.files.length);
+        }
+        else if (e->key.ascii == 'm')
+        {
+            state->app->audio->mixer.muted = !state->app->audio->mixer.muted;
         }
         else if (e->key.virtual == TERM_KEY_LEFT)
         {
