@@ -47,38 +47,39 @@ path_t *path_normalize(path_t *path)
 }
 
 // TODO: resolve path link & junction
-path_t *path_resolve(path_t *path)
-{
-    if (!path->is_abs)
-    {
-        char cwd[1024];
-        getcwd(cwd, 1024);
-        path_segmentize_insert(cwd, &path->segments, 0);
-        path->is_abs = true;
-    }
+// path_t *path_resolve(path_t *path)
+// {
+//     if (!path->is_abs)
+//     {
+//         char cwd[1024];
+//         getcwd(cwd, 1024);
+//         path_segmentize_insert(cwd, &path->segments, 0);
+//         path->is_abs = true;
+//     }
 
-    strview_t *view;
-    ARR_FOREACH_BYREF(path->segments, view, i)
-    {
-        if (view->len == 1 && view->buf[0] == '.')
-            array_remove(&path->segments, i--, 1);
-        else if (view->len == 2 && view->buf[0] == '.' && view->buf[1] == '.')
-        {
-            if (i == 0)
-            {
-                array_remove(&path->segments, i, 1);
-                i -= 1;
-            }
-            else
-            {
-                array_remove(&path->segments, i - 1, 2);
-                i -= 2;
-            }
-        }
-    }
+//     strview_t *view;
+//     ARR_FOREACH_BYREF(path->segments, view, i)
+//     {
+//         if (view->len == 1 && view->buf[0] == '.')
+//             array_remove(&path->segments, i--, 1);
+//         else if (view->len == 2 && view->buf[0] == '.' && view->buf[1] ==
+//         '.')
+//         {
+//             if (i == 0)
+//             {
+//                 array_remove(&path->segments, i, 1);
+//                 i -= 1;
+//             }
+//             else
+//             {
+//                 array_remove(&path->segments, i - 1, 2);
+//                 i -= 2;
+//             }
+//         }
+//     }
 
-    return path;
-}
+//     return path;
+// }
 
 static void path_segmentize_generic(char *str, array_t *out, int index)
 {
@@ -138,9 +139,13 @@ str_t *path_render(path_t *path)
     return &path->front;
 }
 
+#ifndef _WIN32
+#  include <unistd.h>
+#endif
+
 bool path_exists(char *path)
 {
-#ifdef _MSC_VER
+#ifdef _WIN32
     return _access(path, 0) == 0;
 #else
     return access(path, F_OK) == 0;

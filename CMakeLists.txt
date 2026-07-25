@@ -14,8 +14,6 @@ endif()
 
 if (MSVC)
     add_compile_options(/utf-8)
-else()
-    string(APPEND CMAKE_C_FLAGS " -Wall -Werror -pg -Wno-unused-but-set-variable -Wno-unused-variable -Wno-unused-function")
 endif()
 
 include(FetchContent)
