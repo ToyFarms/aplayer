@@ -50,6 +50,7 @@ add_executable(aplayer
     ./src/session.c
     ./src/metagen.c
     ./src/metagen_lyrics.cpp
+    ./src/ssixel.c
 
     ./src/struct/array.c
     ./src/struct/dict.c
@@ -106,7 +107,7 @@ if (NOT WIN32)
   target_link_libraries(aplayer PRIVATE ncurses)
 endif()
 
-pkg_check_modules(LIBAV REQUIRED libavformat libavcodec libavutil libswresample libswscale libavfilter libsixel libebur128)
+pkg_check_modules(LIBAV REQUIRED libavformat libavcodec libavutil libswresample libswscale libavfilter libebur128)
 target_include_directories(aplayer PRIVATE ${LIBAV_INCLUDE_DIRS})
 target_link_directories(aplayer PRIVATE ${LIBAV_LIBRARY_DIRS})
 target_link_libraries(aplayer PRIVATE ${LIBAV_LIBRARIES})

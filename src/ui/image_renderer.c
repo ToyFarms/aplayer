@@ -3,9 +3,9 @@
 #include "app.h"
 #include "ds.h"
 #include "imgconv.h"
+#include "ssixel.h"
 #include "term.h"
 #include "term_draw.h"
-#include <sixel.h>
 
 #define PXR                  0
 #define PXG                  1
@@ -377,32 +377,10 @@ static int write_fn(char *buf, int len, void *userdata)
 static void image_render_sixel(str_t *str_out, image_t *img,
                                const term_capability *cap)
 {
-    sixel_output_t *output = NULL;
-    sixel_dither_t *dither = NULL;
-    int result;
     str_t tmp = str_create();
 
-    result = sixel_output_new(&output, write_fn, &tmp, NULL);
-    if (SIXEL_FAILED(result))
-        goto cleanup;
-
-    result = sixel_dither_new(&dither, 256, NULL);
-    if (SIXEL_FAILED(result))
-        goto cleanup;
-
-    result = sixel_dither_initialize(dither, img->data, img->width, img->height,
-                                     SIXEL_PIXELFORMAT_RGB888, 0, 0, 3);
-    if (SIXEL_FAILED(result))
-        goto cleanup;
-
-    sixel_dither_set_diffusion_type(dither, DIFFUSE_FS);
-    sixel_dither_set_body_only(dither, 0);
-    sixel_dither_set_optimize_palette(dither, 1);
-
-    result = sixel_encode((unsigned char *)img->data, img->width, img->height,
-                          3, dither, output);
-    if (SIXEL_FAILED(result))
-        goto cleanup;
+    sixel_encode_rgb(&tmp, (const uint8_t *)img->data, img->width, img->height,
+                     256);
 
     if (cap->is_tmux)
     {
@@ -423,11 +401,6 @@ static void image_render_sixel(str_t *str_out, image_t *img,
         str_cat_str(str_out, &tmp);
     }
 
-cleanup:
-    if (dither)
-        sixel_dither_unref(dither);
-    if (output)
-        sixel_output_unref(output);
     str_free(&tmp);
 }
 
