@@ -14,7 +14,7 @@ static arena_block *arena_block_create(size_t size)
     block->next = NULL;
     block->capacity = size;
     block->len = 0;
-    block->data = mem + sizeof(arena_block);
+    block->data = (unsigned char *)mem + sizeof(arena_block);
 
     return block;
 }
@@ -71,7 +71,7 @@ void *arena_alloc(arena_allocator *arena, size_t size)
         }
     }
 
-    void *ptr = arena->current->data + arena->current->len;
+    void *ptr = (unsigned char *)arena->current->data + arena->current->len;
     assert(ptr);
 
     arena->current->len += size;

@@ -33,21 +33,21 @@
 
 #include "metagen.h"
 
-#include <taglib/fileref.h>
-#include <taglib/mpegfile.h>
-#include <taglib/id3v2tag.h>
-#include <taglib/id3v2frame.h>
-#include <taglib/synchronizedlyricsframe.h>
-#include <taglib/oggfile.h>
-#include <taglib/vorbisfile.h>
-#include <taglib/flacfile.h>
-#include <taglib/xiphcomment.h>
-#include <taglib/tpropertymap.h>
-#include <taglib/mp4file.h>
-#include <taglib/mp4tag.h>
-#include <taglib/mp4item.h>
-#include <taglib/tstring.h>
-#include <taglib/tstringlist.h>
+#include <fileref.h>
+#include <mpegfile.h>
+#include <id3v2tag.h>
+#include <id3v2frame.h>
+#include <synchronizedlyricsframe.h>
+#include <oggfile.h>
+#include <vorbisfile.h>
+#include <flacfile.h>
+#include <xiphcomment.h>
+#include <tpropertymap.h>
+#include <mp4file.h>
+#include <mp4tag.h>
+#include <mp4item.h>
+#include <tstring.h>
+#include <tstringlist.h>
 
 #include <cstdlib>
 #include <cstring>

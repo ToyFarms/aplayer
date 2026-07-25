@@ -11,19 +11,19 @@ void image_free(image_t *img)
 
     if (img->repr)
     {
-        free(img->repr->data);
+        av_free(img->repr->data);
         free(img->repr);
     }
 
     free(img->title);
     free(img->comment);
-    free(img->data);
+    av_free(img->data);
 }
 
 int image_resize(image_t *img, int flags, int width, int height)
 {
     if (img->repr)
-        free(img->repr->data);
+        av_free(img->repr->data);
     else
         img->repr = calloc(1, sizeof(*img->repr));
 

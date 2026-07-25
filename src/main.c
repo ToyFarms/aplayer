@@ -18,7 +18,6 @@
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <unistd.h>
 
 static void print_opt_double(const char *label, opt_double_t v)
 {

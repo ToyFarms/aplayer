@@ -1,6 +1,5 @@
 #include "metagen.h"
-
-#include <taglib/tag_c.h>
+#include "tag_c.h"
 
 #include <stdio.h>
 #include <stdlib.h>

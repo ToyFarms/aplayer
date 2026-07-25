@@ -6,7 +6,6 @@
 #include <ebur128.h>
 #include <errno.h>
 #include <math.h>
-#include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -22,7 +21,8 @@ static const float TARGET_LUFS = -18.0;
 static void autogain_free(audio_effect *eff)
 {
     effect_autogain *ctx = eff->ctx;
-    ebur128_destroy(&ctx->st);
+    if (ctx->st)
+        ebur128_destroy(&ctx->st);
 
     _audio_eff_free_default(eff);
 }

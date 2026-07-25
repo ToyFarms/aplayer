@@ -147,12 +147,12 @@ static int audio_callback(const void *input, void *output,
                           PaStreamCallbackFlags statusFlags, void *userData)
 {
     audio_mixer *mixer = userData;
+    int nb_samples = (int)frameCount * mixer->nb_channels;
+    float *out = (float *)output;
 
-    int nb_samples = frameCount * mixer->nb_channels;
-    float buffer[nb_samples];
-    memset(buffer, 0, nb_samples * sizeof(float));
+    memset(out, 0, nb_samples * sizeof(*out));
 
-    int ret = mixer_get_frame(mixer, nb_samples, buffer);
+    int ret = mixer_get_frame(mixer, nb_samples, out);
     if (ret == EOF)
     {
         log_debug("Audio finished\n");
@@ -163,8 +163,6 @@ static int audio_callback(const void *input, void *output,
         log_error("Failed to get frame from mixer: code=%d\n", ret);
         return paAbort;
     }
-
-    memcpy(output, buffer, nb_samples * sizeof(float));
 
     return paContinue;
 }

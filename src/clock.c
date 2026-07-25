@@ -5,7 +5,6 @@
 #if defined(_WIN32) || defined(_WIN64)
 #  define PLATFORM_WINDOWS
 #  include <mmsystem.h>
-#  include <windows.h>
 #  pragma comment(lib, "winmm.lib")
 #else
 #  define PLATFORM_POSIX

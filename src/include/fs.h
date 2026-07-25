@@ -2,15 +2,16 @@
 #define __FS_H
 
 #include "ds.h"
-
 #include <stdbool.h>
 #include <sys/stat.h>
+
 #ifdef _WIN32
-#  error "NOT IMPLEMENTED"
+#  define WIN32_LEAN_AND_MEAN
+#  include <windows.h>
 #else
 #  include <dirent.h>
 #endif // _WIN32
-
+//
 typedef struct fs_entry_t
 {
     struct stat stat;
@@ -21,8 +22,10 @@ typedef struct fs_entry_t
 typedef struct fs_iterator
 {
     const char *dir;
-#ifdef _WIN32
-#  error "NOT IMPLEMENTED"
+#ifdef _MSC_VER
+    HANDLE h;
+    WIN32_FIND_DATAW find_data;
+    int has_pending;
 #else
     DIR *d;
 #endif // _WIN32
@@ -35,40 +38,5 @@ void fs_iter_free(fs_iterator *iter);
 bool fs_is_dir(const fs_entry_t *entry);
 strview_t fs_name(const fs_entry_t *entry);
 strview_t fs_suffix(const fs_entry_t *entry);
-
-typedef struct fsmon_t fsmon_t;
-
-enum fsmon_event_type
-{
-    DIR_EVENT_UNKNOWN,
-    DIR_EVENT_CREATED,
-    DIR_EVENT_MODIFIED,
-    DIR_EVENT_DELETED,
-    DIR_EVENT_MOVED,
-};
-
-enum fsmon_error
-{
-    FSMON_OK,
-    FSMON_ALREADY_WATCHING,
-};
-
-typedef struct fsmon_event
-{
-    enum fsmon_event_type type;
-    const char *path;
-    const char *old_path;
-} fsmon_event;
-
-#define FSMON_RECURSIVE (1 << 0)
-#define FSMON_FILE_ONLY (1 << 1)
-#define FSMON_DIR_ONLY  (1 << 2)
-
-// TODO: add callback api, figure out how to handle poll vs callback
-
-fsmon_t *fsmon_create();
-void fsmon_free(fsmon_t *mon);
-int fsmon_watch(fsmon_t *mon, const char *path, int flags);
-const fsmon_event *fsmon_poll(fsmon_t *mon);
 
 #endif /* __FS_H */

@@ -7,6 +7,7 @@
 #include <string.h>
 #include <threads.h>
 #include <wchar.h>
+#include <stdarg.h>
 
 static const wchar_t blocks_horizontal[] = {
     L' ', L'▏', L'▎', L'▍', L'▌', L'▋', L'▊', L'▉', L'█',
@@ -268,14 +269,20 @@ str_t *term_draw_strf(str_t *buf, const char *fmt, ...)
     return buf;
 }
 
+#ifdef _MSC_VER
+#  define THREAD_LOCAL __declspec(thread)
+#else
+#  define THREAD_LOCAL _Thread_local
+#endif
+
 str_t *term_draw_padding(str_t *buf, int length)
 {
     if (length <= 0)
         return buf;
 
 #define MAX_PAD 1024
-    static thread_local char pad[MAX_PAD];
-    static thread_local bool initialized = false;
+    static THREAD_LOCAL char pad[MAX_PAD];
+    static THREAD_LOCAL bool initialized = false;
     if (!initialized)
     {
         memset(pad, ' ', MAX_PAD);

@@ -78,6 +78,11 @@ static const glyph_t glyphs[] = {
     {L'▓', 0xFF, 5},
 };
 
+#ifdef _MSC_VER
+#include <intrin.h>
+#  define __builtin_popcount __popcnt
+#endif // _MSC_VER
+
 static wchar_t pick_glyph_for_mask(uint8_t mask)
 {
     wchar_t best = L' ';
@@ -363,7 +368,7 @@ static void image_render_braille(str_t *out, image_t *img)
         term_draw_move(out, VEC(-(img->width + 1) / 2, 1));
     }
 
-    free(frame.buffer);
+    av_free(frame.buffer);
 }
 
 static int write_fn(char *buf, int len, void *userdata)

@@ -5,7 +5,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
-#include <unistd.h>
 
 static const char *log_level_str[] = {
     "QUIET", "WARNING", "ERROR", "FATAL", "INFO", "DEBUG",

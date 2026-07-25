@@ -22,8 +22,12 @@ size_t term_draw_truncate_termchar(str_t *dst, str_t *buf, wchar_t end_char,
 str_t *term_draw_reset(str_t *buf);
 str_t *term_draw_clear(str_t *buf);
 str_t *term_draw_str(str_t *buf, const char *str, int len);
+#ifdef _MSC_VER
+str_t *term_draw_strf(str_t *buf, _Printf_format_string_ const char *fmt, ...);
+#else
 str_t *term_draw_strf(str_t *buf, const char *fmt, ...)
     __attribute__((format(printf, 2, 3)));
+#endif // _MSC_VER
 str_t *term_draw_padding(str_t *buf, int length);
 str_t *term_draw_hline(str_t *buf, int length);
 str_t *term_draw_vline(str_t *buf, int length, color_t bg, color_t fg);

@@ -88,7 +88,7 @@ int ring_buf_write(ring_buf_t *rbuf, const void *mem, int items)
         int items_now =
             (items_to_write < space_left) ? items_to_write : space_left;
 
-        memcpy(rbuf->buf + (rbuf->write_idx * rbuf->item_size), src,
+        memcpy((unsigned char *)rbuf->buf + (rbuf->write_idx * rbuf->item_size), src,
                items_now * rbuf->item_size);
 
         items_to_write -= items_now;
@@ -117,7 +117,8 @@ int ring_buf_read(ring_buf_t *rbuf, int req_item, void *out)
 
     if (rbuf->read_idx + req_item <= rbuf->capacity)
     {
-        memcpy(out, rbuf->buf + (rbuf->read_idx * rbuf->item_size),
+        memcpy(out,
+               (unsigned char *)rbuf->buf + (rbuf->read_idx * rbuf->item_size),
                req_item * rbuf->item_size);
         rbuf->read_idx += req_item;
     }
@@ -127,10 +128,12 @@ int ring_buf_read(ring_buf_t *rbuf, int req_item, void *out)
         int fit = req_item - overflow;
 
         if (fit != 0)
-            memcpy(out, rbuf->buf + (rbuf->read_idx * rbuf->item_size),
+            memcpy(out,
+                   (unsigned char *)rbuf->buf +
+                       (rbuf->read_idx * rbuf->item_size),
                    fit * rbuf->item_size);
 
-        memcpy(out + (fit * rbuf->item_size), rbuf->buf,
+        memcpy((unsigned char *)out + (fit * rbuf->item_size), rbuf->buf,
                overflow * rbuf->item_size);
         rbuf->read_idx = overflow;
     }
@@ -159,7 +162,8 @@ int ring_buf_try_read(ring_buf_t *rbuf, int req_item, void *out)
 
     if (rbuf->read_idx + req_item <= rbuf->capacity)
     {
-        memcpy(out, rbuf->buf + (rbuf->read_idx * rbuf->item_size),
+        memcpy(out,
+               (unsigned char *)rbuf->buf + (rbuf->read_idx * rbuf->item_size),
                req_item * rbuf->item_size);
         rbuf->read_idx += req_item;
     }
@@ -169,10 +173,12 @@ int ring_buf_try_read(ring_buf_t *rbuf, int req_item, void *out)
         int fit = req_item - overflow;
 
         if (fit != 0)
-            memcpy(out, rbuf->buf + (rbuf->read_idx * rbuf->item_size),
+            memcpy(out,
+                   (unsigned char *)rbuf->buf +
+                       (rbuf->read_idx * rbuf->item_size),
                    fit * rbuf->item_size);
 
-        memcpy(out + (fit * rbuf->item_size), rbuf->buf,
+        memcpy((unsigned char *)out + (fit * rbuf->item_size), rbuf->buf,
                overflow * rbuf->item_size);
         rbuf->read_idx = overflow;
     }

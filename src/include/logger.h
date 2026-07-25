@@ -47,8 +47,13 @@ void logger_add_output(int level, FILE *fd, int flags);
 void logger_add_callback(int level, logger_cb_fun callback, int flags);
 void logger_remove_callback(logger_cb_fun callback);
 void logger_use_color(bool enable);
+#if defined(_MSC_VER)
+void logger_log(int level, const char *filename, const char *fn_name, int line,
+                _Printf_format_string_ const char *fmt, ...);
+#else
 void logger_log(int level, const char *filename, const char *fn_name, int line,
                 const char *fmt, ...) __attribute__((format(printf, 5, 6)));
+#endif // defined(_MSC_VER)
 void logger_logv(int level, const char *filename, const char *fn_name, int line,
                  const char *fmt, va_list args);
 

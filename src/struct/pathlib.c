@@ -2,7 +2,6 @@
 #include "logger.h"
 
 #include <assert.h>
-#include <unistd.h>
 
 // TODO: come back to this, and change fs that use char to use path_t
 // TODO: figure out how to structure this with cross-platform in mind
@@ -141,12 +140,11 @@ str_t *path_render(path_t *path)
 
 bool path_exists(char *path)
 {
-#if OS == OS_LINUX
-    return access(path, F_OK) == 0;
-#else
-#  warning "NOT TESTED"
+#ifdef _MSC_VER
     return _access(path, 0) == 0;
-#endif // OS == OS_LINUX
+#else
+    return access(path, F_OK) == 0;
+#endif // _MSC_VER
 }
 
 strview_t path_name(char *path)

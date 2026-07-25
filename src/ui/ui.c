@@ -15,6 +15,10 @@
 #include <stdlib.h>
 #include <string.h>
 
+#ifdef _MSC_VER
+#  define strcasecmp  _stricmp
+#endif
+
 static ui_setting ui_default_setting()
 {
     ui_setting s = (ui_setting){

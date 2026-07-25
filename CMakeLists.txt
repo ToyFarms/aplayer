@@ -1,18 +1,49 @@
 cmake_minimum_required(VERSION 3.14)
 project(audio_player C CXX)
 
-string(LENGTH "${CMAKE_SOURCE_DIR}/" SOURCE_PATH_SIZE)
-add_definitions("-DLOGGER_BASEPATH_LENGTH=${SOURCE_PATH_SIZE}")
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_C_STANDARD 17)
+set(CMAKE_C_STANDARD_REQUIRED ON)
 
-include(FindPkgConfig)
-find_package(PkgConfig REQUIRED)
-string(APPEND CMAKE_C_FLAGS " -Wall -Werror -pg -Wno-unused-but-set-variable -Wno-unused-variable -Wno-unused-function")
+if (NOT WIN32)
+    find_package(PkgConfig REQUIRED)
+endif()
+
+if (MSVC)
+    add_compile_options(/utf-8)
+else()
+    string(APPEND CMAKE_C_FLAGS " -Wall -Werror -pg -Wno-unused-but-set-variable -Wno-unused-variable -Wno-unused-function")
+endif()
 
 include(FetchContent)
+
+if (WIN32)
+    FetchContent_Declare(
+        pthread-win32
+        GIT_REPOSITORY https://github.com/GerHobbelt/pthread-win32
+        GIT_TAG master
+        GIT_SHALLOW TRUE
+    )
+    FetchContent_MakeAvailable(pthread-win32)
+
+    FetchContent_Declare(
+        ffmpeg_prebuilt
+        URL https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl-shared.zip
+    )
+    FetchContent_MakeAvailable(ffmpeg_prebuilt)
+else()
+    pkg_check_modules(LIBAV REQUIRED IMPORTED_TARGET
+        libavformat
+        libavcodec
+        libavutil
+        libswresample
+        libswscale
+        libavfilter
+    )
+endif()
 
 set(BUILD_TESTING OFF CACHE BOOL "" FORCE)
 set(BUILD_BINDINGS ON CACHE BOOL "" FORCE)
@@ -20,27 +51,44 @@ set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
 set(WITH_ZLIB ON CACHE BOOL "" FORCE)
 
 FetchContent_Declare(
-  taglib
-  GIT_REPOSITORY https://github.com/taglib/taglib.git
-  GIT_TAG v2.0.2
-  GIT_SHALLOW TRUE
+    taglib
+    GIT_REPOSITORY https://github.com/taglib/taglib.git
+    GIT_TAG v2.0.2
+    GIT_SHALLOW TRUE
 )
-FetchContent_MakeAvailable(taglib)
 
-set(TAGLIB_LOCAL_PREFIX ${CMAKE_BINARY_DIR}/taglib-local)
-add_custom_command(
-  OUTPUT ${TAGLIB_LOCAL_PREFIX}/include/taglib/tag_c.h
-  COMMAND ${CMAKE_COMMAND} --install ${taglib_BINARY_DIR} --prefix ${TAGLIB_LOCAL_PREFIX}
-  DEPENDS tag tag_c
-  COMMENT "Installing vendored taglib headers/libs into build tree"
+FetchContent_Declare(
+    libebur128
+    GIT_REPOSITORY https://github.com/jiixyj/libebur128.git
+    GIT_TAG master
+    GIT_SHALLOW TRUE
 )
-add_custom_target(taglib_local_install DEPENDS ${TAGLIB_LOCAL_PREFIX}/include/taglib/tag_c.h)
+
+FetchContent_Declare(
+    portaudio
+    GIT_REPOSITORY https://github.com/PortAudio/portaudio.git
+    GIT_TAG master
+    GIT_SHALLOW TRUE
+)
+
+FetchContent_Declare(
+    fftw3
+    URL https://www.fftw.org/pub/fftw/fftw-3.3.11.tar.gz
+)
+
+FetchContent_MakeAvailable(taglib libebur128 portaudio fftw3)
+
+if (WIN32)
+    set(PLATFORM_SUFFIX win)
+else()
+    set(PLATFORM_SUFFIX linux)
+endif()
 
 add_executable(aplayer
     ./src/main.c
-    ./src/fs_linux.c
+    ./src/fs_${PLATFORM_SUFFIX}.c
     ./src/logger.c
-    ./src/exception_linux.c
+    ./src/exception_${PLATFORM_SUFFIX}.c
     ./src/app.c
     ./src/utils.c
     ./src/playlist.c
@@ -60,7 +108,7 @@ add_executable(aplayer
     ./src/struct/arena_allocator.c
     ./src/struct/pathlib.c
 
-    ./src/term/term_linux.c
+    ./src/term/term_${PLATFORM_SUFFIX}.c
     ./src/term/term_draw.c
 
     ./src/audio/audio.c
@@ -99,29 +147,43 @@ add_executable(aplayer
     ./thirdparty/wcwidth.c
     ./thirdparty/cJSON.c
 )
-add_dependencies(aplayer taglib_local_install)
 
-target_link_libraries(aplayer PRIVATE m pthread fftw3 portaudio)
+target_compile_definitions(aplayer PRIVATE TAGLIB_STATIC)
 
-if (NOT WIN32)
-  target_link_libraries(aplayer PRIVATE ncurses)
+if (WIN32)
+    target_link_libraries(aplayer PRIVATE pthreadVC3 avformat avcodec avutil swresample swscale avfilter)
+    target_link_directories(aplayer PRIVATE "${ffmpeg_prebuilt_SOURCE_DIR}/lib")
+else()
+    pkg_check_modules(LIBAV REQUIRED IMPORTED_TARGET
+        libavformat
+        libavcodec
+        libavutil
+        libswresample
+        libswscale
+        libavfilter
+    )
+    target_link_libraries(aplayer PRIVATE m pthread ncurses PkgConfig::LIBAV)
 endif()
 
-pkg_check_modules(LIBAV REQUIRED libavformat libavcodec libavutil libswresample libswscale libavfilter libebur128)
-target_include_directories(aplayer PRIVATE ${LIBAV_INCLUDE_DIRS})
-target_link_directories(aplayer PRIVATE ${LIBAV_LIBRARY_DIRS})
-target_link_libraries(aplayer PRIVATE ${LIBAV_LIBRARIES})
-
-target_link_libraries(aplayer PRIVATE tag tag_c)
-target_include_directories(aplayer PRIVATE ${TAGLIB_LOCAL_PREFIX}/include)
+file(GLOB_RECURSE TAGLIB_HEADERS "${taglib_SOURCE_DIR}/taglib/*.h")
+set(TAGLIB_INCLUDE_DIRS "")
+foreach(_hdr ${TAGLIB_HEADERS})
+    get_filename_component(_dir ${_hdr} DIRECTORY)
+    list(APPEND TAGLIB_INCLUDE_DIRS ${_dir})
+endforeach()
+list(REMOVE_DUPLICATES TAGLIB_INCLUDE_DIRS)
 
 target_include_directories(aplayer PRIVATE
-  ./src/include
-  ./thirdparty/include
+    ./src/include
+    ./thirdparty/include
+    "${ffmpeg_prebuilt_SOURCE_DIR}/include"
+    "${pthread-win32_SOURCE_DIR}"
+    "${libebur128_SOURCE_DIR}/ebur128"
+    "${taglib_SOURCE_DIR}/bindings/c"
+    "${taglib_SOURCE_DIR}"
+    "${taglib_BINARY_DIR}"
+    ${TAGLIB_INCLUDE_DIRS}
+    "${fftw3_SOURCE_DIR}/api"
 )
 
-execute_process(
-  COMMAND ${CMAKE_COMMAND} -E copy
-        ${CMAKE_BINARY_DIR}/compile_commands.json
-        ${CMAKE_SOURCE_DIR}/compile_commands.json
-)
+target_link_libraries(aplayer PRIVATE fftw3 tag tag_c portaudio ebur128)

@@ -4,8 +4,8 @@
 #include <stdint.h>
 
 #if defined(_WIN32) || defined(_WIN64)
-#  include <winnt.h>
-#else
+#  define WIN32_LEAN_AND_MEAN
+#  include <windows.h>
 #endif
 
 typedef struct clock_highres_t
@@ -13,7 +13,7 @@ typedef struct clock_highres_t
     uint64_t last_time_ns;
     uint64_t next_frame_time_ns;
 
-#ifdef PLATFORM_WINDOWS
+#if defined(_WIN32) || defined(_WIN64)
     LARGE_INTEGER freq;
     int inited;
 #endif

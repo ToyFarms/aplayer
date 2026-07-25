@@ -44,10 +44,15 @@ handle_t term_handle(enum handle_type type)
 void term_write(char *str, int size)
 {
     win_handles_init();
-
     DWORD len = (DWORD)(size >= 0 ? size : strlen(str));
+
+    int wlen = MultiByteToWideChar(CP_UTF8, 0, str, (int)len, NULL, 0);
+    WCHAR *wbuf = malloc(wlen * sizeof(WCHAR));
+    MultiByteToWideChar(CP_UTF8, 0, str, (int)len, wbuf, wlen);
+
     DWORD written = 0;
-    WriteFile(g_stdout, str, len, &written, NULL);
+    WriteConsoleW(g_stdout, wbuf, wlen, &written, NULL);
+    free(wbuf);
 }
 
 static void term_prepare(void)
@@ -77,14 +82,12 @@ static void term_prepare(void)
 
     term_write(TESC TALTBUF, -1);
     term_write(TESC TCURSORHIDE, -1);
-    term_write(TESC TMOUSEENABLE, -1);
     term_write("\x1b[?7l", -1);
 }
 
 static void term_reset(void)
 {
     term_write("\x1b[?7h", -1);
-    term_write(TESC TMOUSEDISABLE, -1);
     term_write(TESC TCURSORSHOW, -1);
     term_write(TESC TMAINBUF, -1);
 
@@ -294,7 +297,7 @@ static void handle_mouse_event(MOUSE_EVENT_RECORD *m, queue_t *out)
     static const DWORD buttons[3] = {
         FROM_LEFT_1ST_BUTTON_PRESSED,
         RIGHTMOST_BUTTON_PRESSED,
-        FROM_LEFT_2ST_BUTTON_PRESSED,
+        FROM_LEFT_2ND_BUTTON_PRESSED,
     };
 
     for (int i = 0; i < 3; i++)

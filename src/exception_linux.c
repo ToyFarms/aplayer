@@ -5,8 +5,14 @@
 #include <stdlib.h>
 #include <string.h>
 
+#if defined(_MSC_VER)
+#  define THREAD_LOCAL __declspec(thread)
+#else
+#  define THREAD_LOCAL _Thread_local
+#endif
+
 static void (*panic)() = NULL;
-static exc_context *exc_head = NULL;
+static THREAD_LOCAL exc_context *exc_head = NULL;
 
 exc_context *_exception_push_context(exc_context *ctx)
 {

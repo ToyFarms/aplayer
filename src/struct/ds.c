@@ -7,6 +7,12 @@
 #include <stdarg.h>
 #include <stdlib.h>
 #include <string.h>
+#include <wchar.h>
+
+#ifdef _WIN32
+#define WIN32_LEAN_AND_MEAN
+#include <Windows.h>
+#endif // _WIN32
 
 #define offset(str) ((str)->buf + (str)->len)
 
@@ -263,6 +269,52 @@ str_t *str_catf_d(str_t *str, const char *fmt, ...)
     return str;
 }
 
+#ifdef _WIN32
+
+str_t *str_catwch(str_t *str, const wchar_t wc)
+{
+    char buf[4];
+    int len =
+        WideCharToMultiByte(CP_UTF8, 0, &wc, 1, buf, sizeof(buf), NULL, NULL);
+    if (len <= 0)
+    {
+        log_error("Failed to convert wide char to utf-8\n");
+        errno = -EINVAL;
+        return str;
+    }
+
+    str_catlen(str, buf, (size_t)len);
+    return str;
+}
+
+str_t *str_catwcs(str_t *str, const wchar_t *ws)
+{
+    int needed = WideCharToMultiByte(CP_UTF8, 0, ws, -1, NULL, 0, NULL, NULL);
+    if (needed <= 0)
+    {
+        log_error("Failed to get the required length for a utf-8 string\n");
+        errno = -EINVAL;
+        return str;
+    }
+
+    ensure_size(str, (size_t)needed);
+
+    int len = WideCharToMultiByte(CP_UTF8, 0, ws, -1, offset(str), needed, NULL,
+                                  NULL);
+    if (len <= 0)
+    {
+        log_error("Failed to convert wide string to utf-8\n");
+        errno = -EINVAL;
+        return str;
+    }
+
+
+    str->len += (size_t)(len - 1);
+    return str;
+}
+
+#else
+
 str_t *str_catwcs(str_t *str, const wchar_t *ws)
 {
     size_t len = wcstombs(NULL, ws, 0);
@@ -284,7 +336,6 @@ str_t *str_catwcs(str_t *str, const wchar_t *ws)
     }
 
     str->len += length;
-
     return str;
 }
 
@@ -302,9 +353,10 @@ str_t *str_catwch(str_t *str, const wchar_t wc)
 
     str->len += length;
     append_null(str);
-
     return str;
 }
+
+#endif /* _WIN32 */
 
 #ifdef _WIN32
 wchar_t *str_decode(const str_t *str)
@@ -427,12 +479,149 @@ str_t *str_repeat_char(str_t *str, char ch, size_t n, const char *sep)
     return str;
 }
 
+str_t *str_repeat_cstr(str_t *str, const char *s, size_t n, const char *sep)
+{
+    assert(str && s);
+    if (n == 0)
+        return str;
+    size_t s_len = strlen(s);
+    size_t sep_len = sep ? strlen(sep) : 0;
+    size_t total = n * s_len + sep_len * (n - 1);
+    ensure_size(str, total + 1);
+    for (size_t i = 0; i < n; ++i)
+    {
+        memcpy(offset(str), s, s_len);
+        str->len += s_len;
+        if (sep_len && i + 1 < n)
+        {
+            memcpy(offset(str), sep, sep_len);
+            str->len += sep_len;
+        }
+    }
+    append_null(str);
+    return str;
+}
+
+#ifdef _WIN32
+
 str_t *str_repeat_wchar(str_t *str, wchar_t wc, size_t n, const wchar_t *wsep)
 {
     assert(str);
     if (n == 0)
         return str;
-    char buf_wc[MB_CUR_MAX];
+
+    char buf_wc[4];
+    int wc_len = WideCharToMultiByte(CP_UTF8, 0, &wc, 1, buf_wc, sizeof(buf_wc),
+                                     NULL, NULL);
+    if (wc_len <= 0)
+    {
+        log_error("Failed to convert wide char to utf-8\n");
+        errno = -EINVAL;
+        return str;
+    }
+
+    size_t sep_len = 0;
+    char *buf_sep = NULL;
+    if (wsep)
+    {
+        int needed =
+            WideCharToMultiByte(CP_UTF8, 0, wsep, -1, NULL, 0, NULL, NULL);
+        if (needed <= 0)
+        {
+            log_error("Failed to convert wide separator to utf-8\n");
+            errno = -EINVAL;
+            return str;
+        }
+        buf_sep = malloc((size_t)needed);
+        WideCharToMultiByte(CP_UTF8, 0, wsep, -1, buf_sep, needed, NULL, NULL);
+        sep_len = (size_t)(needed - 1);
+    }
+
+    size_t total = n * (size_t)wc_len + sep_len * (n - 1);
+    ensure_size(str, total + 1);
+
+    for (size_t i = 0; i < n; ++i)
+    {
+        memcpy(offset(str), buf_wc, (size_t)wc_len);
+        str->len += (size_t)wc_len;
+        if (sep_len && i + 1 < n)
+        {
+            memcpy(offset(str), buf_sep, sep_len);
+            str->len += sep_len;
+        }
+    }
+
+    append_null(str);
+    free(buf_sep);
+    return str;
+}
+
+str_t *str_repeat_wcs(str_t *str, const wchar_t *ws, size_t n,
+                      const wchar_t *wsep)
+{
+    assert(str && ws);
+    if (n == 0)
+        return str;
+
+    int ws_needed =
+        WideCharToMultiByte(CP_UTF8, 0, ws, -1, NULL, 0, NULL, NULL);
+    if (ws_needed <= 0)
+    {
+        log_error("Failed to convert wide string to utf-8\n");
+        errno = -EINVAL;
+        return str;
+    }
+    char *buf_ws = malloc((size_t)ws_needed);
+    WideCharToMultiByte(CP_UTF8, 0, ws, -1, buf_ws, ws_needed, NULL, NULL);
+    size_t ws_len = (size_t)(ws_needed - 1);
+
+    size_t sep_len = 0;
+    char *buf_sep = NULL;
+    if (wsep)
+    {
+        int sep_needed =
+            WideCharToMultiByte(CP_UTF8, 0, wsep, -1, NULL, 0, NULL, NULL);
+        if (sep_needed <= 0)
+        {
+            log_error("Failed to convert wide separator to utf-8\n");
+            errno = -EINVAL;
+            free(buf_ws);
+            return str;
+        }
+        buf_sep = malloc((size_t)sep_needed);
+        WideCharToMultiByte(CP_UTF8, 0, wsep, -1, buf_sep, sep_needed, NULL,
+                            NULL);
+        sep_len = (size_t)(sep_needed - 1);
+    }
+
+    size_t total = n * ws_len + sep_len * (n - 1);
+    ensure_size(str, total + 1);
+
+    for (size_t i = 0; i < n; ++i)
+    {
+        memcpy(offset(str), buf_ws, ws_len);
+        str->len += ws_len;
+        if (sep_len && i + 1 < n)
+        {
+            memcpy(offset(str), buf_sep, sep_len);
+            str->len += sep_len;
+        }
+    }
+
+    append_null(str);
+    free(buf_ws);
+    free(buf_sep);
+    return str;
+}
+
+#else 
+
+str_t *str_repeat_wchar(str_t *str, wchar_t wc, size_t n, const wchar_t *wsep)
+{
+    assert(str);
+    if (n == 0)
+        return str;
+    char buf_wc[MB_LEN_MAX];
     int wc_len = wctomb(buf_wc, wc);
     assert(wc_len > 0);
     size_t sep_len = 0;
@@ -457,29 +646,6 @@ str_t *str_repeat_wchar(str_t *str, wchar_t wc, size_t n, const wchar_t *wsep)
     }
     append_null(str);
     free(buf_sep);
-    return str;
-}
-
-str_t *str_repeat_cstr(str_t *str, const char *s, size_t n, const char *sep)
-{
-    assert(str && s);
-    if (n == 0)
-        return str;
-    size_t s_len = strlen(s);
-    size_t sep_len = sep ? strlen(sep) : 0;
-    size_t total = n * s_len + sep_len * (n - 1);
-    ensure_size(str, total + 1);
-    for (size_t i = 0; i < n; ++i)
-    {
-        memcpy(offset(str), s, s_len);
-        str->len += s_len;
-        if (sep_len && i + 1 < n)
-        {
-            memcpy(offset(str), sep, sep_len);
-            str->len += sep_len;
-        }
-    }
-    append_null(str);
     return str;
 }
 
@@ -517,6 +683,8 @@ str_t *str_repeat_wcs(str_t *str, const wchar_t *ws, size_t n,
     free(buf_sep);
     return str;
 }
+
+#endif /* _WIN32 */
 
 str_t *str_repeat_str(str_t *str, const str_t *src, size_t n, const char *sep)
 {

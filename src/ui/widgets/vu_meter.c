@@ -10,7 +10,7 @@ static float lerp(float v0, float v1, float t)
 }
 
 static const int _tick_width = 4;
-static int tick_width = _tick_width;
+static int tick_width = 4;
 
 static const wchar_t *vu_tick_patterns[] = {L"─", L"╴"};
 

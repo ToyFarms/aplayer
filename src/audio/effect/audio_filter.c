@@ -2,6 +2,7 @@
 #include "logger.h"
 
 #include <assert.h>
+#define _USE_MATH_DEFINES
 #include <math.h>
 #include <stdbool.h>
 #include <stdio.h>

@@ -50,8 +50,12 @@ str_t *str_cat_str(str_t *dst, const str_t *src);
 str_t *str_cat_strlen(str_t *dst, const str_t *src, size_t len);
 // faster version only for number concatenation
 str_t *str_catf_d(str_t *str, const char *fmt, ...);
+#if defined(_MSC_VER)
+str_t *str_catf(str_t *str, _Printf_format_string_ const char *fmt, ...);
+#else
 str_t *str_catf(str_t *str, const char *fmt, ...)
     __attribute__((format(printf, 2, 3)));
+#endif // defined(_MSC_VER)
 str_t *str_catfv(str_t *str, const char *fmt, va_list args);
 str_t *str_catwcs(str_t *str, const wchar_t *ws);
 str_t *str_catwch(str_t *str, const wchar_t wc);

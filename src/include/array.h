@@ -11,13 +11,29 @@ typedef struct array_t
 
 #define array(...)     array_t
 #define ARR_AS(arr, T) ((T *)((arr).data))
-#define ARR_FOREACH(arr, elm, i)                                               \
-    for (int i = 0;                                                            \
-         i < (arr).length && (elm = ARR_AS(arr, typeof(elm))[i], 1); i++)
-#define ARR_FOREACH_BYREF(arr, elm, i)                                           \
-    for (int i = 0;                                                            \
-         i < (arr).length && (elm = &(ARR_AS(arr, typeof(*elm)))[i]); i++)
+#ifdef _MSC_VER
+#  define ARR_FOREACH(arr, elm, i)                                             \
+      for (int i = 0;                                                          \
+           i < (arr).length &&                                                 \
+           (memcpy(&(elm), (char *)(arr).data + (size_t)(i) * (arr).item_size, \
+                   sizeof(elm)),                                               \
+            1);                                                                \
+           ++i)
 
+#  define ARR_FOREACH_BYREF(arr, elm, i)                                       \
+      for (int i = 0; i < (arr).length &&                                      \
+                      ((elm) = (void *)((char *)(arr).data +                   \
+                                        (size_t)(i) * (arr).item_size),        \
+                      1);                                                      \
+           ++i)
+#else
+#  define ARR_FOREACH(arr, elm, i)                                             \
+      for (int i = 0;                                                          \
+           i < (arr).length && (elm = ARR_AS(arr, typeof(elm))[i], 1); i++)
+#  define ARR_FOREACH_BYREF(arr, elm, i)                                       \
+      for (int i = 0;                                                          \
+           i < (arr).length && (elm = &(ARR_AS(arr, typeof(*elm)))[i]); i++)
+#endif // _MSC_VER
 array_t array_create(int max_item, int item_size);
 void array_free(array_t *arr);
 void array_resize(array_t *arr, int new_max_item);

@@ -7,12 +7,12 @@
 
 static void *offset(array_t *arr)
 {
-    return arr->data + (arr->length * arr->item_size);
+    return (unsigned char *)arr->data + (arr->length * arr->item_size);
 }
 
 static void *offsetfrom(array_t *arr, size_t from)
 {
-    return arr->data + (from * arr->item_size);
+    return (unsigned char *)arr->data + (from * arr->item_size);
 }
 
 static void array_copy_buffer(array_t *arr, const void *mem, int item_count)
@@ -167,8 +167,10 @@ int array_remove(array_t *arr, int index, int item_count)
     int move_size = (arr->length - (index + item_count)) * arr->item_size;
 
     if (move_size > 0)
-        memmove(arr->data + index * arr->item_size,
-                arr->data + (index + item_count) * arr->item_size, move_size);
+        memmove((unsigned char *)arr->data + index * arr->item_size,
+                (unsigned char *)arr->data +
+                    (index + item_count) * arr->item_size,
+                move_size);
 
     arr->length -= item_count;
 
@@ -177,8 +179,8 @@ int array_remove(array_t *arr, int index, int item_count)
 
 static void swap_element(array_t *arr, int a, int b)
 {
-    unsigned char *x = arr->data + (a * arr->item_size);
-    unsigned char *y = arr->data + (b * arr->item_size);
+    unsigned char *x = (unsigned char *)arr->data + (a * arr->item_size);
+    unsigned char *y = (unsigned char *)arr->data + (b * arr->item_size);
 
     for (int i = 0; i < arr->item_size; i++)
     {
