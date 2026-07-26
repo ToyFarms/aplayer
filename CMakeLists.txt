@@ -32,7 +32,7 @@ if (WIN32)
 
     FetchContent_Declare(
         ffmpeg_prebuilt
-        URL https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl-shared.zip
+        URL https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-07-24-13-32/ffmpeg-master-latest-win64-gpl-shared.zip
     )
     FetchContent_MakeAvailable(ffmpeg_prebuilt)
 else()
