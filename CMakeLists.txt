@@ -11,12 +11,22 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_C_STANDARD 17)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 
+set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
+set(BUILD_TESTING OFF CACHE BOOL "" FORCE)
+set(BUILD_BINDINGS ON CACHE BOOL "" FORCE)
+set(WITH_ZLIB ON CACHE BOOL "" FORCE)
+
 if (NOT WIN32)
     find_package(PkgConfig REQUIRED)
+    set(PKG_CONFIG_USE_CMAKE_PREFIX_PATH ON)
 endif()
 
 if (MSVC)
+    set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
     add_compile_options(/utf-8)
+else()
+    add_compile_options(-static-libgcc -static-libstdc++)
+    add_link_options(-static-libgcc -static-libstdc++)
 endif()
 
 include(FetchContent)
@@ -44,12 +54,9 @@ else()
         libswscale
         libavfilter
     )
-endif()
 
-set(BUILD_TESTING OFF CACHE BOOL "" FORCE)
-set(BUILD_BINDINGS ON CACHE BOOL "" FORCE)
-set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
-set(WITH_ZLIB ON CACHE BOOL "" FORCE)
+    pkg_check_modules(NCURSES REQUIRED IMPORTED_TARGET STATIC ncurses)
+endif()
 
 FetchContent_Declare(
     taglib
@@ -64,6 +71,9 @@ FetchContent_Declare(
     GIT_TAG v1.2.6
     GIT_SHALLOW TRUE
 )
+
+set(PA_BUILD_SHARED OFF CACHE BOOL "" FORCE)
+set(PA_BUILD_STATIC ON CACHE BOOL "" FORCE)
 
 FetchContent_Declare(
     portaudio
@@ -155,15 +165,7 @@ if (WIN32)
     target_link_libraries(aplayer PRIVATE pthreadVC3 avformat avcodec avutil swresample swscale avfilter)
     target_link_directories(aplayer PRIVATE "${ffmpeg_prebuilt_SOURCE_DIR}/lib")
 else()
-    pkg_check_modules(LIBAV REQUIRED IMPORTED_TARGET
-        libavformat
-        libavcodec
-        libavutil
-        libswresample
-        libswscale
-        libavfilter
-    )
-    target_link_libraries(aplayer PRIVATE m pthread ncurses PkgConfig::LIBAV)
+    target_link_libraries(aplayer PRIVATE m pthread PkgConfig::LIBAV PkgConfig::NCURSES)
 endif()
 
 file(GLOB_RECURSE TAGLIB_HEADERS "${taglib_SOURCE_DIR}/taglib/*.h")
@@ -185,6 +187,20 @@ target_include_directories(aplayer PRIVATE
     "${taglib_BINARY_DIR}"
     ${TAGLIB_INCLUDE_DIRS}
     "${fftw3_SOURCE_DIR}/api"
+    "${portaudio_SOURCE_DIR}/api"
 )
 
-target_link_libraries(aplayer PRIVATE fftw3 tag tag_c portaudio ebur128)
+target_link_libraries(aplayer PRIVATE fftw3 tag tag_c portaudio_static ebur128)
+
+if (WIN32)
+    file(GLOB FFMPEG_DLLS
+        "${ffmpeg_prebuilt_SOURCE_DIR}/bin/*.dll"
+    )
+
+    add_custom_command(TARGET aplayer POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            ${FFMPEG_DLLS}
+            $<TARGET_FILE_DIR:aplayer>
+        VERBATIM
+    )
+endif()

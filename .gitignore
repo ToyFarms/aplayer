@@ -1,5 +1,6 @@
 *.cache
 build/
+built/
 compile_commands.json
 a.py
 a.c
