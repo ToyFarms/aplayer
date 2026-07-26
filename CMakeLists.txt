@@ -25,7 +25,7 @@ if (WIN32)
     FetchContent_Declare(
         pthread-win32
         GIT_REPOSITORY https://github.com/GerHobbelt/pthread-win32
-        GIT_TAG master
+        GIT_TAG v4.1.0.9
         GIT_SHALLOW TRUE
     )
     FetchContent_MakeAvailable(pthread-win32)
@@ -54,21 +54,21 @@ set(WITH_ZLIB ON CACHE BOOL "" FORCE)
 FetchContent_Declare(
     taglib
     GIT_REPOSITORY https://github.com/taglib/taglib.git
-    GIT_TAG v2.0.2
+    GIT_TAG v2.3.1
     GIT_SHALLOW TRUE
 )
 
 FetchContent_Declare(
     libebur128
     GIT_REPOSITORY https://github.com/jiixyj/libebur128.git
-    GIT_TAG master
+    GIT_TAG v1.2.6
     GIT_SHALLOW TRUE
 )
 
 FetchContent_Declare(
     portaudio
     GIT_REPOSITORY https://github.com/PortAudio/portaudio.git
-    GIT_TAG master
+    GIT_TAG v19.7.0
     GIT_SHALLOW TRUE
 )
 
