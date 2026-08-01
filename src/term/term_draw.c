@@ -3,30 +3,43 @@
 #include "wcwidth.h"
 
 #include <math.h>
+#include <stdarg.h>
 #include <stdlib.h>
 #include <string.h>
 #include <threads.h>
 #include <wchar.h>
-#include <stdarg.h>
 
 static size_t utf8_decode(const char *p, uint32_t *wc)
 {
     unsigned char c = (unsigned char)p[0];
-    if (c == 0) return 0;
-    if (c < 0x80) {
+    if (c == 0)
+        return 0;
+    if (c < 0x80)
+    {
         *wc = c;
         return 1;
-    } else if ((c & 0xE0) == 0xC0) {
-        if ((p[1] & 0xC0) != 0x80) goto error;
+    }
+    else if ((c & 0xE0) == 0xC0)
+    {
+        if ((p[1] & 0xC0) != 0x80)
+            goto error;
         *wc = ((c & 0x1F) << 6) | (p[1] & 0x3F);
         return 2;
-    } else if ((c & 0xF0) == 0xE0) {
-        if ((p[1] & 0xC0) != 0x80 || (p[2] & 0xC0) != 0x80) goto error;
+    }
+    else if ((c & 0xF0) == 0xE0)
+    {
+        if ((p[1] & 0xC0) != 0x80 || (p[2] & 0xC0) != 0x80)
+            goto error;
         *wc = ((c & 0x0F) << 12) | ((p[1] & 0x3F) << 6) | (p[2] & 0x3F);
         return 3;
-    } else if ((c & 0xF8) == 0xF0) {
-        if ((p[1] & 0xC0) != 0x80 || (p[2] & 0xC0) != 0x80 || (p[3] & 0xC0) != 0x80) goto error;
-        *wc = ((c & 0x07) << 18) | ((p[1] & 0x3F) << 12) | ((p[2] & 0x3F) << 6) | (p[3] & 0x3F);
+    }
+    else if ((c & 0xF8) == 0xF0)
+    {
+        if ((p[1] & 0xC0) != 0x80 || (p[2] & 0xC0) != 0x80 ||
+            (p[3] & 0xC0) != 0x80)
+            goto error;
+        *wc = ((c & 0x07) << 18) | ((p[1] & 0x3F) << 12) |
+              ((p[2] & 0x3F) << 6) | (p[3] & 0x3F);
         return 4;
     }
 error:
@@ -203,10 +216,10 @@ size_t term_draw_truncate(str_t *dst, const char *buf, size_t width)
     return used;
 }
 
-size_t term_draw_truncate_termchar(str_t *dst, str_t *buf, uint32_t end_char,
+size_t term_draw_truncate_termchar(str_t *dst, str_t *buf, wchar_t end_char,
                                    size_t width)
 {
-    int ell_w = mk_wcwidth(end_char);
+    int ell_w = mk_wcwidth((uint32_t)end_char);
     if (ell_w < 0)
         ell_w = 0;
 

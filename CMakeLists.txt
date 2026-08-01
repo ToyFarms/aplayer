@@ -55,7 +55,7 @@ else()
         libavfilter
     )
 
-    pkg_check_modules(NCURSES REQUIRED IMPORTED_TARGET STATIC ncurses)
+    pkg_check_modules(NCURSES REQUIRED IMPORTED_TARGET ncurses)
 endif()
 
 FetchContent_Declare(
