@@ -64,55 +64,70 @@ static enum AVCodecID probe_format(const uint8_t *data, size_t size)
     AVIOContext *ioctx = NULL;
     unsigned char *iobuf = NULL;
     enum AVCodecID codec = AV_CODEC_ID_NONE;
+    int opened = 0;
 
     iobuf = av_malloc(size + AVPROBE_PADDING_SIZE);
     if (!iobuf)
     {
         log_error("malloc failed\n");
-        goto error;
+        goto cleanup;
     }
+
     memcpy(iobuf, data, size);
     memset(iobuf + size, 0, AVPROBE_PADDING_SIZE);
 
-    ioctx = avio_alloc_context(iobuf, size, 0, NULL, NULL, NULL, NULL);
+    ioctx = avio_alloc_context(iobuf, (int)size, 0, NULL, NULL, NULL, NULL);
     if (!ioctx)
     {
         log_error("avio_alloc_context failed\n");
         av_free(iobuf);
-        goto error;
+        iobuf = NULL;
+        goto cleanup;
     }
 
     avctx = avformat_alloc_context();
     if (!avctx)
     {
         log_error("avformat_alloc_context failed\n");
-        av_free(ioctx->buffer);
-        avio_context_free(&ioctx);
-        goto error;
+        goto cleanup;
     }
-    avctx->pb = ioctx;
 
-    if (avformat_open_input(&avctx, NULL, NULL, NULL) >= 0)
+    avctx->pb = ioctx;
+    avctx->flags |= AVFMT_FLAG_CUSTOM_IO;
+
+    if (avformat_open_input(&avctx, NULL, NULL, NULL) < 0)
     {
-        if (avformat_find_stream_info(avctx, NULL) >= 0)
+        goto cleanup;
+    }
+    opened = 1;
+
+    if (avformat_find_stream_info(avctx, NULL) >= 0)
+    {
+        for (unsigned int i = 0; i < avctx->nb_streams; ++i)
         {
-            for (unsigned int i = 0; i < avctx->nb_streams; ++i)
+            AVCodecParameters *par = avctx->streams[i]->codecpar;
+            if (par->codec_type == AVMEDIA_TYPE_VIDEO)
             {
-                AVCodecParameters *par = avctx->streams[i]->codecpar;
-                if (par->codec_type == AVMEDIA_TYPE_VIDEO)
-                {
-                    codec = par->codec_id;
-                    break;
-                }
+                codec = par->codec_id;
+                break;
             }
         }
     }
 
-error:
+cleanup:
     if (avctx)
-        avformat_close_input(&avctx);
-    else
+    {
+        if (opened)
+            avformat_close_input(&avctx);
+        else
+            avformat_free_context(avctx);
+    }
+
+    if (ioctx)
+    {
+        av_freep(&ioctx->buffer);
         avio_context_free(&ioctx);
+    }
 
     if (codec == AV_CODEC_ID_NONE)
         codec = guess_image_codec_from_magic(data, size);
@@ -242,166 +257,54 @@ error:
     return f;
 }
 
-// imgconv_frame imgconv_resize(const uint8_t *src_buf, int sws_flags,
-//                              int src_width, int src_height,
-//                              enum AVPixelFormat srcfmt,
-//                              enum AVPixelFormat dstfmt, int target_width,
-//                              int target_height, enum imgconv_scale_mode mode)
-// {
-//     imgconv_frame f = {.width = -1, .height = -1, .buffer = NULL};
-//     struct SwsContext *sws = NULL;
-//     AVFrame *src_frame = NULL;
-//     AVFrame *tmp_frame = NULL;
-//     AVFrame *dst_frame = NULL;
-//     int ret = 0;
-//
-//     float src_aspect = (float)src_width / src_height;
-//     int scaled_w = target_width;
-//     int scaled_h = target_height;
-//     if (mode == IMGCONV_SCALE_BY_WIDTH)
-//         scaled_h = lrintf(target_width / src_aspect);
-//     else
-//         scaled_w = lrintf(target_height * src_aspect);
-//
-//     // Allocate source frame
-//     src_frame = av_frame_alloc();
-//     if (!src_frame)
-//         goto cleanup;
-//     ret = av_image_fill_arrays(src_frame->data, src_frame->linesize, src_buf,
-//                                srcfmt, src_width, src_height, 1);
-//     if (ret < 0)
-//         goto cleanup;
-//
-//     tmp_frame = av_frame_alloc();
-//     if (!tmp_frame)
-//         goto cleanup;
-//     tmp_frame->format = dstfmt;
-//     tmp_frame->width = scaled_w;
-//     tmp_frame->height = scaled_h;
-//     ret = av_frame_get_buffer(tmp_frame, 1);
-//     if (ret < 0)
-//         goto cleanup;
-//
-//     sws = sws_getContext(src_width, src_height, srcfmt, scaled_w, scaled_h,
-//                          dstfmt, sws_flags, NULL, NULL, NULL);
-//     if (!sws)
-//         goto cleanup;
-//     ret = sws_scale(sws, (const uint8_t *const *)src_frame->data,
-//                     src_frame->linesize, 0, src_height, tmp_frame->data,
-//                     tmp_frame->linesize);
-//     if (ret < 0)
-//         goto cleanup;
-//     sws_freeContext(sws);
-//     sws = NULL;
-//
-//     dst_frame = av_frame_alloc();
-//     if (!dst_frame)
-//         goto cleanup;
-//     dst_frame->format = dstfmt;
-//     dst_frame->width = target_width;
-//     dst_frame->height = target_height;
-//     ret = av_frame_get_buffer(dst_frame, 1);
-//     if (ret < 0)
-//         goto cleanup;
-//
-//     ptrdiff_t linesizes[AV_NUM_DATA_POINTERS] = {0};
-//     for (int i = 0; i < AV_NUM_DATA_POINTERS; i++)
-//     {
-//         linesizes[i] = (ptrdiff_t)dst_frame->linesize[i];
-//     }
-//     ret = av_image_fill_black(dst_frame->data, linesizes, dst_frame->format,
-//                               AVCOL_RANGE_UNSPECIFIED, dst_frame->width,
-//                               dst_frame->height);
-//     if (ret < 0)
-//         goto cleanup;
-//
-//     int x_off = (target_width - scaled_w) / 2;
-//     int y_off = (target_height - scaled_h) / 2;
-//     const AVPixFmtDescriptor *desc = av_pix_fmt_desc_get(dstfmt);
-//
-//     // for (int p = 0; p < AV_NUM_DATA_POINTERS && dst_frame->data[p]; p++)
-//     // {
-//     //     int pw = (p == 0) ? scaled_w : (scaled_w >> desc->log2_chroma_w);
-//     //     int ph = (p == 0) ? scaled_h : (scaled_h >> desc->log2_chroma_h);
-//     //     int step = desc->comp[p].step;
-//     //     int dst_linesz = dst_frame->linesize[p];
-//     //     int src_linesz = dst_frame->linesize[p];
-//     //     int x_plane_off =
-//     //         (p == 0 ? x_off : (x_off >> desc->log2_chroma_w)) * step;
-//     //     int y_plane_off = (p == 0 ? y_off : (y_off >>
-//     desc->log2_chroma_h));
-//     //
-//     //     for (int y = 0; y < ph; y++)
-//     //     {
-//     //         uint8_t *dst_row = dst_frame->data[p] +
-//     //                            (y + y_plane_off) * dst_linesz +
-//     x_plane_off;
-//     //         uint8_t *src_row = dst_frame->data[p] + y * src_linesz;
-//     //         memcpy(dst_row, src_row, pw * step);
-//     //     }
-//     // }
-//
-//     int buf_size =
-//         av_image_get_buffer_size(dstfmt, target_width, target_height, 1);
-//     uint8_t *buf = av_malloc(buf_size);
-//     if (!buf)
-//         goto cleanup;
-//     ret = av_image_copy_to_buffer(
-//         buf, buf_size, (const uint8_t *const *)dst_frame->data,
-//         dst_frame->linesize, dstfmt, target_width, target_height, 1);
-//     if (ret < 0)
-//     {
-//         av_free(buf);
-//         goto cleanup;
-//     }
-//
-//     f.buffer = buf;
-//     f.size = buf_size;
-//     f.width = target_width;
-//     f.height = target_height;
-//
-// cleanup:
-//     av_frame_free(&src_frame);
-//     av_frame_free(&tmp_frame);
-//     av_frame_free(&dst_frame);
-//     if (sws)
-//         sws_freeContext(sws);
-//     return f;
-// }
-
-static int imgconv_resize_no_preserve(const uint8_t *src_buf, int sws_flags,
-                                      int src_width, int src_height,
-                                      enum AVPixelFormat srcfmt,
-                                      enum AVPixelFormat dstfmt, int dst_width,
-                                      int dst_height, AVFrame *dst_frame)
+int imgconv_resize_no_preserve(const uint8_t *src_buf, int sws_flags,
+                               int src_width, int src_height,
+                               enum AVPixelFormat srcfmt,
+                               enum AVPixelFormat dstfmt, int dst_width,
+                               int dst_height, AVFrame *dst_frame)
 {
     int ret = 0;
     AVFrame *src_frame = NULL;
+    AVFrame *tmp_frame = NULL;
     struct SwsContext *sws = NULL;
 
     sws = sws_getContext(src_width, src_height, srcfmt, dst_width, dst_height,
                          dstfmt, sws_flags, NULL, NULL, NULL);
-    if (sws == NULL)
+    if (!sws)
+        return -1;
+
+    src_frame = av_frame_alloc();
+    tmp_frame = av_frame_alloc();
+    if (!src_frame || !tmp_frame)
     {
         ret = -1;
         goto cleanup;
     }
 
-    src_frame = av_frame_alloc();
-    if (src_frame == NULL)
-    {
-        ret = -1;
-        goto cleanup;
-    }
-    ret = av_image_fill_arrays(src_frame->data, src_frame->linesize, src_buf,
+    ret = av_image_fill_arrays(tmp_frame->data, tmp_frame->linesize, src_buf,
                                srcfmt, src_width, src_height, 1);
     if (ret < 0)
         goto cleanup;
 
+    src_frame->format = srcfmt;
+    src_frame->width = src_width;
+    src_frame->height = src_height;
+    ret = av_frame_get_buffer(src_frame, 32);
+    if (ret < 0)
+        goto cleanup;
+
+    ret = av_frame_make_writable(src_frame);
+    if (ret < 0)
+        goto cleanup;
+
+    av_image_copy(src_frame->data, src_frame->linesize,
+                  (const uint8_t *const *)tmp_frame->data, tmp_frame->linesize,
+                  srcfmt, src_width, src_height);
+
     dst_frame->format = dstfmt;
     dst_frame->width = dst_width;
     dst_frame->height = dst_height;
-    ret = av_frame_get_buffer(dst_frame, 1);
+    ret = av_frame_get_buffer(dst_frame, 32);
     if (ret < 0)
         goto cleanup;
 
@@ -413,8 +316,8 @@ static int imgconv_resize_no_preserve(const uint8_t *src_buf, int sws_flags,
 
 cleanup:
     av_frame_free(&src_frame);
+    av_frame_free(&tmp_frame);
     sws_freeContext(sws);
-
     return ret;
 }
 
@@ -445,13 +348,13 @@ static AVFrame *imgconv_fit(AVFrame *frame, int target_width, int target_height)
     }
 
     const AVPixFmtDescriptor *desc = av_pix_fmt_desc_get(frame->format);
-    // Compute offsets
+
     int x_off = (target_width - frame->width) / 2;
     int y_off = (target_height - frame->height) / 2;
-    // For cropping, determine source offset if frame larger
+
     int src_x_off = x_off < 0 ? -x_off : 0;
     int src_y_off = y_off < 0 ? -y_off : 0;
-    // Destination offset inside dst
+
     int dst_x_off = x_off > 0 ? x_off : 0;
     int dst_y_off = y_off > 0 ? y_off : 0;
 
@@ -462,13 +365,11 @@ static AVFrame *imgconv_fit(AVFrame *frame, int target_width, int target_height)
         int shift_x = (p == 0 ? 0 : desc->log2_chroma_w);
         int shift_y = (p == 0 ? 0 : desc->log2_chroma_h);
 
-        // calculate plane dimensions
         int in_w = (frame->width + ((1 << shift_x) - 1)) >> shift_x;
         int in_h = (frame->height + ((1 << shift_y) - 1)) >> shift_y;
         int out_w = (target_width + ((1 << shift_x) - 1)) >> shift_x;
         int out_h = (target_height + ((1 << shift_y) - 1)) >> shift_y;
 
-        // effective copy region
         int copy_w = FFMIN(in_w - (src_x_off >> shift_x), out_w);
         int copy_h = FFMIN(in_h - (src_y_off >> shift_y), out_h);
         if (copy_w <= 0 || copy_h <= 0)
@@ -957,329 +858,3 @@ imgconv_palette_result imgconv_to_palette(const uint8_t *buf, int width,
     res.palette = palette;
     return res;
 }
-
-// imgconv_palette_result imgconv_to_256palette(const uint8_t *buf, int width,
-//                                              int height)
-// {
-//     imgconv_palette_result res = {.width = -1, .height = -1, .indices =
-//     NULL}; AVFilterGraph *filter_graph = NULL; AVFilterContext *buffersrc_ctx
-//     = NULL; AVFilterContext *buffersink_ctx = NULL; AVFilterContext
-//     *palgen_ctx = NULL; enum AVPixelFormat pix_fmts[] = {AV_PIX_FMT_RGB24,
-//     AV_PIX_FMT_NONE}; const AVFilter *buffersrc = NULL; const AVFilter
-//     *buffersink = NULL; const AVFilter *palgen = NULL; AVFrame *input = NULL;
-//     AVFrame *pal_frame = NULL;
-//     uint8_t *b = NULL;
-//     str_t args = {0};
-//     int ret = 0;
-//
-//     filter_graph = avfilter_graph_alloc();
-//     if (filter_graph == NULL)
-//     {
-//         log_error("Failed to allocate graph context\n");
-//         goto cleanup;
-//     }
-//
-//     buffersrc = avfilter_get_by_name("buffer");
-//     if (buffersrc == NULL)
-//     {
-//         log_error("Failed to get buffer filter\n");
-//         goto cleanup;
-//     }
-//     buffersink = avfilter_get_by_name("buffersink");
-//     if (buffersink == NULL)
-//     {
-//         log_error("Failed to get buffer sink filter\n");
-//         goto cleanup;
-//     }
-//
-//     args = str_create();
-//     str_catf(&args,
-//              "video_size=%dx%d:pix_fmt=%d:time_base=1/25:pixel_aspect=1/1",
-//              width, height, AV_PIX_FMT_RGB24);
-//
-//     ret = avfilter_graph_create_filter(&buffersrc_ctx, buffersrc, "in",
-//                                        args.buf, NULL, filter_graph);
-//     if (ret < 0)
-//     {
-//         log_error("Failed to create input node: %s\n", av_err2str(ret));
-//         goto cleanup;
-//     }
-//
-//     ret = avfilter_graph_create_filter(&palgen_ctx, palgen, "palgen", NULL,
-//                                        NULL, filter_graph);
-//     if (ret < 0)
-//     {
-//         log_error("Failed to create input node: %s\n", av_err2str(ret));
-//         goto cleanup;
-//     }
-//
-//     ret = avfilter_graph_create_filter(&buffersink_ctx, buffersink, "out",
-//     NULL,
-//                                        NULL, filter_graph);
-//     if (ret < 0)
-//     {
-//         log_error("Failed to create output node: %s\n", av_err2str(ret));
-//         goto cleanup;
-//     }
-//
-//     ret = av_opt_set_int_list(buffersink_ctx, "pix_fmts", pix_fmts,
-//                               AV_PIX_FMT_NONE, AV_OPT_SEARCH_CHILDREN);
-//     if (ret < 0)
-//     {
-//         log_error("Failed to set pix_fmts to output: %s\n", av_err2str(ret));
-//         goto cleanup;
-//     }
-//
-//     if ((ret = avfilter_link(buffersink_ctx, 0, palgen_ctx, 0)) < 0 ||
-//         (ret = avfilter_link(palgen_ctx, 0, buffersink_ctx, 0)) < 0 ||
-//         (ret = avfilter_graph_config(filter_graph, NULL)) < 0)
-//     {
-//         log_error("Palette graph config failed: %s\n", av_err2str(ret));
-//         goto cleanup;
-//     }
-//
-//     input = av_frame_alloc();
-//     if (input == NULL)
-//     {
-//         log_error("Failed allocate input frame\n");
-//         goto cleanup;
-//     }
-//     input->format = AV_PIX_FMT_RGB24;
-//     input->width = width;
-//     input->height = height;
-//     ret = av_image_fill_arrays(input->data, input->linesize, buf,
-//                                AV_PIX_FMT_RGB24, width, height, 1);
-//     if (ret < 0)
-//     {
-//         log_error("Failed to fill input frame with data: %s\n",
-//                   av_err2str(ret));
-//         goto cleanup;
-//     }
-//
-//     ret = av_buffersrc_add_frame(buffersrc_ctx, input);
-//     if (ret < 0)
-//     {
-//         log_error("Failed to add input frame to filter input: %s\n",
-//                   av_err2str(ret));
-//         goto cleanup;
-//     }
-//     ret = av_buffersrc_add_frame(buffersrc_ctx, NULL);
-//     if (ret < 0)
-//     {
-//         log_error("Failed to send EOF to filter input: %s\n",
-//         av_err2str(ret)); goto cleanup;
-//     }
-//
-//     pal_frame = av_frame_alloc();
-//     if (pal_frame == NULL)
-//     {
-//         log_error("Failed to allocate output frame\n");
-//         goto cleanup;
-//     }
-//     ret = av_buffersink_get_frame(buffersink_ctx, pal_frame);
-//     if (ret < 0)
-//     {
-//         log_error("Failed to receive frame from filter output: %s\n",
-//                   av_err2str(ret));
-//         goto cleanup;
-//     }
-//
-//     int buf_size = av_image_get_buffer_size(pal_frame->format,
-//     pal_frame->width,
-//                                             pal_frame->height, 1);
-//     if (buf_size < 0)
-//     {
-//         log_error("Could not calculate the required output buffer size:
-//         %s\n",
-//                   av_err2str(ret));
-//         goto cleanup;
-//     }
-//     b = av_malloc(buf_size);
-//     if (b == NULL)
-//     {
-//         log_error("Failed to allocate output buffer\n");
-//         goto cleanup;
-//     }
-//     ret = av_image_copy_to_buffer(b, buf_size,
-//                                   (const uint8_t *const *)pal_frame->data,
-//                                   pal_frame->linesize, pal_frame->format,
-//                                   pal_frame->width, pal_frame->height, 1);
-//     if (ret < 0)
-//     {
-//         log_error("Failed to copy from output frame to output buffer: %s\n",
-//                   av_err2str(ret));
-//         av_free(b);
-//         goto cleanup;
-//     }
-//
-// cleanup:
-//     avfilter_graph_free(&filter_graph);
-//     av_frame_free(&input);
-//     av_frame_free(&pal_frame);
-//     str_free(&args);
-//
-//     //     if (!pal_graph) {
-//     //         log_error("Failed to alloc palette graph\n");
-//     //         return res;
-//     //     }
-//     //     const AVFilter *buffersrc = avfilter_get_by_name("buffer");
-//     //     const AVFilter *palettegen = avfilter_get_by_name("palettegen");
-//     //     const AVFilter *buffersink = avfilter_get_by_name("buffersink");
-//     //     if (!buffersrc || !palettegen || !buffersink) {
-//     //         log_error("Filters missing\n");
-//     //         goto cleanup_palette;
-//     //     }
-//     //     snprintf(args, sizeof(args),
-//     // "video_size=%dx%d:pix_fmt=%d:time_base=1/25:pixel_aspect=1/1",
-//     //              width, height, AV_PIX_FMT_RGB24);
-//     //     if ((ret = avfilter_graph_create_filter(&src_ctx, buffersrc,
-//     "src",
-//     //                                              args, NULL, pal_graph)) <
-//     0
-//     //                                              ||
-//     //         (ret = avfilter_graph_create_filter(&palgen_ctx, palettegen,
-//     //         "palgen",
-//     //                                              NULL, NULL, pal_graph)) <
-//     0
-//     //                                              ||
-//     //         (ret = avfilter_graph_create_filter(&sink_ctx, buffersink,
-//     //         "sink",
-//     //                                              NULL, NULL, pal_graph)) <
-//     0)
-//     //                                              {
-//     //         log_error("Palette filters creation failed: %s\n",
-//     //         av_err2str(ret)); goto cleanup_palette;
-//     //     }
-//     //
-//     //     enum AVPixelFormat out_fmts[] = { AV_PIX_FMT_RGBA, AV_PIX_FMT_NONE
-//     };
-//     //     av_opt_set_int_list(sink_ctx, "pix_fmts", out_fmts,
-//     AV_PIX_FMT_NONE,
-//     //     AV_OPT_SEARCH_CHILDREN);
-//     //
-//     //     // link: src -> palgen -> sink
-//     //     if ((ret = avfilter_link(src_ctx, 0, palgen_ctx, 0)) < 0 ||
-//     //         (ret = avfilter_link(palgen_ctx, 0, sink_ctx, 0)) < 0 ||
-//     //         (ret = avfilter_graph_config(pal_graph, NULL)) < 0) {
-//     //         log_error("Palette graph config failed: %s\n",
-//     av_err2str(ret));
-//     //         goto cleanup_palette;
-//     //     }
-//     //     // prepare input frame
-//     //     in_frame = av_frame_alloc();
-//     //     if (!in_frame) goto cleanup_palette;
-//     //     in_frame->format = AV_PIX_FMT_RGB24;
-//     //     in_frame->width  = width;
-//     //     in_frame->height = height;
-//     //     if ((ret = av_image_fill_arrays(in_frame->data,
-//     in_frame->linesize,
-//     //                                     buf, AV_PIX_FMT_RGB24,
-//     //                                     width, height, 1)) < 0) {
-//     //         log_error("Fill input failed: %s\n", av_err2str(ret));
-//     //         goto cleanup_palette;
-//     //     }
-//     //     ret = av_buffersrc_add_frame(src_ctx, in_frame);
-//     //     ret = av_buffersrc_add_frame(src_ctx, NULL);
-//     //     pal_frame = av_frame_alloc();
-//     //     if (!pal_frame || (ret = av_buffersink_get_frame(sink_ctx,
-//     //     pal_frame)) < 0) {
-//     //         log_error("Getting palette frame failed: %s\n",
-//     av_err2str(ret));
-//     //         goto cleanup_palette;
-//     //     }
-//     //     // extract palette
-//     //     int pal_w = pal_frame->width;
-//     //     int pal_h = pal_frame->height;
-//     //     uint8_t *pdat = pal_frame->data[0];
-//     //     int lsz = pal_frame->linesize[0];
-//     //     int cnt = FFMIN(256, pal_w * pal_h);
-//     //     for (int i = 0; i < cnt; i++) {
-//     //         int x = i % pal_w;
-//     //         int y = i / pal_w;
-//     //         uint8_t *px = pdat + y * lsz + x * 4;
-//     //         res.palette[i][0] = px[0];
-//     //         res.palette[i][1] = px[1];
-//     //         res.palette[i][2] = px[2];
-//     //     }
-//     //     for (int i = cnt; i < 256; i++) {
-//     //         res.palette[i][0] = res.palette[i][1] = res.palette[i][2] = 0;
-//     //     }
-//     //
-//     // cleanup_palette:
-//     //     avfilter_graph_free(&pal_graph);
-//     //     av_frame_free(&in_frame);
-//     //     if (!pal_frame)
-//     //         return res;
-//     //
-//     //     // // 2) Map to indices with paletteuse
-//     //     // AVFilterGraph *idx_graph = avfilter_graph_alloc();
-//     //     // AVFilterContext *src_img = NULL, *src_pal = NULL, *idx_sink =
-//     //     NULL;
-//     //     // AVFrame *out_frame = NULL;
-//     //     // if (!idx_graph) {
-//     //     //     log_error("Idx graph alloc failed\n");
-//     //     //     goto cleanup_all;
-//     //     // }
-//     //     // const AVFilter *paletteuse =
-//     avfilter_get_by_name("paletteuse");
-//     //     // if (!buffersrc || !buffersink || !paletteuse) {
-//     //     //     log_error("Required idx filters missing\n");
-//     //     //     goto cleanup_all;
-//     //     // }
-//     //     // // image input
-//     //     // if ((ret = avfilter_graph_create_filter(&src_img, buffersrc,
-//     //     "srcImg",
-//     //     //                                          args, NULL,
-//     idx_graph)) <
-//     //     0 ||
-//     //     //     (ret = avfilter_graph_create_filter(&src_pal, buffersrc,
-//     //     "srcPal",
-//     //     //                                          args, NULL,
-//     idx_graph)) <
-//     //     0 ||
-//     //     //     (ret = avfilter_graph_create_filter(&idx_sink, paletteuse,
-//     //     "idxSink",
-//     //     //                                          NULL, NULL,
-//     idx_graph)) <
-//     //     0) {
-//     //     //     log_error("Idx filters creation failed: %s\n",
-//     //     av_err2str(ret));
-//     //     //     goto cleanup_all;
-//     //     // }
-//     //     // if ((ret = avfilter_link(src_img, 0, idx_sink, 0)) < 0 ||
-//     //     //     (ret = avfilter_link(src_pal, 0, idx_sink, 1)) < 0 ||
-//     //     //     (ret = avfilter_graph_config(idx_graph, NULL)) < 0) {
-//     //     //     log_error("Idx graph config failed: %s\n",
-//     av_err2str(ret));
-//     //     //     goto cleanup_all;
-//     //     // }
-//     //     // // feed frames
-//     //     // in_frame = av_frame_alloc();
-//     //     // in_frame->format = AV_PIX_FMT_RGB24;
-//     //     // in_frame->width  = width;
-//     //     // in_frame->height = height;
-//     //     // av_image_fill_arrays(in_frame->data, in_frame->linesize,
-//     //     //                      buf, AV_PIX_FMT_RGB24, width, height, 1);
-//     //     // ret = av_buffersrc_add_frame(src_img, in_frame);
-//     //     // ret = av_buffersrc_add_frame(src_pal, pal_frame);
-//     //     // ret = av_buffersrc_add_frame(src_img, NULL);
-//     //     // ret = av_buffersrc_add_frame(src_pal, NULL);
-//     //     // // get indexed frame
-//     //     // out_frame = av_frame_alloc();
-//     //     // if (!out_frame || (ret = av_buffersink_get_frame(idx_sink,
-//     //     out_frame)) < 0) {
-//     //     //     log_error("Paletteuse failed: %s\n", av_err2str(ret));
-//     //     //     goto cleanup_all;
-//     //     // }
-//     //     // int np = width * height;
-//     //     // res.indices = malloc(np);
-//     //     // if (res.indices)
-//     //     //     memcpy(res.indices, out_frame->data[0], np);
-//     //
-//     // // cleanup_all:
-//     //     // avfilter_graph_free(&idx_graph);
-//     //     av_frame_free(&pal_frame);
-//     //     av_frame_free(&in_frame);
-//     //     // av_frame_free(&out_frame);
-//     //     return res;
-// }

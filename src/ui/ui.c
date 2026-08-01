@@ -154,6 +154,8 @@ void ui_free(ui_state *state)
         str_free(&ui_img->rendered);
     }
     array_free(&state->art_st.images);
+
+    array_free(&state->lyrics_st.lines);
 }
 
 static void ui_update(ui_state *state)
