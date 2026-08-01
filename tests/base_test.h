@@ -25,7 +25,11 @@
 // #define __FILENAME__                                                           \
 //     (strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : __FILE__)
 
-#define test_init_setlocale setlocale(LC_ALL, "")
+#ifdef _WIN32
+    #define test_init_setlocale setlocale(LC_ALL, ".UTF8");
+#else
+    #define test_init_setlocale setlocale(LC_ALL, "");
+#endif
 #define test_init_initlogger                                                   \
     logger_set_level(LOG_DEBUG);                                               \
     logger_add_output(-1, fopen("tests/logs/" __FILE_NAME__ ".log", "a"),      \

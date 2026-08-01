@@ -79,14 +79,14 @@ void audio_free(audio_ctx *audio)
     if (audio == NULL)
         return;
 
-    mixer_free(&audio->mixer);
-
     log_debug("Stopping PortAudio stream\n");
     Pa_StopStream(audio->stream);
     log_debug("Closing PortAudio stream\n");
     Pa_CloseStream(audio->stream);
     log_debug("Terminating PortAudio\n");
     Pa_Terminate();
+
+    mixer_free(&audio->mixer);
 
     free(audio);
 }

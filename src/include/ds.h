@@ -12,6 +12,13 @@ typedef struct str_t
     char *buf;
     size_t len;
     size_t capacity;
+
+#ifdef _WIN32
+    wchar_t *wide_buf;
+    size_t wide_len;
+    size_t wide_capacity;
+    size_t wide_synced_len;
+#endif // _WIN32
 } str_t;
 
 typedef struct strview_t
@@ -62,6 +69,9 @@ str_t *str_catwch(str_t *str, const wchar_t wc);
 
 wchar_t *str_decode(const str_t *str);
 str_t str_encode(const wchar_t *utf16);
+#ifdef _WIN32
+const wchar_t *str_as_wide(str_t *str);
+#endif // _WIN32
 
 str_t *str_repeat_char(str_t *str, char ch, size_t n, const char *sep);
 str_t *str_repeat_wchar(str_t *str, wchar_t wc, size_t n, const wchar_t *sep);

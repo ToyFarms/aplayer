@@ -1,6 +1,7 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 # pyright: basic
 
+from dataclasses import dataclass
 from pathlib import Path
 import os
 import re
@@ -8,10 +9,154 @@ import subprocess
 import argparse
 import shutil
 import time
-import attr
 import math
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Callable, Iterable, Literal, Optional, Generator
+
+IS_WINDOWS = os.name == "nt"
+EXE_SUFFIX = ".exe" if IS_WINDOWS else ""
+
+
+def _find_vswhere() -> Optional[str]:
+    candidates = [
+        os.path.expandvars(
+            r"%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe"
+        ),
+        os.path.expandvars(
+            r"%ProgramFiles%\Microsoft Visual Studio\Installer\vswhere.exe"
+        ),
+    ]
+    for c in candidates:
+        if Path(c).exists():
+            return c
+    return shutil.which("vswhere")
+
+
+def _find_vs_install_path() -> Optional[str]:
+    vswhere = _find_vswhere()
+    if not vswhere:
+        return None
+    try:
+        res = subprocess.run(
+            [
+                vswhere,
+                "-latest",
+                "-products", "*",
+                "-requires", "Microsoft.VisualStudio.Component.VC.Tools.x86.x64",
+                "-property", "installationPath",
+            ],
+            capture_output=True,
+            text=True,
+        )
+        path = res.stdout.strip()
+        return path or None
+    except Exception:
+        return None
+
+
+def _find_vcvarsall() -> Optional[str]:
+    install_path = _find_vs_install_path()
+    if not install_path:
+        return None
+    vcvarsall = Path(install_path) / "VC" / "Auxiliary" / "Build" / "vcvarsall.bat"
+    return str(vcvarsall) if vcvarsall.exists() else None
+
+
+def get_msvc_env(arch: str = "x64") -> Optional[dict[str, str]]:
+    vcvarsall = _find_vcvarsall()
+    if not vcvarsall:
+        return None
+    try:
+        res = subprocess.run(
+            f'"{vcvarsall}" {arch} && set',
+            shell=True,
+            capture_output=True,
+            text=True,
+        )
+        if res.returncode != 0:
+            return None
+        env: dict[str, str] = {}
+        for line in res.stdout.splitlines():
+            if "=" in line:
+                key, _, value = line.partition("=")
+                env[key] = value
+        return env or None
+    except Exception:
+        return None
+
+
+MSVC_ENV: Optional[dict[str, str]] = None
+
+
+def find_msvc_cl() -> Optional[str]:
+    global MSVC_ENV
+
+    found = shutil.which("cl")
+    if found:
+        return found
+
+    env = MSVC_ENV if MSVC_ENV is not None else get_msvc_env()
+    if not env:
+        return None
+    MSVC_ENV = env
+    path_var = env.get("Path") or env.get("PATH")
+    if not path_var:
+        return None
+    for directory in path_var.split(os.pathsep):
+        candidate = Path(directory) / "cl.exe"
+        if candidate.exists():
+            return str(candidate)
+
+    return None
+
+
+def default_compiler() -> str:
+    global MSVC_ENV
+
+    found = shutil.which("cc") or shutil.which("gcc") or shutil.which("clang")
+    if found:
+        return found
+
+    if IS_WINDOWS:
+        cl = find_msvc_cl()
+        if cl:
+            print(f"Detected MSVC toolchain: \x1b[1m{cl}\x1b[0m")
+            return cl
+        print(
+            "\x1b[33mWarning: no C compiler found (looked for cc/gcc/clang and "
+            "an installed Visual Studio C++ toolchain)\x1b[0m"
+        )
+
+    return "cc"
+
+
+DEFAULT_CC = default_compiler()
+
+if IS_WINDOWS:
+    try:
+        import ctypes
+
+        kernel32 = ctypes.windll.kernel32
+        ENABLE_VIRTUAL_TERMINAL_PROCESSING = 0x0004
+        handle = kernel32.GetStdHandle(-11)
+        mode = ctypes.c_uint32()
+        if kernel32.GetConsoleMode(handle, ctypes.byref(mode)):
+            kernel32.SetConsoleMode(
+                handle, mode.value | ENABLE_VIRTUAL_TERMINAL_PROCESSING
+            )
+    except Exception:
+        pass
+
+    try:
+        import ctypes
+
+        SEM_FAILCRITICALERRORS = 0x0001
+        SEM_NOGPFAULTERRORBOX = 0x0002
+        ctypes.windll.kernel32.SetErrorMode(
+            SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX
+        )
+    except Exception:
+        pass
 
 try:
     from pygments import highlight, lexers, formatters
@@ -25,6 +170,13 @@ except ModuleNotFoundError:
     def highlight(code, lexer, formatter, outfile=None):
         _ = lexer, formatter, outfile
         return code
+
+
+def term_size() -> os.terminal_size:
+    try:
+        return os.get_terminal_size()
+    except OSError:
+        return os.terminal_size((80, 24))
 
 
 class UnitStat:
@@ -65,7 +217,7 @@ class Unit:
         source: str,
         cflags: str = "",
         flags: list[str] = [],
-        compiler: str = "cc",
+        compiler: str = DEFAULT_CC,
     ) -> None:
         self.filename = Path(filename)
         self.name = name
@@ -73,8 +225,11 @@ class Unit:
         self.cflags = cflags
         self.flags = flags
         self.compiler = compiler
-        self.out = Path(f"tests/build/{self.filename.stem}_{self.name}")
+        self.out = Path(f"tests/build/{self.filename.stem}_{self.name}{EXE_SUFFIX}")
         self.src = Path(f"tests/build/src/{self.filename.stem}_{self.name}.c")
+        if IS_WINDOWS:
+            self.cflags = re.sub(r'(?m)^\s*-lm\s*$', '', self.cflags)
+
         self.build_status = 0
         self.run_status = 0
         self.retcode = 0
@@ -95,8 +250,29 @@ class Unit:
         self.src.write_text(self.source, "utf-8")
 
     @property
+    def is_msvc(self) -> bool:
+        return Path(self.compiler).stem.lower() == "cl"
+
+    @property
     def command(self) -> list[str]:
-        command: list[str] = [
+        if self.is_msvc:
+            command: list[str] = [
+                self.compiler,
+                str(self.src),
+                f"/Fe:{self.out}",
+                "/utf-8",
+                "/std:c17",
+                "/nologo",
+                *self.cflags.splitlines(),
+            ]
+            command = list(map(lambda x: x.strip(), command))
+            debug_flags: list[str] = []
+            if "DEBUG" in self.flags:
+                debug_flags.extend(["/Od", "/Zi"])
+
+            return command + debug_flags + self.extra_command
+
+        command = [
             self.compiler,
             str(self.src),
             "-o",
@@ -104,7 +280,7 @@ class Unit:
             *self.cflags.splitlines(),
         ]
         command = list(map(lambda x: x.strip(), command))
-        debug_flags: list[str] = []
+        debug_flags = []
         if "DEBUG" in self.flags:
             debug_flags.extend(["-O0", "-g3"])
 
@@ -124,7 +300,7 @@ class Unit:
         ]
         return self._hash(
             f"{self.source}{self.command}"
-            f"{''.join(file.read_text() for file in files)}"
+            f"{''.join(file.read_text(encoding="utf-8") for file in files)}"
         )
 
     def need_rebuild(self) -> bool:
@@ -133,13 +309,13 @@ class Unit:
             cache_file.touch()
             return True
 
-        content = cache_file.read_text().splitlines()
+        content = cache_file.read_text(encoding="utf-8").splitlines()
         for line in content:
             if self.test_name() in line:
                 name, _hash = line.split("@@@")
                 return (
                     int(_hash) != hash(self)
-                    and Path("tests/build/" + name.replace(":", "_")).exists()
+                    or not self.out.exists()
                 )
 
         return True
@@ -147,7 +323,7 @@ class Unit:
     def update_cache(self) -> None:
         cache_file = Path("tests/build.cache")
         cache_file.touch()
-        content = cache_file.read_text().splitlines()
+        content = cache_file.read_text(encoding="utf-8").splitlines()
         updated = False
         for i, line in enumerate(content):
             if self.test_name() in line:
@@ -169,21 +345,24 @@ class Unit:
 
             self.prepare()
 
-            res = subprocess.run(self.command, capture_output=True)
+            build_env = MSVC_ENV if self.is_msvc and MSVC_ENV else None
+            res = subprocess.run(
+                self.command, capture_output=True, env=build_env
+            )
 
         msg = (
             f"\x1b[1mBuilding\x1b[0m {self.test_name()!r}: "
             f"{' '.join(self.command)!r}"
         )
 
-        width = os.get_terminal_size().columns
+        width = term_size().columns
         align_on_col = width - 18
         padding = max(align_on_col - len(msg), 0)
         msg = f"{msg} {'.'*padding} build@{self.stat.build_time:.2f} ms"
         print(msg, flush=True)
 
         if res.returncode != 0:
-            print(res.stderr.decode())
+            print(res.stderr.decode(errors="surrogateescape"))
             print(f"\x1b[31mFailed to build {self.test_name()}\x1b[0m")
             self.build_status = 1
 
@@ -199,7 +378,7 @@ class Unit:
         STATUS_FAIL = 1
 
         def print_status(status: int, retcode: int, is_mp: bool) -> None:
-            width = os.get_terminal_size().columns
+            width = term_size().columns
 
             msg = "" if is_mp else "\r"
             if status == STATUS_OK:
@@ -227,18 +406,29 @@ class Unit:
 
             if debug:
                 print(f"    \x1b[34mDEBUG\x1b[0m {self.test_name()}", flush=True)
-                subprocess.run(["gdb", "--tui", self.out])
+                debugger = shutil.which("gdb") or shutil.which("lldb")
+                if not debugger:
+                    print(
+                        "\x1b[31mNo debugger found (looked for 'gdb' or 'lldb' "
+                        "in PATH)\x1b[0m"
+                    )
+                    return
+                if debugger.endswith("lldb"):
+                    subprocess.run([debugger, str(self.out)])
+                else:
+                    subprocess.run([debugger, "--tui", str(self.out)])
                 return
 
             if not is_multithreaded:
                 print(f"{self.test_name()}", end="", flush=True)
 
-            res = subprocess.run(f"./{self.out}", capture_output=True)
+            res = subprocess.run([str(self.out)], capture_output=True)
             self.retcode = res.returncode
 
         if res.returncode != 0 and not expect_fail:
             print_status(STATUS_FAIL, res.returncode, is_multithreaded)
-            stderr = res.stderr.decode()
+            stderr_raw = res.stderr.decode(errors="surrogateescape")
+            stderr = stderr_raw.encode("utf-8", errors="replace").decode("utf-8")
 
             print(f"@@@ stdout=\x1b[1m{res.stdout}\x1b[0m", flush=True)
             if stderr.startswith("MEM_EQ("):
@@ -295,7 +485,7 @@ def diff_memory(dump: str) -> str:
     name2, part2 = part2.split("<[", 1)
     part2 = part2.split("]>) ")[0].split(" ")
 
-    chunk = os.get_terminal_size().columns // 5
+    chunk = term_size().columns // 5
     name_max = find_maxlen([name1, name2])
 
     diff = []
@@ -368,7 +558,7 @@ def find_path_and_read(string: str, test_name: str) -> Optional[str]:
                     original_row = lineno
 
                 original = (
-                    Path(file).read_text().splitlines()
+                    Path(file).read_text(encoding="utf-8").splitlines()
                     if file not in original_lookup
                     else original_lookup[file]
                 )
@@ -423,7 +613,7 @@ def get_line_inbetween(
     return source[start_index + 1 : end_index]
 
 
-@attr.define
+@dataclass
 class Testcase:
     source: str
     flags: list[str]
@@ -490,7 +680,7 @@ def generate_source(
 ) -> str:
     _ = flags
 
-    base = Path("tests/base_test.h").read_text()
+    base = Path("tests/base_test.h").read_text(encoding="utf-8")
 
     source_map = []
     for i, line in enumerate(source.split("\n"), 1):
@@ -517,12 +707,24 @@ def generate_source(
 #endif /* test_init_initlogger */
 """
 
+    win_crt_setup = """#ifdef _WIN32
+#  include <crtdbg.h>
+#  include <stdlib.h>
+    _CrtSetReportMode(_CRT_ASSERT, _CRTDBG_MODE_FILE);
+    _CrtSetReportFile(_CRT_ASSERT, _CRTDBG_FILE_STDERR);
+    _CrtSetReportMode(_CRT_ERROR, _CRTDBG_MODE_FILE);
+    _CrtSetReportFile(_CRT_ERROR, _CRTDBG_FILE_STDERR);
+    _set_abort_behavior(0, _WRITE_ABORT_MSG | _CALL_REPORTFAULT);
+#endif /* _WIN32 */
+"""
+
     return f"""{base}
 {includes}
 void _{group}_{test}()
 {source}
 int main()
 {{
+{win_crt_setup}
 {logger if "logger.c" in cflags else ""}
     {init}
     _{group}_{test}();
@@ -557,7 +759,7 @@ def get_units_status(units: list[Unit]) -> tuple[list[Unit], list[Unit], list[Un
 
 
 def print_center(text: str) -> None:
-    width = os.get_terminal_size().columns
+    width = term_size().columns
     print(f"{text:^{width}}")
 
 
@@ -629,7 +831,7 @@ def print_chart(ratios: list[tuple[str, float, RGBColor]], diameter: int) -> Non
         pixels.append(row)
 
     buf = []
-    term_width = os.get_terminal_size().columns
+    term_width = term_size().columns
     for row, next_row in pairwise(pixels):
         buf.append(" " * int(term_width * 0.1))
         for top_px, bot_px in zip(row, next_row):
@@ -649,7 +851,7 @@ def print_chart(ratios: list[tuple[str, float, RGBColor]], diameter: int) -> Non
 
 
 def print_unit_chart(
-    units: list[Unit], diameter=os.get_terminal_size().columns / 2
+    units: list[Unit], diameter=term_size().columns / 2
 ) -> None:
     total = len(units)
     success, fails, build_failed = get_units_status(units)
@@ -761,8 +963,8 @@ def print_summary(units: list[Unit]) -> None:
     print_center("-- Summary --")
     print()
 
-    w = os.get_terminal_size().columns
-    h = os.get_terminal_size().lines
+    w = term_size().columns
+    h = term_size().lines
     print_unit_chart(units, min(h / 2, w / 4))
     print_stats(units)
 
@@ -811,8 +1013,8 @@ def main() -> None:
     if args.rebuild:
         print("Rebuilding all test...")
         print("Removing all cache and binary...")
-        shutil.rmtree("tests/build")
-        os.remove("tests/build.cache")
+        shutil.rmtree("tests/build", ignore_errors=True)
+        Path("tests/build.cache").unlink(missing_ok=True)
 
     files: list[Path] = []
     if not args.target:
@@ -833,7 +1035,7 @@ def main() -> None:
 
     for file in files:
         print(f"Transpiling \x1b[4m{file}\x1b[0m")
-        source = file.read_text().splitlines()
+        source = file.read_text(encoding="utf-8").splitlines()
         includes = parse_includes(source)
         cflags = parse_cflags(source)
         testcases = parse_testcases(source)

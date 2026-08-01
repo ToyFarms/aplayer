@@ -10,11 +10,73 @@
 #include <wchar.h>
 
 #ifdef _WIN32
-#define WIN32_LEAN_AND_MEAN
-#include <Windows.h>
+#  define WIN32_LEAN_AND_MEAN
+#  include <Windows.h>
 #endif // _WIN32
 
 #define offset(str) ((str)->buf + (str)->len)
+
+#ifdef _WIN32
+
+const wchar_t *str_as_wide(str_t *str)
+{
+    assert(str);
+
+    if (str->wide_synced_len > str->len)
+    {
+        str->wide_len = 0;
+        str->wide_synced_len = 0;
+    }
+
+    size_t new_bytes = str->len - str->wide_synced_len;
+    if (new_bytes == 0 && str->wide_buf)
+        return str->wide_buf;
+
+    const char *chunk = str->buf + str->wide_synced_len;
+    int needed = 0;
+    if (new_bytes > 0)
+    {
+        needed =
+            MultiByteToWideChar(CP_UTF8, 0, chunk, (int)new_bytes, NULL, 0);
+        if (needed <= 0)
+        {
+            log_error("Failed to convert wide char chunk to utf-16\n");
+            errno = -EINVAL;
+            return str->wide_buf;
+        }
+    }
+
+    size_t required = str->wide_len + (size_t)needed + 1;
+    if (required > str->wide_capacity)
+    {
+        size_t newcap = str->wide_capacity ? str->wide_capacity : 64;
+        while (newcap < required)
+            newcap *= 2;
+
+        wchar_t *nbuf = realloc(str->wide_buf, newcap * sizeof(wchar_t));
+        if (nbuf == NULL)
+        {
+            errno = -ENOMEM;
+            return str->wide_buf;
+        }
+        str->wide_buf = nbuf;
+        str->wide_capacity = newcap;
+    }
+
+    if (needed > 0)
+    {
+        MultiByteToWideChar(CP_UTF8, 0, chunk, (int)new_bytes,
+                            str->wide_buf + str->wide_len, needed);
+        str->wide_len += (size_t)needed;
+    }
+
+    str->wide_buf[str->wide_len] = L'\0';
+    str->wide_synced_len = str->len;
+
+    return str->wide_buf;
+}
+
+#endif // _WIN32
 
 static size_t get_avail(str_t *str)
 {
@@ -86,6 +148,9 @@ void str_free(str_t *str)
         return;
 
     free(str->buf);
+#ifdef _WIN32
+    free(str->wide_buf);
+#endif
     memset(str, 0, sizeof(*str));
 }
 
@@ -167,13 +232,15 @@ str_t *str_catf(str_t *str, const char *fmt, ...)
     va_list args;
 
     va_start(args, fmt);
-    size_t needed = vsnprintf(NULL, 0, fmt, args);
+    int needed = vsnprintf(NULL, 0, fmt, args);
+    if (needed < 0)
+        return str;
     va_end(args);
 
     va_start(args, fmt);
 
     ensure_size(str, needed + 1);
-    vsprintf(offset(str), fmt, args);
+    vsnprintf(offset(str), needed + 1, fmt, args);
     str->len += needed;
 
     va_end(args);
@@ -307,7 +374,6 @@ str_t *str_catwcs(str_t *str, const wchar_t *ws)
         errno = -EINVAL;
         return str;
     }
-
 
     str->len += (size_t)(len - 1);
     return str;
@@ -614,7 +680,7 @@ str_t *str_repeat_wcs(str_t *str, const wchar_t *ws, size_t n,
     return str;
 }
 
-#else 
+#else
 
 str_t *str_repeat_wchar(str_t *str, wchar_t wc, size_t n, const wchar_t *wsep)
 {

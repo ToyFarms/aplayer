@@ -9,6 +9,31 @@
 #include <wchar.h>
 #include <stdarg.h>
 
+static size_t utf8_decode(const char *p, uint32_t *wc)
+{
+    unsigned char c = (unsigned char)p[0];
+    if (c == 0) return 0;
+    if (c < 0x80) {
+        *wc = c;
+        return 1;
+    } else if ((c & 0xE0) == 0xC0) {
+        if ((p[1] & 0xC0) != 0x80) goto error;
+        *wc = ((c & 0x1F) << 6) | (p[1] & 0x3F);
+        return 2;
+    } else if ((c & 0xF0) == 0xE0) {
+        if ((p[1] & 0xC0) != 0x80 || (p[2] & 0xC0) != 0x80) goto error;
+        *wc = ((c & 0x0F) << 12) | ((p[1] & 0x3F) << 6) | (p[2] & 0x3F);
+        return 3;
+    } else if ((c & 0xF8) == 0xF0) {
+        if ((p[1] & 0xC0) != 0x80 || (p[2] & 0xC0) != 0x80 || (p[3] & 0xC0) != 0x80) goto error;
+        *wc = ((c & 0x07) << 18) | ((p[1] & 0x3F) << 12) | ((p[2] & 0x3F) << 6) | (p[3] & 0x3F);
+        return 4;
+    }
+error:
+    *wc = L'?';
+    return 1;
+}
+
 static const wchar_t blocks_horizontal[] = {
     L' ', L'▏', L'▎', L'▍', L'▌', L'▋', L'▊', L'▉', L'█',
 };
@@ -91,11 +116,21 @@ str_t *term_draw_clear(str_t *buf)
 
 int term_draw_strwidth(str_t *buf)
 {
-    wchar_t *utf16 = str_decode(buf);
-    int size = mk_wcswidth(utf16, wcslen(utf16));
-    free(utf16);
+    int width = 0;
+    const char *p = buf->buf;
+    while (*p)
+    {
+        uint32_t wc;
+        size_t clen = utf8_decode(p, &wc);
+        if (clen == 0)
+            break;
+        int w = mk_wcwidth(wc);
+        if (w >= 0)
+            width += w;
+        p += clen;
+    }
 
-    return size;
+    return width;
 }
 
 size_t term_draw_truncate_str(str_t *dst, str_t *buf, size_t width)
@@ -107,21 +142,9 @@ size_t term_draw_truncate_str(str_t *dst, str_t *buf, size_t width)
 
     while (*p)
     {
-        wchar_t wc;
-        size_t clen = mbrtowc(&wc, p, MB_CUR_MAX, &st);
-        if (clen == (size_t)-2)
-        {
-            clen = 1;
-            wc = L'?';
-            memset(&st, 0, sizeof st);
-        }
-        else if (clen == (size_t)-1)
-        {
-            clen = 1;
-            wc = L'?';
-            memset(&st, 0, sizeof st);
-        }
-        else if (clen == 0)
+        uint32_t wc;
+        size_t clen = utf8_decode(p, &wc);
+        if (clen == 0)
         {
             break;
         }
@@ -154,21 +177,9 @@ size_t term_draw_truncate(str_t *dst, const char *buf, size_t width)
 
     while (*p)
     {
-        wchar_t wc;
-        size_t clen = mbrtowc(&wc, p, MB_CUR_MAX, &st);
-        if (clen == (size_t)-2)
-        {
-            clen = 1;
-            wc = L'?';
-            memset(&st, 0, sizeof st);
-        }
-        else if (clen == (size_t)-1)
-        {
-            clen = 1;
-            wc = L'?';
-            memset(&st, 0, sizeof st);
-        }
-        else if (clen == 0)
+        uint32_t wc;
+        size_t clen = utf8_decode(p, &wc);
+        if (clen == 0)
         {
             break;
         }
@@ -192,7 +203,7 @@ size_t term_draw_truncate(str_t *dst, const char *buf, size_t width)
     return used;
 }
 
-size_t term_draw_truncate_termchar(str_t *dst, str_t *buf, wchar_t end_char,
+size_t term_draw_truncate_termchar(str_t *dst, str_t *buf, uint32_t end_char,
                                    size_t width)
 {
     int ell_w = mk_wcwidth(end_char);
@@ -210,21 +221,9 @@ size_t term_draw_truncate_termchar(str_t *dst, str_t *buf, wchar_t end_char,
 
     while (*p)
     {
-        wchar_t wc;
-        size_t clen = mbrtowc(&wc, p, MB_CUR_MAX, &st);
-        if (clen == (size_t)-2)
-        {
-            clen = 1;
-            wc = L'?';
-            memset(&st, 0, sizeof st);
-        }
-        else if (clen == (size_t)-1)
-        {
-            clen = 1;
-            wc = L'?';
-            memset(&st, 0, sizeof st);
-        }
-        else if (clen == 0)
+        uint32_t wc;
+        size_t clen = utf8_decode(p, &wc);
+        if (clen == 0)
         {
             break;
         }

@@ -22,7 +22,8 @@ typedef struct fs_entry_t
 typedef struct fs_iterator
 {
     const char *dir;
-#ifdef _MSC_VER
+#ifdef _WIN32
+    const wchar_t *dirw;
     HANDLE h;
     WIN32_FIND_DATAW find_data;
     int has_pending;

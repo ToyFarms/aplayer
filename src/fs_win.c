@@ -6,19 +6,20 @@
 #include <io.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
 #include <wchar.h>
 
 int fs_iter_init(fs_iterator *iter, const char *dir)
 {
+    memset(iter, 0, sizeof(*iter));
+
     str_t pattern = str_create();
     str_catf(&pattern, "%s\\*", dir);
 
-    wchar_t *patternw = str_decode(&pattern);
     WIN32_FIND_DATAW find_data;
-    HANDLE h = FindFirstFileW(patternw, &find_data);
+    HANDLE h = FindFirstFileW(str_as_wide(&pattern), &find_data);
 
     str_free(&pattern);
-    free(patternw);
 
     if (h == INVALID_HANDLE_VALUE)
     {
@@ -28,9 +29,13 @@ int fs_iter_init(fs_iterator *iter, const char *dir)
 
     iter->h = h;
     iter->dir = dir;
+    iter->dirw = str_decode(
+        &(str_t){.buf = (char *)dir,
+                 .len = strlen(dir)});
     iter->find_data = find_data;
     iter->has_pending = 1;
     iter->exhausted = 0;
+
     return 0;
 }
 
@@ -59,7 +64,6 @@ bool fs_iter_next(fs_iterator *iter, fs_entry_t *entry_out)
             continue;
 
         str_t name = str_encode(namew);
-
         entry_out->path = str_create();
         str_catf(&entry_out->path, "%s/%s", iter->dir, name.buf);
         entry_out->name = (strview_t){
@@ -68,11 +72,12 @@ bool fs_iter_next(fs_iterator *iter, fs_entry_t *entry_out)
         };
         str_free(&name);
 
-        if (_wstat(namew, &entry_out->stat) == -1)
+        wchar_t *fullpath = str_as_wide(&entry_out->path);
+        if (_wstat(fullpath, &entry_out->stat) == -1)
         {
-            log_error("Failed get file stat: %s: %s\n", entry_out->path.buf,
-                      strerror(errno));
+            log_error("Failed to stat: %ls: %s\n", fullpath, strerror(errno));
         }
+
         return true;
     }
 }
@@ -81,13 +86,18 @@ void fs_iter_free(fs_iterator *iter)
 {
     if (iter == NULL)
         return;
-    FindClose(iter->h);
+
+    if (iter->h != INVALID_HANDLE_VALUE)
+        FindClose(iter->h);
+
+    free(iter->dirw);
 }
 
 bool fs_is_dir(const fs_entry_t *entry)
 {
     return entry->stat.st_mode & S_IFDIR;
 }
+
 strview_t fs_name(const fs_entry_t *entry)
 {
     char *name = strrchr(entry->path.buf, '/');
@@ -97,6 +107,7 @@ strview_t fs_name(const fs_entry_t *entry)
         .len = strlen(name),
     };
 }
+
 strview_t fs_suffix(const fs_entry_t *entry)
 {
     char *suffix = strrchr(entry->path.buf, '.');

@@ -107,8 +107,7 @@ add_executable(aplayer
     ./src/imgconv.c
     ./src/image.c
     ./src/session.c
-    ./src/metagen.c
-    ./src/metagen_lyrics.cpp
+    ./src/metagen.cpp
     ./src/ssixel.c
 
     ./src/struct/array.c
@@ -182,7 +181,6 @@ target_include_directories(aplayer PRIVATE
     "${ffmpeg_prebuilt_SOURCE_DIR}/include"
     "${pthread-win32_SOURCE_DIR}"
     "${libebur128_SOURCE_DIR}/ebur128"
-    "${taglib_SOURCE_DIR}/bindings/c"
     "${taglib_SOURCE_DIR}"
     "${taglib_BINARY_DIR}"
     ${TAGLIB_INCLUDE_DIRS}

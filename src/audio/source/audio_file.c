@@ -60,6 +60,8 @@ static int audio_file_init(audio_source *audio)
 
     int ret;
 
+    ctx->meta = metadata_read(ctx->filename);
+
     log_debug("Opening input\n");
     ret = avformat_open_input(&ctx->ic, ctx->filename, NULL, NULL);
     if (ret < 0)
@@ -126,9 +128,6 @@ static int audio_file_init(audio_source *audio)
 
     audio_set_stream_metadata(audio, ctx->avctx->ch_layout.nb_channels,
                               ctx->avctx->sample_rate, ctx->avctx->sample_fmt);
-
-    log_debug("Reading metadata\n");
-    ctx->meta = metadata_read(ctx->filename);
 
     return 0;
 }

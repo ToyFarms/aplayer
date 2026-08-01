@@ -307,15 +307,14 @@ TEST_BEGIN(catf)
 {
     str_t str = str_create();
 
-    str_catf(&str, "Hello %% %d %% %f %d%p %zu %llu %%\n", -100, 0.3f + 0.2f,
-             123, NULL, 0xFFFFFUL, 0xFFFFFFULL);
+    str_catf(&str, "Hello %% %d %% %f %d %zu %llu %%\n", -100, 0.3f + 0.2f, 123,
+             (size_t)0xFFFFFUL, 0xFFFFFFULL);
     ASSERT_NOTNULL(str.buf);
     ASSERT_MEM_EQ(str.buf + str.len, "\0", 1);
 
-    const char expected[] =
-        "Hello % -100 % 0.500000 123(nil) 1048575 16777215 %\n";
+    const char expected[] = "Hello % -100 % 0.500000 123 1048575 16777215 %\n";
     ASSERT_INT_EQ((int)str.len, (int)sizeof(expected) - 1);
-    ASSERT_MEM_EQ(str.buf, expected, sizeof(expected) - 1);
+    ASSERT_MEM_EQ(str.buf, expected, str.len);
 }
 TEST_END()
 
@@ -323,38 +322,37 @@ TEST_BEGIN(catf_many)
 {
     str_t str = str_create();
 
-    str_catf(&str, "Hello %% %d %% %f %d%p %zu %llu %%\n", -100, 0.3f + 0.2f,
-             123, NULL, 0xFFFFFUL, 0xFFFFFFULL);
+    str_catf(&str, "Hello %% %d %% %f %d %zu %llu %%\n", -100, 0.3f + 0.2f, 123,
+             (size_t)0xFFFFFUL, 0xFFFFFFULL);
     ASSERT_NOTNULL(str.buf);
     ASSERT_MEM_EQ(str.buf + str.len, "\0", 1);
-    str_catf(&str, "Hello %% %d %% %f %d%p %zu %llu %%\n", -100, 0.3f + 0.2f,
-             123, NULL, 0xFFFFFUL, 0xFFFFFFULL);
+    str_catf(&str, "Hello %% %d %% %f %d %zu %llu %%\n", -100, 0.3f + 0.2f, 123,
+             (size_t)0xFFFFFUL, 0xFFFFFFULL);
     ASSERT_NOTNULL(str.buf);
     ASSERT_MEM_EQ(str.buf + str.len, "\0", 1);
-    str_catf(&str, "Hello %% %d %% %f %d%p %zu %llu %%\n", -100, 0.3f + 0.2f,
-             123, NULL, 0xFFFFFUL, 0xFFFFFFULL);
+    str_catf(&str, "Hello %% %d %% %f %d %zu %llu %%\n", -100, 0.3f + 0.2f, 123,
+             (size_t)0xFFFFFUL, 0xFFFFFFULL);
     ASSERT_NOTNULL(str.buf);
     ASSERT_MEM_EQ(str.buf + str.len, "\0", 1);
-    str_catf(&str, "Hello %% %d %% %f %d%p %zu %llu %%\n", -100, 0.3f + 0.2f,
-             123, NULL, 0xFFFFFUL, 0xFFFFFFULL);
+    str_catf(&str, "Hello %% %d %% %f %d %zu %llu %%\n", -100, 0.3f + 0.2f, 123,
+             (size_t)0xFFFFFUL, 0xFFFFFFULL);
     ASSERT_NOTNULL(str.buf);
     ASSERT_MEM_EQ(str.buf + str.len, "\0", 1);
-    str_catf(&str, "Hello %% %d %% %f %d%p %zu %llu %%\n", -100, 0.3f + 0.2f,
-             123, NULL, 0xFFFFFUL, 0xFFFFFFULL);
+    str_catf(&str, "Hello %% %d %% %f %d %zu %llu %%\n", -100, 0.3f + 0.2f, 123,
+             (size_t)0xFFFFFUL, 0xFFFFFFULL);
     ASSERT_NOTNULL(str.buf);
     ASSERT_MEM_EQ(str.buf + str.len, "\0", 1);
-    str_catf(&str, "Hello %% %d %% %f %d%p %zu %llu %%\n", -100, 0.3f + 0.2f,
-             123, NULL, 0xFFFFFUL, 0xFFFFFFULL);
+    str_catf(&str, "Hello %% %d %% %f %d %zu %llu %%\n", -100, 0.3f + 0.2f, 123,
+             (size_t)0xFFFFFUL, 0xFFFFFFULL);
     ASSERT_NOTNULL(str.buf);
     ASSERT_MEM_EQ(str.buf + str.len, "\0", 1);
 
-    const char expected[] =
-        "Hello % -100 % 0.500000 123(nil) 1048575 16777215 %\n"
-        "Hello % -100 % 0.500000 123(nil) 1048575 16777215 %\n"
-        "Hello % -100 % 0.500000 123(nil) 1048575 16777215 %\n"
-        "Hello % -100 % 0.500000 123(nil) 1048575 16777215 %\n"
-        "Hello % -100 % 0.500000 123(nil) 1048575 16777215 %\n"
-        "Hello % -100 % 0.500000 123(nil) 1048575 16777215 %\n";
+    const char expected[] = "Hello % -100 % 0.500000 123 1048575 16777215 %\n"
+                            "Hello % -100 % 0.500000 123 1048575 16777215 %\n"
+                            "Hello % -100 % 0.500000 123 1048575 16777215 %\n"
+                            "Hello % -100 % 0.500000 123 1048575 16777215 %\n"
+                            "Hello % -100 % 0.500000 123 1048575 16777215 %\n"
+                            "Hello % -100 % 0.500000 123 1048575 16777215 %\n";
     ASSERT_INT_EQ((int)str.len, (int)sizeof(expected) - 1);
     ASSERT_MEM_EQ(str.buf, expected, sizeof(expected) - 1);
 }
@@ -417,9 +415,7 @@ TEST_BEGIN(catw, INIT : setlocale)
     ASSERT_INT_NEQ((int)str.len, 0);
     ASSERT_MEM_EQ(str.buf + str.len, "\0", 1);
 
-    wchar_t out[100] = {0};
-    mbstowcs(out, str.buf, str.len);
-
+    wchar_t *out = str_decode(&str);
     ASSERT_MEM_EQ(out, string, sizeof(string));
 }
 TEST_END()
@@ -450,9 +446,7 @@ TEST_BEGIN(catw_many, INIT : setlocale)
     ASSERT_INT_NEQ((int)str.len, 0);
     ASSERT_MEM_EQ(str.buf + str.len, "\0", 1);
 
-    wchar_t out[256] = {0};
-    mbstowcs(out, str.buf, str.len);
-
+    wchar_t *out = str_decode(&str);
     wchar_t expected[] = L"おはよう世界!"
                          L"おはよう世界!"
                          L"おはよう世界!"
@@ -488,8 +482,7 @@ TEST_BEGIN(catwch, INIT : setlocale)
     ASSERT_NOTNULL(str.buf);
     ASSERT_MEM_EQ(str.buf + str.len, "\0", 1);
 
-    wchar_t out[100] = {0};
-    mbstowcs(out, str.buf, str.len);
+    wchar_t *out = str_decode(&str);
 
     wchar_t expected[] = L"世界は綺麗だね";
     ASSERT_MEM_EQ(out, expected, sizeof(expected));
@@ -501,7 +494,9 @@ TEST_BEGIN(stress, INIT : setlocale)
     str_t str = str_create();
 #define MAX  (1024 * 1024)
 #define ITER (5000)
-    char expected[MAX] = {0};
+    char *expected = calloc(1024 * 1024, 1);
+    if (!expected)
+        abort();
     int len = 0;
 
     for (int i = 0; i < ITER; i++)
@@ -520,7 +515,7 @@ TEST_BEGIN(stress, INIT : setlocale)
 
         str_cat(&str, a);
         str_catch(&str, b[0]);
-        str_catf(&str, "%d%d %f %p %%!", -120, 69, 0.3f + 0.2f, NULL);
+        str_catf(&str, "%d%d %f %%!", -120, 69, 0.3f + 0.2f);
         str_catf_d(&str, "%d%d%%%%%d!", 100, -100, -6969);
         str_catwch(&str, L'空');
         str_catwcs(&str, L"HELLO 世界!");
@@ -530,8 +525,7 @@ TEST_BEGIN(stress, INIT : setlocale)
 
         expected[len++] = a[0];
         expected[len++] = b[0];
-        len += sprintf(expected + len, "%d%d %f %p %%!", -120, 69, 0.3f + 0.2f,
-                       NULL);
+        len += sprintf(expected + len, "%d%d %f %%!", -120, 69, 0.3f + 0.2f);
         len += sprintf(expected + len, "%d%d%%%%%d!", 100, -100, -6969);
         len += sprintf(expected + len, "%lc", L'空');
         len += sprintf(expected + len, "%ls", L"HELLO 世界!");
@@ -653,8 +647,7 @@ TEST_BEGIN(repeat_wchar)
     str_repeat_wchar(&s, L'世', 3, L"-");
     ASSERT_NOTNULL(s.buf);
     ASSERT_INT_GTE((int)s.capacity, (int)s.len + 1);
-    wchar_t out[16] = {0};
-    mbstowcs(out, s.buf, s.len + 1);
+    wchar_t *out = str_decode(&s);
     wchar_t exp[] = L"世-世-世";
     ASSERT_INT_EQ((int)wcslen(out), (int)wcslen(exp));
     ASSERT_MEM_EQ(out, exp, sizeof(exp));
