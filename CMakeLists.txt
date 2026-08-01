@@ -188,7 +188,7 @@ target_include_directories(aplayer PRIVATE
     "${portaudio_SOURCE_DIR}/api"
 )
 
-target_link_libraries(aplayer PRIVATE fftw3 tag tag_c portaudio_static ebur128)
+target_link_libraries(aplayer PRIVATE fftw3 tag portaudio_static ebur128)
 
 if (WIN32)
     file(GLOB FFMPEG_DLLS
