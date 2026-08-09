@@ -39,8 +39,8 @@
 #define TPOSITIVE      "[7m"
 #define TSTRIKETHROUGH "[9m"
 #define TCLEAR         "[2J"
-#define TSAVECUR       "[s" /* save cursor position */
-#define TRESTORECUR    "[u" /* restore cursor position */
+#define TSAVECUR       "[s"
+#define TRESTORECUR    "[u"
 
 #define TERM_KMOD_SHIFT   (1 << 0)
 #define TERM_KMOD_CTRL    (1 << 1)

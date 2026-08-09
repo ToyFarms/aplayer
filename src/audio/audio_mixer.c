@@ -151,23 +151,27 @@ int mixer_get_frame(audio_mixer *mixer, int req_sample, float *out)
 
     // TODO: fix order, make all changeable
 
-    audio_effect *eff;
-    ARR_FOREACH_BYREF(mixer->effects, eff, i)
+    if (max_len > 0)
     {
-        eff->process(
-            eff, AUDIO_CALLBACK_PARAM(NULL, out, max_len, mixer->nb_channels,
-                                      mixer->sample_rate, mixer->sample_fmt));
-    }
+        audio_effect *eff;
+        ARR_FOREACH_BYREF(mixer->effects, eff, i)
+        {
+            eff->process(eff, AUDIO_CALLBACK_PARAM(
+                                  NULL, out, max_len, mixer->nb_channels,
+                                  mixer->sample_rate, mixer->sample_fmt));
+        }
 
-    for (int sample = 0; sample < max_len; sample++)
-        out[sample] *= master_gain;
+        for (int sample = 0; sample < max_len; sample++)
+            out[sample] *= master_gain;
 
-    audio_analyzer *analyzer;
-    ARR_FOREACH_BYREF(mixer->analyzer, analyzer, i)
-    {
-        analyzer->process(analyzer, AUDIO_CALLBACK_PARAM(
-                                        NULL, out, max_len, mixer->nb_channels,
-                                        mixer->sample_rate, mixer->sample_fmt));
+        audio_analyzer *analyzer;
+        ARR_FOREACH_BYREF(mixer->analyzer, analyzer, i)
+        {
+            analyzer->process(
+                analyzer,
+                AUDIO_CALLBACK_PARAM(NULL, out, max_len, mixer->nb_channels,
+                                     mixer->sample_rate, mixer->sample_fmt));
+        }
     }
 
     pthread_mutex_unlock(&mixer->source_mutex);

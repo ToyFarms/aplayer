@@ -228,7 +228,7 @@ static void vu_meter_draw_static(ui_state *state, str_t *buf, vec2 pos,
 
     vu_meter_reset_anchors(state, size.y);
 
-    term_draw_pos(buf, VEC(pos.x, pos.y - size.y));
+    term_draw_pos(buf, VEC(pos.x, pos.y - size.y + 1));
     term_draw_rect(buf, VEC(size.x, size.y + 1),
                    GET_THEMECOLOR(state, "VU_METER_BG"), COLOR_NONE);
 
@@ -255,7 +255,7 @@ static void vu_meter_draw_static(ui_state *state, str_t *buf, vec2 pos,
         term_draw_pos(buf, VEC(x, pos.y + 1));
         term_draw_color(buf, GET_THEMECOLOR(state, "VU_METER_BG"),
                         GET_THEMECOLOR(state, "VU_METER_FG"));
-        str_cat(buf, "dBFS");
+        str_cat(buf, "DBFS");
         term_draw_reset(buf);
     }
 

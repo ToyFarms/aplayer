@@ -136,6 +136,7 @@ add_executable(aplayer
 
     ./src/audio/analyzer/audio_rms.c
     ./src/audio/analyzer/audio_fft.c
+    ./src/audio/analyzer/audio_activity.c
 
     ./src/ui/color.c
     ./src/ui/ui.c

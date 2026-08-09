@@ -22,6 +22,7 @@ static void log_to_widget(const char *log);
 
 static app_instance *g_app = NULL;
 static void rms_callback(void *actx, void *userdata);
+static void activity_callback(void *actx, void *userdata);
 
 int app_init()
 {
@@ -81,11 +82,31 @@ int app_init()
     audio_analyzer rms = audio_analyzer_rms(rms_callback, NULL);
     array_append(&app->audio->mixer.analyzer, &rms, 1);
 
+    audio_analyzer activity = audio_analyzer_activity(activity_callback, NULL);
+    array_append(&app->audio->mixer.analyzer, &activity, 1);
+
     // audio_effect autogain = audio_eff_autogain();
     // array_append(&app->audio->mixer.effects, &autogain, 1);
 
     g_app = app;
     return 0;
+}
+
+static void activity_callback(void *actx, void *userdata)
+{
+    app_instance *app = app_get();
+    if (app == NULL)
+        return;
+
+    analyzer_activity_ctx *ctx = actx;
+
+    if (app->ui.bands_st.bands.capacity < ctx->nb_channels)
+        array_resize(&app->ui.bands_st.bands, ctx->nb_channels);
+
+    app->ui.bands_st.bands.length = ctx->nb_channels;
+
+    for (int i = 0; i < ctx->nb_channels; i++)
+        ARR_AS(app->ui.bands_st.bands, float)[i] = ctx->level[i];
 }
 
 static void rms_callback(void *actx, void *userdata)

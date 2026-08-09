@@ -124,6 +124,7 @@ void ui_init(ui_state *state, term_state *term, app_instance *app)
 
     state->art_st.images = array_create(8, sizeof(ui_art_image));
     state->art_st.method = IMAGE_RENDER_GLYPH;
+    state->bands_st.bands = array_create(8, sizeof(float));
 }
 
 void ui_free(ui_state *state)
@@ -154,8 +155,8 @@ void ui_free(ui_state *state)
         str_free(&ui_img->rendered);
     }
     array_free(&state->art_st.images);
-
     array_free(&state->lyrics_st.lines);
+    array_free(&state->bands_st.bands);
 }
 
 static void ui_update(ui_state *state)
@@ -219,14 +220,47 @@ static void render_playlist_tabs(ui_state *state)
                          VEC(media_control.pos.x - 2, 1)};
     render_statusline(state, statusline.pos, statusline.size);
 
-    widget vu_meter = {VEC(state->term->width - meter_width, control_mid_y - 2),
-                       VEC(meter_width, list.size.y)};
+    widget vu_meter = {VEC(state->term->width - meter_width, control_mid_y - 3),
+                       VEC(meter_width, list.size.y - 1)};
     render_vu_meter(state, vu_meter.pos, vu_meter.size);
 
     int tabs_width = tabs_get_width(state);
     widget tabs = {VEC(state->term->width / 2 - tabs_width / 2, 0),
                    VEC(tabs_width, 1)};
     render_tabs(state, tabs.pos, tabs.size);
+
+    term_draw_pos(&state->term->buf, VEC(vu_meter.pos.x, vu_meter.pos.y + 1));
+    term_draw_rect(&state->term->buf, VEC(vu_meter.size.x, 1),
+                   GET_THEMECOLOR(state, "VU_METER_BG"), COLOR_NONE);
+
+    float energy;
+    ARR_FOREACH(state->bands_st.bands, energy, i)
+    {
+        if (isnan(energy) || isinf(energy))
+            continue;
+
+        term_draw_pos(&state->term->buf,
+                      VEC(vu_meter.pos.x + state->opt.vu_meter.left_pad +
+                              i * (state->opt.vu_meter.bar_gap +
+                                   state->opt.vu_meter.bar_width),
+                          vu_meter.pos.y + 1));
+
+        term_draw_color(&state->term->buf,
+                        COLOR(energy * 255, energy * 255, energy * 255),
+                        COLOR_NONE);
+
+        term_draw_padding(&state->term->buf, state->opt.vu_meter.bar_width);
+        term_draw_reset(&state->term->buf);
+    }
+
+    term_draw_pos(
+        &state->term->buf,
+        VEC(vu_meter.pos.x + state->opt.vu_meter.left_pad +
+                state->bands_st.bands.length * (state->opt.vu_meter.bar_gap +
+                                                state->opt.vu_meter.bar_width),
+            vu_meter.pos.y + 1));
+    term_draw_color(&state->term->buf, COLOR_NONE, GET_THEMECOLOR(state, "PRIMARY"));
+    term_draw_str(&state->term->buf, "ACT", 3);
 }
 
 static void render_visual_tabs(ui_state *state)

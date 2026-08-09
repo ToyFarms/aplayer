@@ -12,6 +12,7 @@ enum audio_analyzer_type
 {
     AUDIO_ANALYZER_RMS,
     AUDIO_ANALYZER_FFT,
+    AUDIO_ANALYZER_ACTIVITY,
 };
 
 typedef struct audio_analyzer
@@ -43,5 +44,16 @@ typedef struct analyzer_fft_ctx
 } analyzer_fft_ctx;
 
 audio_analyzer audio_analyzer_fft(analyzer_callback callback, void *userdata);
+
+#define ANALYZER_ACTIVITY_MAX_CHANNELS 8
+
+typedef struct analyzer_activity_ctx
+{
+    float level[ANALYZER_ACTIVITY_MAX_CHANNELS];
+    int nb_channels;
+} analyzer_activity_ctx;
+
+audio_analyzer audio_analyzer_activity(analyzer_callback callback,
+                                       void *userdata);
 
 #endif /* __AUDIO_ANALYZER_H */

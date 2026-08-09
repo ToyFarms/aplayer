@@ -319,9 +319,9 @@ str_t *term_draw_hline(str_t *buf, int length)
 
 str_t *term_draw_vline(str_t *buf, int length, color_t bg, color_t fg)
 {
-    // NOTE: will crash if color length exceed 128; it shouldn't, but who knows
-    char c[128];
-    str_t cs = {.buf = c, .len = 0, .capacity = 128};
+    // NOTE: will crash if color length exceed 64; it shouldn't, but who knows
+    char c[64];
+    str_t cs = {.buf = c, .len = 0, .capacity = 64};
     term_draw_color(&cs, bg, fg);
 
     for (int i = 0; i < length; i++)
@@ -375,12 +375,16 @@ str_t *term_draw_rect(str_t *buf, vec2 size, color_t bg, color_t fg)
     if (size.x <= 0 || size.y <= 0)
         return buf;
 
-    // TODO: compute color only once
+    char c[64];
+    str_t color = {.buf = c, .len = 0, .capacity = 64};
+    term_draw_color(&color, bg, fg);
+
     for (int i = 0; i < size.y; i++)
     {
-        term_draw_color(buf, bg, fg);
+        str_catlen(buf, color.buf, color.len);
         str_catf_d(buf, TESC THLINE TESC TRESET TESC TDOWN, size.x);
     }
+
     return buf;
 }
 

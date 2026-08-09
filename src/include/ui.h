@@ -148,6 +148,11 @@ typedef struct ui_lyrics_state
     bool recenter;
 } ui_lyrics_state;
 
+typedef struct ui_bands_state
+{
+    array(float) bands;
+} ui_bands_state;
+
 enum ui_art_size_mode
 {
     UI_ART_SIZE_AUTO,
@@ -197,6 +202,7 @@ typedef struct ui_state
     ui_art_state art_st;
     ui_overlay_state overlay_st;
     ui_lyrics_state lyrics_st;
+    ui_bands_state bands_st;
 
     ui_setting opt;
 } ui_state;
