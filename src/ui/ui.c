@@ -16,7 +16,7 @@
 #include <string.h>
 
 #ifdef _MSC_VER
-#  define strcasecmp  _stricmp
+#  define strcasecmp _stricmp
 #endif
 
 static ui_setting ui_default_setting()
@@ -183,49 +183,36 @@ static void render_playlist_tabs(ui_state *state)
 
     int control_mid_y = list.pos.y + list.size.y + 1;
 
-    audio_source src =
-        ARR_AS(state->app->audio->mixer.sources, audio_source)[0];
+    audio_source *src =
+        &ARR_AS(state->app->audio->mixer.sources, audio_source)[0];
     widget timestamp = {VEC(2, control_mid_y), VEC(0, 1)};
     timestamp.size.x = render_timestamp(state, timestamp.pos, timestamp.size,
-                                        src.timestamp, src.duration);
+                                        src->timestamp, src->duration);
     term_draw_padding(&state->term->buf, 1);
     widget hprogress = {
         VEC(timestamp.pos.x + timestamp.size.x + 1, control_mid_y),
-        VEC(state->term->width - (timestamp.pos.x + timestamp.size.x + 12), 1)};
+        VEC(state->term->width - (timestamp.pos.x + timestamp.size.x + 14), 1)};
 
     render_hprogress(state, hprogress.pos, hprogress.size,
-                     (double)src.timestamp / (double)src.duration);
+                     (double)src->timestamp / (double)src->duration);
 
     widget volume = {VEC(hprogress.pos.x + hprogress.size.x + 1, control_mid_y),
-                     VEC(10, 1)};
+                     VEC(13, 1)};
 
     render_volume(state, volume.pos, volume.size,
-                  state->app->audio->mixer.master_gain);
+                  state->app->audio->mixer.master_gain, "V:");
 
-    audio_effect *eff;
-    ARR_FOREACH_BYREF(state->app->audio->mixer.effects, eff, i)
-    {
-        switch (eff->type)
-        {
-        case AUDIO_EFF_AUTOGAIN:
-            render_volume_color(state, VEC(volume.pos.x - 1, volume.pos.y + 1),
-                                volume.size,
-                                20 * log10f(audio_eff_autogain_get_gain(eff)),
-                                GET_THEMECOLOR(state, "VOLUME_BG"),
-                                GET_THEMECOLOR(state, "PRIMARY_DIM"));
-            break;
-        case AUDIO_EFF_GAIN:
-        case AUDIO_EFF_PAN:
-        case AUDIO_EFF_FILTER:
-            break;
-        }
-    }
+    render_volume_color(state, VEC(volume.pos.x, volume.pos.y + 1), volume.size,
+                        src->get_loudness(src),
+                        "A:", GET_THEMECOLOR(state, "VOLUME_BG"),
+                        GET_THEMECOLOR(state, "PRIMARY_DIM"));
 
-    widget media_control = {VEC(state->term->width / 2 - 9, control_mid_y + 1),
-                            VEC(17, 1)};
+    widget media_control = {
+        VEC(hprogress.pos.x + hprogress.size.x / 2 - 9, control_mid_y + 1),
+        VEC(17, 1)};
     render_media_control(state, media_control.pos, media_control.size);
 
-    widget statusline = {VEC(2, control_mid_y + 1),
+    widget statusline = {VEC(timestamp.pos.x, control_mid_y + 1),
                          VEC(media_control.pos.x - 2, 1)};
     render_statusline(state, statusline.pos, statusline.size);
 
@@ -248,29 +235,21 @@ static void render_visual_tabs(ui_state *state)
         state->term->resized = true;
     }
 
-    int total_width = 0;
     ui_art_image *img;
-    ARR_FOREACH_BYREF(state->art_st.images, img, i)
-    {
-        vec2 size = art_resolve_size(img->img, state->art_st.method, VEC(-1, state->term->height / 2), UI_ART_SIZE_AUTO);
-        total_width += size.x;
-    }
 
-    int x = 0;
     ARR_FOREACH_BYREF(state->art_st.images, img, i)
     {
         vec2 size = render_art_image(
-            state,
-            VEC((state->term->width / 2 - total_width) + x, state->term->height / 2), i,
+            state, VEC(state->term->width / 2, state->term->height / 2), i,
             VEC(-1, state->term->height / 2), UI_ART_SIZE_AUTO,
-            UI_ANCHOR_BOTTOM_LEFT, state->art_st.method, &state->term->capability);
-        x += size.x;
+            UI_ANCHOR_BOTTOM, state->art_st.method, &state->term->capability);
     }
 
     int width = state->term->width * 0.5;
-    render_lyrics(state,
-                  VEC(state->term->width / 2 - width / 2, state->term->height / 2 + 1),
-                  VEC(width, 5));
+    render_lyrics(
+        state,
+        VEC(state->term->width / 2 - width / 2, state->term->height / 2 + 1),
+        VEC(width, 5));
     // audio_source src =
     //     ARR_AS(state->app->audio->mixer.sources, audio_source)[0];
 

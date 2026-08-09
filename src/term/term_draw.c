@@ -388,3 +388,13 @@ str_t *term_draw_invert(str_t *buf)
 {
     return str_cat(buf, TESC TNEGATIVE);
 }
+
+str_t *term_draw_savepos(str_t *buf)
+{
+    return str_cat(buf, TESC TSAVECUR);
+}
+
+str_t *term_draw_restorepos(str_t *buf)
+{
+    return str_cat(buf, TESC TRESTORECUR);
+}

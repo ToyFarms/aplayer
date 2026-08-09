@@ -132,6 +132,7 @@ add_executable(aplayer
     ./src/audio/effect/audio_pan.c
     ./src/audio/effect/audio_filter.c
     ./src/audio/effect/audio_autogain.c
+    ./src/audio/effect/audio_fade.c
 
     ./src/audio/analyzer/audio_rms.c
     ./src/audio/analyzer/audio_fft.c

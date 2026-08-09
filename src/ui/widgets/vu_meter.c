@@ -412,7 +412,10 @@ static void vu_meter_draw_numeric(ui_state *state, str_t *buf, vec2 pos, int x,
     term_draw_pos(buf, VEC(x, pos.y + 1));
     term_draw_color(buf, GET_THEMECOLOR(state, "VU_METER_BG"),
                     GET_THEMECOLOR(state, "VU_METER_FG"));
-    str_catf(buf, "%-4.0f", dbfs);
+    if (dbfs == -99.0)
+        str_cat(buf, "---");
+    else
+        str_catf(buf, "%-4.0f", dbfs);
     term_draw_reset(buf);
 }
 

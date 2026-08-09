@@ -160,11 +160,10 @@ vec2 render_art_image(ui_state *state, vec2 pos, int image_index, vec2 size,
         str_t *buf = &state->term->buf;
 
         ui_img->rendered.len = 0;
-        image_render(&ui_img->rendered, ui_img->img->repr, method, cap);
-        term_draw_reset(&ui_img->rendered);
 
         vec2 origin = VEC_SUB(pos, anchor_offset(final_size, anchor));
-        term_draw_pos(buf, origin);
+        image_render(&ui_img->rendered, ui_img->img->repr, origin, method, cap);
+
         str_cat_str(buf, &ui_img->rendered);
 
         ui_img->width = ui_img->img->width;

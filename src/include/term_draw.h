@@ -38,5 +38,7 @@ str_t *term_draw_hblockf(str_t *buf, float x);
 str_t *term_draw_vblockf(str_t *buf, float x);
 str_t *term_draw_rect(str_t *buf, vec2 size, color_t bg, color_t fg);
 str_t *term_draw_invert(str_t *buf);
+str_t *term_draw_savepos(str_t *buf);
+str_t *term_draw_restorepos(str_t *buf);
 
 #endif /* __TERM_DRAW_H */

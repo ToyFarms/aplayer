@@ -1,4 +1,5 @@
 #include "audio_mixer.h"
+#include "array.h"
 #include "audio_analyzer.h"
 #include "audio_effect.h"
 #include "audio_source.h"
@@ -85,11 +86,6 @@ int mixer_get_frame(audio_mixer *mixer, int req_sample, float *out)
     int ret = 0, len = 0, max_len = 0;
     if (mixer->paused)
         return 0;
-    if (mixer->muted)
-    {
-        memset(out, 0, req_sample);
-        return 0;
-    }
 
     pthread_mutex_lock(&mixer->source_mutex);
     audio_source *src;
@@ -114,6 +110,8 @@ int mixer_get_frame(audio_mixer *mixer, int req_sample, float *out)
             continue;
         }
 
+        // TODO: this should actually require timing synchronization between the
+        // sources
         mixer->scratch.length = 0;
         ret = len = src->get_frame(src, req_sample, mixer->scratch.data);
         if (len > max_len)
@@ -133,6 +131,19 @@ int mixer_get_frame(audio_mixer *mixer, int req_sample, float *out)
             array_remove(&mixer->sources, i, 1);
         }
 
+        // we break here rather than early return to make the song progress
+        if (mixer->muted)
+            continue;
+
+        audio_effect *eff;
+        ARR_FOREACH_BYREF(src->pipeline, eff, i)
+        {
+            eff->process(eff, AUDIO_CALLBACK_PARAM(
+                                  src, ARR_AS(mixer->scratch, float), max_len,
+                                  mixer->nb_channels, mixer->sample_rate,
+                                  mixer->sample_fmt));
+        }
+
         assert(mixer->scratch.capacity >= len);
         for (int sample = 0; sample < len; sample++)
             out[sample] += ARR_AS(mixer->scratch, float)[sample];
@@ -143,9 +154,9 @@ int mixer_get_frame(audio_mixer *mixer, int req_sample, float *out)
     audio_effect *eff;
     ARR_FOREACH_BYREF(mixer->effects, eff, i)
     {
-        eff->process(eff, AUDIO_CALLBACK_PARAM(out, max_len, mixer->nb_channels,
-                                               mixer->sample_rate,
-                                               mixer->sample_fmt));
+        eff->process(
+            eff, AUDIO_CALLBACK_PARAM(NULL, out, max_len, mixer->nb_channels,
+                                      mixer->sample_rate, mixer->sample_fmt));
     }
 
     for (int sample = 0; sample < max_len; sample++)
@@ -154,12 +165,9 @@ int mixer_get_frame(audio_mixer *mixer, int req_sample, float *out)
     audio_analyzer *analyzer;
     ARR_FOREACH_BYREF(mixer->analyzer, analyzer, i)
     {
-        analyzer->process(
-            analyzer, (audio_callback_param){.out = out,
-                                             .size = max_len,
-                                             .nb_channels = mixer->nb_channels,
-                                             .sample_rate = mixer->sample_rate,
-                                             .sample_fmt = mixer->sample_fmt});
+        analyzer->process(analyzer, AUDIO_CALLBACK_PARAM(
+                                        NULL, out, max_len, mixer->nb_channels,
+                                        mixer->sample_rate, mixer->sample_fmt));
     }
 
     pthread_mutex_unlock(&mixer->source_mutex);

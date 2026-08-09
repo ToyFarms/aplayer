@@ -10,6 +10,7 @@ enum audio_eff_type
     AUDIO_EFF_PAN,
     AUDIO_EFF_FILTER,
     AUDIO_EFF_AUTOGAIN,
+    AUDIO_EFF_FADE,
 };
 
 enum audio_filt_type
@@ -54,7 +55,10 @@ void audio_eff_filter_set(audio_effect *eff, enum audio_filt_type type,
                           float freq, int sample_rate, filter_param *param);
 
 audio_effect audio_eff_autogain();
-float audio_eff_autogain_get_gain(audio_effect *eff);
-void audio_eff_autogain_initial(audio_effect *eff, audio_source *src);
+
+audio_effect audio_eff_fade(float fade_in_sec, float fade_out_sec);
+void audio_eff_fade_force_in(audio_effect *eff);
+float audio_eff_fade_force_out(audio_effect *eff);
+bool audio_eff_fade_is_done(audio_effect *eff);
 
 #endif /* __AUDIO_EFFECT_H */

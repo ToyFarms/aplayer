@@ -60,7 +60,7 @@ int app_init()
     log_debug("Switching to alt buffer\n");
     term_altbuf();
 
-    log_debug("Initializing exception context\n");
+    // log_debug("Initializing exception context\n");
     // exception_init();
     // exception_panic(term_mainbuf);
     atexit(term_mainbuf);
@@ -81,8 +81,8 @@ int app_init()
     audio_analyzer rms = audio_analyzer_rms(rms_callback, NULL);
     array_append(&app->audio->mixer.analyzer, &rms, 1);
 
-    audio_effect autogain = audio_eff_autogain();
-    array_append(&app->audio->mixer.effects, &autogain, 1);
+    // audio_effect autogain = audio_eff_autogain();
+    // array_append(&app->audio->mixer.effects, &autogain, 1);
 
     g_app = app;
     return 0;

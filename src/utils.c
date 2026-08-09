@@ -55,6 +55,17 @@ void print_raw(const char *str)
     str_free(&s);
 }
 
+static void attach_static_effect(audio_source *src)
+{
+    // TODO: this is hardcoded temporarily, it should be user controlled from a
+    // ui
+    audio_effect autogain = audio_eff_autogain();
+    array_append(&src->pipeline, &autogain, 1);
+
+    audio_effect fade = audio_eff_fade(1.0, 1.0);
+    array_append(&src->pipeline, &fade, 1);
+}
+
 void play_next(app_instance *app)
 {
     const fs_entry_t *entry = playlist_next(&app->playlist);
@@ -72,6 +83,7 @@ void play_next(app_instance *app)
         return;
     }
 
+    attach_static_effect(&src);
     mixer_clear(&app->audio->mixer);
     array_append(&app->audio->mixer.sources, &src, 1);
     app->ui.playlist_st.hovered_idx = app->playlist.current_idx;
@@ -95,6 +107,7 @@ void play_prev(app_instance *app)
         return;
     }
 
+    attach_static_effect(&src);
     mixer_clear(&app->audio->mixer);
     array_append(&app->audio->mixer.sources, &src, 1);
     app->ui.playlist_st.hovered_idx = app->playlist.current_idx;
@@ -119,27 +132,9 @@ void play_at_index(app_instance *app, int index)
         return;
     }
 
+    attach_static_effect(&src);
     mixer_clear(&app->audio->mixer);
-
-    // TODO: these could be refactored as an "attach" callback when an effect
-    // attached initially to an audio source
-    audio_effect *eff;
-    ARR_FOREACH_BYREF(app->audio->mixer.effects, eff, i)
-    {
-        switch (eff->type)
-        {
-        case AUDIO_EFF_AUTOGAIN:
-            audio_eff_autogain_initial(eff, &src);
-            break;
-        case AUDIO_EFF_GAIN:
-        case AUDIO_EFF_PAN:
-        case AUDIO_EFF_FILTER:
-            break;
-        }
-    };
-
-    int idx = array_append(&app->audio->mixer.sources, &src, 1);
-
+    array_append(&app->audio->mixer.sources, &src, 1);
     app->ui.playlist_st.hovered_idx = app->playlist.current_idx;
     app->ui.art_st.initialized = false;
 }

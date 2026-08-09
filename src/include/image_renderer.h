@@ -15,8 +15,8 @@ enum image_render_method
 #define IMAGE_RENDER_LENGTH ((int)IMAGE_RENDER_TGP + 1)
 };
 
-void image_render(str_t *out, image_t *img, enum image_render_method method,
-                  const term_capability *cap);
+void image_render(str_t *out, image_t *img, vec2 pos,
+                  enum image_render_method method, const term_capability *cap);
 vec2 image_pixel_density(enum image_render_method method);
 
 #endif /* __IMAGE_RENDERER_H */

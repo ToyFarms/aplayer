@@ -20,6 +20,7 @@ typedef struct audio_source
     // optional, callee needs to check if its implemented before calling it
     void (*get_arts)(struct audio_source *, array(image_t) * out);
     metadata_t *(*get_metadata)(struct audio_source *);
+    float (*get_loudness)(struct audio_source *);
 
     int stream_nb_channels;
     int stream_sample_rate;

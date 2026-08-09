@@ -79,7 +79,7 @@ static const glyph_t glyphs[] = {
 };
 
 #ifdef _MSC_VER
-#include <intrin.h>
+#  include <intrin.h>
 #  define __builtin_popcount __popcnt
 #endif // _MSC_VER
 
@@ -124,7 +124,7 @@ static const uint8_t bayer8[8][8] = {
 #define DITHER_STRENGTH 12.0f
 #define CLAMPF255(v)    ((v) < 0.0f ? 0.0f : (v) > 255.0f ? 255.0f : (v))
 
-static void image_render_glyph(str_t *out, image_t *img)
+static void image_render_glyph(str_t *out, image_t *img, vec2 pos)
 {
     int cells_x = img->width / SUBCELL_W;
     int cells_y = img->height / SUBCELL_H;
@@ -134,6 +134,8 @@ static void image_render_glyph(str_t *out, image_t *img)
 
     for (int cy = 0; cy < cells_y; cy++)
     {
+        term_draw_pos(out, VEC(pos.x, pos.y + cy));
+
         for (int cx = 0; cx < cells_x; cx++)
         {
             float px[SUBCELL_N][3];
@@ -254,7 +256,6 @@ static void image_render_glyph(str_t *out, image_t *img)
             str_catwch(out, glyph);
         }
         term_draw_reset(out);
-        term_draw_move(out, VEC(-cells_x, 1));
     }
 }
 
@@ -287,7 +288,7 @@ static int coord_to_offset(uint8_t x, uint8_t y)
     return 0;
 }
 
-static void image_render_braille(str_t *out, image_t *img)
+static void image_render_braille(str_t *out, image_t *img, vec2 pos)
 {
     image_t *orig = img;
 
@@ -310,6 +311,8 @@ static void image_render_braille(str_t *out, image_t *img)
     int height = (img->height + 3) / 4;
     for (int block_y = 0; block_y < height; block_y++)
     {
+        term_draw_pos(out, VEC(pos.x, pos.y + block_y));
+
         int px_y = block_y * 4;
         for (int block_x = 0; block_x < width; block_x++)
         {
@@ -365,7 +368,6 @@ static void image_render_braille(str_t *out, image_t *img)
             else
                 str_catch(out, ' ');
         }
-        term_draw_move(out, VEC(-(img->width + 1) / 2, 1));
     }
 
     av_free(frame.buffer);
@@ -379,7 +381,7 @@ static int write_fn(char *buf, int len, void *userdata)
     return 0;
 }
 
-static void image_render_sixel(str_t *str_out, image_t *img,
+static void image_render_sixel(str_t *str_out, image_t *img, vec2 pos,
                                const term_capability *cap)
 {
     str_t tmp = str_create();
@@ -387,6 +389,8 @@ static void image_render_sixel(str_t *str_out, image_t *img,
     sixel_encode_rgb(&tmp, (const uint8_t *)img->data, img->width, img->height,
                      256);
 
+
+    term_draw_pos(str_out, VEC(pos.x, pos.y));
     if (cap->is_tmux)
     {
         str_cat(str_out, "\x1bPtmux;");
@@ -409,19 +413,19 @@ static void image_render_sixel(str_t *str_out, image_t *img,
     str_free(&tmp);
 }
 
-void image_render(str_t *out, image_t *img, enum image_render_method method,
-                  const term_capability *cap)
+void image_render(str_t *out, image_t *img, vec2 pos,
+                  enum image_render_method method, const term_capability *cap)
 {
     switch (method)
     {
     case IMAGE_RENDER_GLYPH:
-        image_render_glyph(out, img);
+        image_render_glyph(out, img, pos);
         break;
     case IMAGE_RENDER_BRAILLE:
-        image_render_braille(out, img);
+        image_render_braille(out, img, pos);
         break;
     case IMAGE_RENDER_SIXEL:
-        image_render_sixel(out, img, cap);
+        image_render_sixel(out, img, pos, cap);
         break;
     case IMAGE_RENDER_TGP:
         break;
