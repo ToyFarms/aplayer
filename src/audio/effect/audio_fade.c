@@ -1,6 +1,5 @@
 #include "audio_effect.h"
 #include "logger.h"
-
 #include <assert.h>
 #include <stdlib.h>
 
@@ -15,46 +14,55 @@ typedef struct effect_fade
 {
     float fade_in_sec;
     float fade_out_sec;
-
     float gain;
     force_state force;
     bool force_out_done;
-
     int last_sample_rate;
+
+    float progress;
+    float start_gain;
+    float last_target;
+    bool segment_active;
 } effect_fade;
 
 static float max_step(float fade_sec, int sample_rate)
 {
     if (fade_sec <= 0.0f || sample_rate <= 0)
         return 1.0f;
-
     return 1.0f / (fade_sec * (float)sample_rate);
 }
 
-static float slew_toward(float current, float target, float step)
+static float ease_in(float t)
 {
-    if (current < target)
+    return t * t;
+}
+
+static float slew_toward_curved(effect_fade *ctx, float target, float dt)
+{
+    if (!ctx->segment_active || target != ctx->last_target)
     {
-        current += step;
-        if (current > target)
-            current = target;
+        ctx->start_gain = ctx->gain;
+        ctx->last_target = target;
+        ctx->progress = 0.0f;
+        ctx->segment_active = true;
     }
-    else if (current > target)
-    {
-        current -= step;
-        if (current < target)
-            current = target;
-    }
-    return current;
+
+    ctx->progress += dt;
+    if (ctx->progress > 1.0f)
+        ctx->progress = 1.0f;
+    else if (ctx->progress < 0.0f)
+        ctx->progress = 0.0f;
+
+    float eased = ease_in(ctx->progress);
+    ctx->gain = ctx->start_gain + (target - ctx->start_gain) * eased;
+    return ctx->gain;
 }
 
 static void fade_process(audio_effect *eff, audio_callback_param p)
 {
     if (p.src == NULL)
         return;
-
     effect_fade *ctx = eff->ctx;
-
     int sample_rate = p.src->target_sample_rate > 0 ? p.src->target_sample_rate
                                                     : p.src->stream_sample_rate;
     if (sample_rate <= 0)
@@ -63,35 +71,31 @@ static void fade_process(audio_effect *eff, audio_callback_param p)
         return;
     }
     ctx->last_sample_rate = sample_rate;
-
     int64_t time_us = p.src->timestamp;
     int64_t duration_us = p.src->duration;
 
     for (int i = 0; i < p.size; i += p.nb_channels)
     {
         float target;
-        float step;
+        float dt;
 
         if (ctx->force == FORCE_IN)
         {
             target = 1.0f;
-            step = max_step(ctx->fade_in_sec, sample_rate);
+            dt = max_step(ctx->fade_in_sec, sample_rate);
         }
         else if (ctx->force == FORCE_OUT)
         {
             target = 0.0f;
-            step = max_step(ctx->fade_out_sec, sample_rate);
+            dt = max_step(ctx->fade_out_sec, sample_rate);
         }
         else
         {
-            /* automatic: fade in near start of track, fade out near end */
             int64_t frame_us =
                 time_us +
                 ((int64_t)(i / p.nb_channels) * 1000000LL) / sample_rate;
-
             target = 1.0f;
-            step = max_step(ctx->fade_in_sec, sample_rate);
-
+            dt = max_step(ctx->fade_in_sec, sample_rate);
             if (ctx->fade_out_sec > 0.0f && duration_us > 0)
             {
                 int64_t remaining_us = duration_us - frame_us;
@@ -99,12 +103,12 @@ static void fade_process(audio_effect *eff, audio_callback_param p)
                 if ((float)remaining_us < fade_out_us)
                 {
                     target = 0.0f;
-                    step = max_step(ctx->fade_out_sec, sample_rate);
+                    dt = max_step(ctx->fade_out_sec, sample_rate);
                 }
             }
         }
 
-        ctx->gain = slew_toward(ctx->gain, target, step);
+        slew_toward_curved(ctx, target, dt);
 
         for (int ch = 0; ch < p.nb_channels; ch++)
             p.out[i + ch] *= ctx->gain;
@@ -124,19 +128,17 @@ static void fade_free(audio_effect *eff)
 audio_effect audio_eff_fade(float fade_in_sec, float fade_out_sec)
 {
     audio_effect eff = {0};
-
     eff.process = fade_process;
     eff.free = fade_free;
     eff.type = AUDIO_EFF_FADE;
     eff.ctx = calloc(1, sizeof(effect_fade));
     assert(eff.ctx != NULL);
-
     effect_fade *ctx = eff.ctx;
     ctx->fade_in_sec = fade_in_sec;
     ctx->fade_out_sec = fade_out_sec;
     ctx->gain = fade_in_sec > 0.0f ? 0.0f : 1.0f;
     ctx->force = FORCE_NONE;
-
+    ctx->segment_active = false;
     return eff;
 }
 

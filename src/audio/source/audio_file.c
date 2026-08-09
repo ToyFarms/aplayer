@@ -30,7 +30,6 @@ static inline void sleep_ms(int ms)
 }
 #endif
 
-
 typedef struct resampler
 {
     SwrContext *swr;
@@ -530,6 +529,7 @@ typedef struct loudness_work_t
 #define LOUDNESS_ANALYSIS_DELAY_MS 200
 #define LOUDNESS_PROBE_SECONDS     2.0f
 #define LOUDNESS_PROBE_COUNT       20
+#define LOUDNESS_BASELINE_LUFS     -18.0f
 
 static inline bool loudness_should_cancel(pthread_mutex_t *mutex, bool *cancel)
 {
@@ -537,14 +537,6 @@ static inline bool loudness_should_cancel(pthread_mutex_t *mutex, bool *cancel)
     bool result = *cancel;
     pthread_mutex_unlock(mutex);
     return result;
-}
-
-static inline void loudness_store_result(pthread_mutex_t *mutex, float *result,
-                                         float value)
-{
-    pthread_mutex_lock(mutex);
-    *result = value;
-    pthread_mutex_unlock(mutex);
 }
 
 static void loudness_do_work(void *ctx)
@@ -665,6 +657,10 @@ static void loudness_do_work(void *ctx)
     }
 
     bool hit_eof = false;
+    int target_samples = (int)(sample_rate * LOUDNESS_PROBE_SECONDS);
+    int64_t total_samples_read = 0;
+    int64_t total_samples_target =
+        (int64_t)target_samples * LOUDNESS_PROBE_COUNT;
     for (int probe = 0; probe < LOUDNESS_PROBE_COUNT; probe++)
     {
         if (loudness_should_cancel(w->mutex, w->cancel) || hit_eof)
@@ -679,7 +675,6 @@ static void loudness_do_work(void *ctx)
         }
 
         int samples_read = 0;
-        int target_samples = (int)(sample_rate * LOUDNESS_PROBE_SECONDS);
 
         while (samples_read < target_samples)
         {
@@ -717,6 +712,7 @@ static void loudness_do_work(void *ctx)
                 {
                     ebur128_add_frames_float(st, buf, converted);
                     samples_read += converted;
+                    total_samples_read += converted;
                 }
                 av_frame_unref(frame);
             }
@@ -725,8 +721,20 @@ static void loudness_do_work(void *ctx)
             if (ebur128_loudness_global(st, &measured_lufs) == 0 &&
                 !isnan(measured_lufs) && !isinf(measured_lufs))
             {
-                w->lufs = (float)measured_lufs;
-                loudness_store_result(w->mutex, w->result, w->lufs);
+                float weight = total_samples_target > 0
+                                   ? (float)total_samples_read /
+                                         (float)total_samples_target
+                                   : 1.0f;
+                if (weight > 1.0f)
+                    weight = 1.0f;
+                else if (weight < 0.0f)
+                    weight = 0.0f;
+
+                w->lufs = LOUDNESS_BASELINE_LUFS * (1.0f - weight) +
+                          (float)measured_lufs * weight;
+                pthread_mutex_lock(w->mutex);
+                *w->result = w->lufs;
+                pthread_mutex_unlock(w->mutex);
             }
         }
     }
