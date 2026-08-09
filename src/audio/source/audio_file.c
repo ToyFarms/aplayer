@@ -15,7 +15,21 @@
 #include <pthread.h>
 #include <stdlib.h>
 #include <string.h>
-#include <time.h>
+
+#if defined(_WIN32)
+#  include <windows.h>
+static inline void sleep_ms(int ms)
+{
+    Sleep((DWORD)ms);
+}
+#else
+#  include <unistd.h>
+static inline void sleep_ms(int ms)
+{
+    usleep((useconds_t)ms * 1000);
+}
+#endif
+
 
 typedef struct resampler
 {
@@ -746,13 +760,11 @@ static void *loudness_thread_fn(void *arg)
         if (loudness_should_cancel(w->mutex, w->cancel))
             goto out;
 
-        int sleep_ms = slice_ms < (LOUDNESS_ANALYSIS_DELAY_MS - waited)
-                           ? slice_ms
-                           : (LOUDNESS_ANALYSIS_DELAY_MS - waited);
-        struct timespec ts = {.tv_sec = sleep_ms / 1000,
-                              .tv_nsec = (sleep_ms % 1000) * 1000000L};
-        nanosleep(&ts, NULL);
-        waited += sleep_ms;
+        int sleep_for_ms = slice_ms < (LOUDNESS_ANALYSIS_DELAY_MS - waited)
+                               ? slice_ms
+                               : (LOUDNESS_ANALYSIS_DELAY_MS - waited);
+        sleep_ms(sleep_for_ms);
+        waited += sleep_for_ms;
     }
 
     if (loudness_should_cancel(w->mutex, w->cancel))

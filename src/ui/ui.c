@@ -202,10 +202,13 @@ static void render_playlist_tabs(ui_state *state)
     render_volume(state, volume.pos, volume.size,
                   state->app->audio->mixer.master_gain, "V:");
 
-    render_volume_color(state, VEC(volume.pos.x, volume.pos.y + 1), volume.size,
-                        src->get_loudness(src),
-                        "A:", GET_THEMECOLOR(state, "VOLUME_BG"),
-                        GET_THEMECOLOR(state, "PRIMARY_DIM"));
+    if (src->get_loudness)
+    {
+        render_volume_color(state, VEC(volume.pos.x, volume.pos.y + 1),
+                            volume.size, src->get_loudness(src),
+                            "A:", GET_THEMECOLOR(state, "VOLUME_BG"),
+                            GET_THEMECOLOR(state, "PRIMARY_DIM"));
+    }
 
     widget media_control = {
         VEC(hprogress.pos.x + hprogress.size.x / 2 - 9, control_mid_y + 1),
