@@ -70,6 +70,7 @@ int app_init()
     playlist_init(&app->playlist);
 
     log_debug("Initializing audio\n");
+    // TODO: dont hardcode 2 channel here
     app->audio = audio_create(audio_callback, -1, 2, 48000, AUDIO_FLT);
     // FIXME: errno is not 0 (even though its fine), Socket operation on
     // non-socket

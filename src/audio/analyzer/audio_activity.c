@@ -24,9 +24,10 @@ typedef struct analyzer_activity
     float smoothing;
     float sensitivity;
 
-    float hp_prev_in;
-    float hp_prev_out;
-    float lp_prev_out;
+    float hp_prev_in[ANALYZER_ACTIVITY_MAX_CHANNELS];
+    float hp_prev_out[ANALYZER_ACTIVITY_MAX_CHANNELS];
+    float lp_prev_out[ANALYZER_ACTIVITY_MAX_CHANNELS];
+
     float hp_coef;
     float lp_coef;
     int filter_sample_rate;
@@ -72,47 +73,55 @@ void activity_process(audio_analyzer *analyzer, audio_callback_param p)
         ctx->lp_coef = dt / (rc_lp + dt);
         ctx->filter_sample_rate = p.sample_rate;
 
-        ctx->hp_prev_in = 0.0f;
-        ctx->hp_prev_out = 0.0f;
-        ctx->lp_prev_out = 0.0f;
+        for (int ch = 0; ch < ANALYZER_ACTIVITY_MAX_CHANNELS; ch++)
+        {
+            ctx->hp_prev_in[ch] = 0.0f;
+            ctx->hp_prev_out[ch] = 0.0f;
+            ctx->lp_prev_out[ch] = 0.0f;
+        }
     }
 
-    float peak = 0.0f;
+    float peak[ANALYZER_ACTIVITY_MAX_CHANNELS] = {0};
+
     for (int i = 0; i < p.size; i += p.nb_channels)
     {
-        float x =
-            (nb_channels >= 2) ? 0.5f * (p.out[i] + p.out[i + 1]) : p.out[i];
+        for (int ch = 0; ch < nb_channels; ch++)
+        {
+            float x = p.out[i + ch];
 
-        float hp_out = ctx->hp_coef * (ctx->hp_prev_out + x - ctx->hp_prev_in);
-        ctx->hp_prev_in = x;
-        ctx->hp_prev_out = hp_out;
+            float hp_out = ctx->hp_coef *
+                           (ctx->hp_prev_out[ch] + x - ctx->hp_prev_in[ch]);
+            ctx->hp_prev_in[ch] = x;
+            ctx->hp_prev_out[ch] = hp_out;
 
-        float lp_out =
-            ctx->lp_prev_out + ctx->lp_coef * (hp_out - ctx->lp_prev_out);
-        ctx->lp_prev_out = lp_out;
+            float lp_out = ctx->lp_prev_out[ch] +
+                           ctx->lp_coef * (hp_out - ctx->lp_prev_out[ch]);
+            ctx->lp_prev_out[ch] = lp_out;
 
-        float s = fabsf(lp_out);
-        if (s > peak)
-            peak = s;
+            float s = fabsf(lp_out);
+            if (s > peak[ch])
+                peak[ch] = s;
+        }
     }
-
-    float raw = peak * ctx->gain;
-    if (raw > 1.0f)
-        raw = 1.0f;
-    if (isnan(raw))
-        raw = 0.0f;
-
-    float prev_smoothed = ctx->primed[0] ? ctx->smoothed[0] : raw;
-    float new_smoothed = prev_smoothed + (raw - prev_smoothed) * ctx->smoothing;
-
-    float delta = fabsf(new_smoothed - prev_smoothed) * ctx->sensitivity;
-    if (delta > 1.0f)
-        delta = 1.0f;
-
-    float target = powf(delta, ctx->curve);
 
     for (int ch = 0; ch < nb_channels; ch++)
     {
+        float raw = peak[ch] * ctx->gain;
+        if (raw > 1.0f)
+            raw = 1.0f;
+        if (isnan(raw))
+            raw = 0.0f;
+
+        float prev_smoothed = ctx->primed[ch] ? ctx->smoothed[ch] : raw;
+        float new_smoothed =
+            prev_smoothed + (raw - prev_smoothed) * ctx->smoothing;
+
+        float delta = fabsf(new_smoothed - prev_smoothed) * ctx->sensitivity;
+        if (delta > 1.0f)
+            delta = 1.0f;
+
+        float target = powf(delta, ctx->curve);
+
         ctx->smoothed[ch] = new_smoothed;
         ctx->primed[ch] = true;
 
@@ -151,19 +160,4 @@ audio_analyzer audio_analyzer_activity(analyzer_callback callback,
     ctx->sensitivity = ANALYZER_ACTIVITY_DEFAULT_SENSITIVITY;
 
     return analyzer;
-}
-
-void audio_analyzer_activity_configure(audio_analyzer *analyzer,
-                                       float attack_ms, float decay_ms,
-                                       float curve, float gain, float smoothing,
-                                       float sensitivity)
-{
-    analyzer_activity *ctx = analyzer->ctx;
-
-    ctx->attack_ms = attack_ms;
-    ctx->decay_ms = decay_ms;
-    ctx->curve = curve;
-    ctx->gain = gain;
-    ctx->smoothing = smoothing;
-    ctx->sensitivity = sensitivity;
 }
