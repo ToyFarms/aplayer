@@ -1,5 +1,6 @@
 #include "utils.h"
 #include "array.h"
+#include "audio_analyzer.h"
 #include "audio_effect.h"
 #include "audio_source.h"
 #include "ds.h"
@@ -55,15 +56,35 @@ void print_raw(const char *str)
     str_free(&s);
 }
 
+static void source_rms_callback(void *actx, void *userdata)
+{
+    app_instance *app = app_get();
+    if (app == NULL)
+        return;
+
+    analyzer_rms_ctx *ctx = actx;
+
+    if (app->ui.source_vu_meter_st.bars.capacity < ctx->nb_channels)
+        array_resize(&app->ui.source_vu_meter_st.bars, ctx->nb_channels);
+
+    app->ui.source_vu_meter_st.bars.length = ctx->nb_channels;
+
+    for (int i = 0; i < ctx->nb_channels; i++)
+        ARR_AS(app->ui.source_vu_meter_st.bars, float)[i] = ctx->rms[i];
+}
+
 static void attach_static_effect(audio_source *src)
 {
     // TODO: this is hardcoded temporarily, it should be user controlled from a
     // ui
     audio_effect autogain = audio_eff_autogain();
-    array_append(&src->pipeline, &autogain, 1);
+    array_append(&src->effects, &autogain, 1);
 
     audio_effect fade = audio_eff_fade(1.0, 1.0);
-    array_append(&src->pipeline, &fade, 1);
+    array_append(&src->effects, &fade, 1);
+
+    audio_analyzer rms = audio_analyzer_rms(source_rms_callback, NULL);
+    array_append(&src->analyzer, &rms, 1);
 }
 
 void play_next(app_instance *app)

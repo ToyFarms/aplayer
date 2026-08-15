@@ -135,13 +135,23 @@ int mixer_get_frame(audio_mixer *mixer, int req_sample, float *out)
         if (mixer->muted)
             continue;
 
+        // this should be called with the source layout, not target (mixer) layout
         audio_effect *eff;
-        ARR_FOREACH_BYREF(src->pipeline, eff, i)
+        ARR_FOREACH_BYREF(src->effects, eff, i)
         {
             eff->process(eff, AUDIO_CALLBACK_PARAM(
                                   src, ARR_AS(mixer->scratch, float), max_len,
                                   mixer->nb_channels, mixer->sample_rate,
                                   mixer->sample_fmt));
+        }
+
+        audio_analyzer *analyzer;
+        ARR_FOREACH_BYREF(src->analyzer, analyzer, i)
+        {
+            analyzer->process(
+                analyzer,
+                AUDIO_CALLBACK_PARAM(NULL, out, max_len, src->stream_nb_channels,
+                                     mixer->sample_rate, mixer->sample_fmt));
         }
 
         assert(mixer->scratch.capacity >= len);

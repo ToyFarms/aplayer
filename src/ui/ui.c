@@ -107,6 +107,7 @@ void ui_init(ui_state *state, term_state *term, app_instance *app)
     state->debug_st.logs = queue_create();
     state->debug_st.logs.free = free;
 
+    // TODO: refactor each into its own file, or atleast function
     state->vu_meter_st.bars = array_create(8, sizeof(float));
     state->vu_meter_st.prev_bars = array_create(8, sizeof(float));
     state->vu_meter_st.easing_bars = array_create(8, sizeof(float));
@@ -114,6 +115,14 @@ void ui_init(ui_state *state, term_state *term, app_instance *app)
     state->vu_meter_st.peak_set = array_create(8, sizeof(uint64_t));
     state->vu_meter_st.anchor_rows = array_create(8, sizeof(int));
     state->vu_meter_st.anchor_dbfs = array_create(8, sizeof(float));
+
+    state->source_vu_meter_st.bars = array_create(8, sizeof(float));
+    state->source_vu_meter_st.prev_bars = array_create(8, sizeof(float));
+    state->source_vu_meter_st.easing_bars = array_create(8, sizeof(float));
+    state->source_vu_meter_st.peaks = array_create(8, sizeof(float));
+    state->source_vu_meter_st.peak_set = array_create(8, sizeof(uint64_t));
+    state->source_vu_meter_st.anchor_rows = array_create(8, sizeof(int));
+    state->source_vu_meter_st.anchor_dbfs = array_create(8, sizeof(float));
 
     state->tabs_st.tabs = array_create(8, sizeof(str_t));
     for (int i = 0; i < TAB_LEN; i++)
@@ -139,6 +148,14 @@ void ui_free(ui_state *state)
     array_free(&state->vu_meter_st.peak_set);
     array_free(&state->vu_meter_st.anchor_rows);
     array_free(&state->vu_meter_st.anchor_dbfs);
+
+    array_free(&state->source_vu_meter_st.bars);
+    array_free(&state->source_vu_meter_st.prev_bars);
+    array_free(&state->source_vu_meter_st.easing_bars);
+    array_free(&state->source_vu_meter_st.peaks);
+    array_free(&state->source_vu_meter_st.peak_set);
+    array_free(&state->source_vu_meter_st.anchor_rows);
+    array_free(&state->source_vu_meter_st.anchor_dbfs);
 
     str_t *s;
     ARR_FOREACH_BYREF(state->tabs_st.tabs, s, i)

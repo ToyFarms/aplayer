@@ -30,7 +30,8 @@ typedef struct audio_source
     int target_sample_rate;
     enum AVSampleFormat target_sample_fmt;
 
-    array(audio_effect) pipeline;
+    array(audio_effect) effects;
+    array(audio_analyzer) analyzer;
 
     // is source realtime (e.g. microphone source)
     bool is_realtime;

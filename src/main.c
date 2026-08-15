@@ -137,7 +137,7 @@ int main(int argc, char **argv)
                     src->seek(src, app->want_to_seek_ms, SEEK_SET);
 
                     audio_effect *eff;
-                    ARR_FOREACH_BYREF(src->pipeline, eff, j)
+                    ARR_FOREACH_BYREF(src->effects, eff, j)
                     {
                         if (eff->type == AUDIO_EFF_FADE)
                             audio_eff_fade_force_in(eff);

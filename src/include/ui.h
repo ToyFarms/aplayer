@@ -198,6 +198,7 @@ typedef struct ui_state
     ui_debug_state debug_st;
     ui_media_control_state media_ctl_st;
     ui_vu_meter_state vu_meter_st;
+    ui_vu_meter_state source_vu_meter_st;
     ui_tabs_state tabs_st;
     ui_art_state art_st;
     ui_overlay_state overlay_st;
