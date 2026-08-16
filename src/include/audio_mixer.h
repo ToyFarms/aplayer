@@ -3,8 +3,17 @@
 
 #include "array.h"
 #include "audio_format.h"
+#include "audio_resampler.h"
+#include "dict.h"
 
 #include <pthread.h>
+
+typedef struct audio_source_resampler
+{
+    resample_ctx_t rate_fmt;
+    resample_ctx_t channel_mix;
+    array(float) leftover;
+} audio_source_resampler;
 
 typedef struct audio_mixer
 {
@@ -14,7 +23,12 @@ typedef struct audio_mixer
 
     pthread_mutex_t source_mutex;
     array(audio_source) sources;
+
+    array(uint8_t) raw_scratch;
     array(float) scratch;
+
+    // audio_source.id -> audio_source_resampler *
+    dict_t resamplers;
 
     float master_gain;
     float norm_gain;

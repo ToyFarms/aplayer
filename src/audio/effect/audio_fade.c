@@ -63,8 +63,7 @@ static void fade_process(audio_effect *eff, audio_callback_param p)
     if (p.src == NULL)
         return;
     effect_fade *ctx = eff->ctx;
-    int sample_rate = p.src->target_sample_rate > 0 ? p.src->target_sample_rate
-                                                    : p.src->stream_sample_rate;
+    int sample_rate = p.src->sample_rate;
     if (sample_rate <= 0)
     {
         log_error("fade: invalid sample rate, skipping\n");

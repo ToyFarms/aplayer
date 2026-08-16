@@ -80,11 +80,11 @@ int app_init()
         // return errnb;
     }
 
-    audio_analyzer rms = audio_analyzer_rms(rms_callback, NULL);
-    array_append(&app->audio->mixer.analyzer, &rms, 1);
+    // audio_analyzer rms = audio_analyzer_rms(rms_callback, NULL);
+    // array_append(&app->audio->mixer.analyzer, &rms, 1);
 
-    audio_analyzer activity = audio_analyzer_activity(activity_callback, NULL);
-    array_append(&app->audio->mixer.analyzer, &activity, 1);
+    // audio_analyzer activity = audio_analyzer_activity(activity_callback, NULL);
+    // array_append(&app->audio->mixer.analyzer, &activity, 1);
 
     // audio_effect autogain = audio_eff_autogain();
     // array_append(&app->audio->mixer.effects, &autogain, 1);

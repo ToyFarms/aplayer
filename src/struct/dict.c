@@ -79,10 +79,10 @@ void dict_clear(dict_t *dict)
 
     for (int i = 0; i < dict->bucket_slot; i++)
     {
-        array(dict_item) bkt = dict->buckets[i];
+        array(dict_item) *bkt = &dict->buckets[i];
 
         dict_item *item;
-        ARR_FOREACH_BYREF(bkt, item, j)
+        ARR_FOREACH_BYREF(*bkt, item, j)
         {
             if (item->self_owned)
                 free(item->data);
@@ -94,7 +94,7 @@ void dict_clear(dict_t *dict)
             item->key = NULL;
         }
 
-        array_free(&bkt);
+        bkt->length = 0;
     }
 
     dict->length = 0;

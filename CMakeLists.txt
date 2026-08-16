@@ -125,6 +125,7 @@ add_executable(aplayer
     ./src/audio/audio_source.c
     ./src/audio/audio_mixer.c
     ./src/audio/audio_effect.c
+    ./src/audio/audio_resampler.c
 
     ./src/audio/source/audio_file.c
 

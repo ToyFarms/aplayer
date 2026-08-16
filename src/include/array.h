@@ -43,5 +43,6 @@ int array_insert(array_t *arr, const void *mem, int item_count, int index);
 int array_remove(array_t *arr, int index, int item_count);
 void array_shuffle(array_t *arr);
 void array_reverse(array_t *arr);
+void array_ensure_size(array_t *arr, int item_count);
 
 #endif /* __ARRAY_H */

@@ -17,6 +17,7 @@
 #include "utils.h"
 
 #include <assert.h>
+#include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -79,7 +80,7 @@ int main(int argc, char **argv)
 
     queue_t event_queue = queue_create();
     event_queue.free = free;
-    play_at_index(app, app->playlist.current_idx);
+    play_at_index(app, app->playlist.current_idx, true);
     int want_to_debug = 0;
 
     while (true)

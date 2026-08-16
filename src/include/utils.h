@@ -21,6 +21,6 @@ void restore_stream(stream_mute_ctx h);
 void print_raw(const char *str);
 void play_next(app_instance *app);
 void play_prev(app_instance *app);
-void play_at_index(app_instance *app, int index);
+void play_at_index(app_instance *app, int index, bool clear);
 
 #endif /* __UTILS_H */

@@ -214,3 +214,9 @@ void array_reverse(array_t *arr)
     for (int i = 0; i < arr->length / 2; ++i)
         swap_element(arr, i, arr->length - 1 - i);
 }
+
+void array_ensure_size(array_t *arr, int item_count)
+{
+    if (arr->capacity - arr->length < item_count)
+        array_resize(arr, item_count);
+}

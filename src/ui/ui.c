@@ -276,7 +276,8 @@ static void render_playlist_tabs(ui_state *state)
                 state->bands_st.bands.length * (state->opt.vu_meter.bar_gap +
                                                 state->opt.vu_meter.bar_width),
             vu_meter.pos.y + 1));
-    term_draw_color(&state->term->buf, COLOR_NONE, GET_THEMECOLOR(state, "PRIMARY"));
+    term_draw_color(&state->term->buf, COLOR_NONE,
+                    GET_THEMECOLOR(state, "PRIMARY"));
     term_draw_str(&state->term->buf, "ACT", 3);
 }
 
@@ -373,7 +374,8 @@ void ui_event(ui_state *state, term_event *e)
             if (now - last_update < MS2NS(50))
                 return;
 
-            play_at_index(state->app, state->playlist_st.hovered_idx);
+            play_at_index(state->app, state->playlist_st.hovered_idx,
+                          !(e->key.mod & TERM_KMOD_SHIFT));
             last_update = now;
         }
         else if (e->key.ascii == 'g')
@@ -414,12 +416,14 @@ void ui_event(ui_state *state, term_event *e)
             state->media_ctl_st.play_hovered = true;
             state->media_ctl_st.play_last = gclock_now_ns();
         }
-        else if (e->key.ascii == '{')
+        else if (e->key.ascii == '{' ||
+                 (e->key.mod & TERM_KMOD_CTRL && e->key.ascii == 'u'))
         {
             state->playlist_st.hovered_idx = MATH_MAX(
                 state->playlist_st.hovered_idx - state->term->height * 0.5, 0);
         }
-        else if (e->key.ascii == '}')
+        else if (e->key.ascii == '}' ||
+                 (e->key.mod & TERM_KMOD_CTRL && e->key.ascii == 'd'))
         {
             state->playlist_st.hovered_idx = MATH_MIN(
                 state->playlist_st.hovered_idx + state->term->height * 0.5,

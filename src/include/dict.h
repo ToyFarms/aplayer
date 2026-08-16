@@ -30,23 +30,38 @@ typedef struct dict_t
     dict_strcmp_fn strcmp;
 } dict_t;
 
-#define DICT_FOREACH(key, item, i, dict)                                       \
-    for (int __i = 0, __attribute__((unused)) i = -1;                          \
-         __i < (dict)->bucket_slot; __i++)                                     \
-    {                                                                          \
-        __attribute__((unused)) char *key = NULL;                              \
-        array_t __bkt = (dict)->buckets[__i];                                  \
-        dict_item *__item;                                                     \
-        ARR_FOREACH_BYREF(__bkt, __item, __j)                                  \
-        {                                                                      \
-            i++;                                                               \
-            key = __item->key;                                                 \
-            item = __item->data;
+typedef struct
+{
+    dict_t *d;
+    int bucket_idx;
+    int slot_idx;
+} dict_iter_t;
 
-#define DICT_FOREACH_END                                                       \
-    }                                                                          \
+static inline dict_item *dict_iter_next(dict_iter_t *it)
+{
+    while (it->bucket_idx < it->d->bucket_slot)
+    {
+        array_t bkt = it->d->buckets[it->bucket_idx];
+        if (it->slot_idx < bkt.length)
+        {
+            dict_item *item = &ARR_AS(bkt, dict_item)[it->slot_idx];
+            it->slot_idx++;
+            return item;
+        }
+        it->bucket_idx++;
+        it->slot_idx = 0;
     }
+    return NULL;
+}
 
+#define DICT_FOREACH(mykey, myitem, myi, mydict)                               \
+    for (dict_iter_t __it = {(mydict), 0, 0};;)                                \
+        for (int myi = -1, __go = 1; __go; __go = 0)                           \
+            for (dict_item * __item;                                           \
+                 (__item = dict_iter_next(&__it)) != NULL ? (myi++, 1) : 0;)     \
+                for (int __once = 1; __once; __once = 0)                       \
+                    for (char *mykey = __item->key, *item = 0; __once;         \
+                         __once = 0, myitem = __item->data)
 dict_t dict_create();
 void dict_free(dict_t *dict);
 void dict_clear(dict_t *dict);

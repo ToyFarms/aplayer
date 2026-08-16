@@ -276,3 +276,19 @@ TEST_BEGIN(overwrite)
     ASSERT_MEM_EQ(ret, data2, strlen(data2));
 }
 TEST_END()
+
+TEST_BEGIN(reuse_after_clear)
+{
+    dict_t dict = dict_create();
+
+    char *data = "Hello World!";
+    dict_insert(&dict, "TEST1", data);
+
+    dict_clear(&dict);
+
+    dict_insert(&dict, "TEST1", data);
+
+    char *ret = dict_get(&dict, "TEST1", NULL);
+    ASSERT_MEM_EQ(ret, data, strlen(data));
+}
+TEST_END()

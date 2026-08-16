@@ -15,7 +15,7 @@ void rms_process(audio_analyzer *analyzer, audio_callback_param p)
 
     for (int i = 0; i < p.size; i += p.nb_channels)
     {
-        for (int ch = 0; ch < p.nb_channels; ch++)
+        for (int ch = 0; ch < p.nb_channels && ch < 8; ch++)
         {
             float s = p.out[i + ch];
             rms[ch] += s * s;
@@ -23,7 +23,7 @@ void rms_process(audio_analyzer *analyzer, audio_callback_param p)
     }
 
     float nb_samples = (float)p.size / (float)p.nb_channels;
-    for (int ch = 0; ch < p.nb_channels; ch++)
+    for (int ch = 0; ch < p.nb_channels && ch < 8; ch++)
         rms[ch] = sqrtf(rms[ch] / nb_samples);
 
     analyzer->callback(

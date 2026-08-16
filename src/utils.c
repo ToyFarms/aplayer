@@ -64,13 +64,30 @@ static void source_rms_callback(void *actx, void *userdata)
 
     analyzer_rms_ctx *ctx = actx;
 
-    if (app->ui.source_vu_meter_st.bars.capacity < ctx->nb_channels)
-        array_resize(&app->ui.source_vu_meter_st.bars, ctx->nb_channels);
+    if (app->ui.vu_meter_st.bars.capacity < ctx->nb_channels)
+        array_resize(&app->ui.vu_meter_st.bars, ctx->nb_channels);
 
-    app->ui.source_vu_meter_st.bars.length = ctx->nb_channels;
+    app->ui.vu_meter_st.bars.length = ctx->nb_channels;
 
     for (int i = 0; i < ctx->nb_channels; i++)
-        ARR_AS(app->ui.source_vu_meter_st.bars, float)[i] = ctx->rms[i];
+        ARR_AS(app->ui.vu_meter_st.bars, float)[i] = ctx->rms[i];
+}
+
+static void source_activity_callback(void *actx, void *userdata)
+{
+    app_instance *app = app_get();
+    if (app == NULL)
+        return;
+
+    analyzer_activity_ctx *ctx = actx;
+
+    if (app->ui.bands_st.bands.capacity < ctx->nb_channels)
+        array_resize(&app->ui.bands_st.bands, ctx->nb_channels);
+
+    app->ui.bands_st.bands.length = ctx->nb_channels;
+
+    for (int i = 0; i < ctx->nb_channels; i++)
+        ARR_AS(app->ui.bands_st.bands, float)[i] = ctx->level[i];
 }
 
 static void attach_static_effect(audio_source *src)
@@ -85,6 +102,10 @@ static void attach_static_effect(audio_source *src)
 
     audio_analyzer rms = audio_analyzer_rms(source_rms_callback, NULL);
     array_append(&src->analyzer, &rms, 1);
+
+    audio_analyzer activity =
+        audio_analyzer_activity(source_activity_callback, NULL);
+    array_append(&src->analyzer, &activity, 1);
 }
 
 void play_next(app_instance *app)
@@ -94,9 +115,7 @@ void play_next(app_instance *app)
         return;
 
     char *file = entry->path.buf;
-    audio_source src =
-        audio_from_file(file, app->audio->nb_channels, app->audio->sample_rate,
-                        app->audio->sample_fmt);
+    audio_source src = audio_from_file(file);
     if (errno != 0)
     {
         play_next(app);
@@ -118,9 +137,7 @@ void play_prev(app_instance *app)
         return;
 
     char *file = entry->path.buf;
-    audio_source src =
-        audio_from_file(file, app->audio->nb_channels, app->audio->sample_rate,
-                        app->audio->sample_fmt);
+    audio_source src = audio_from_file(file);
     if (errno != 0)
     {
         play_prev(app);
@@ -135,7 +152,7 @@ void play_prev(app_instance *app)
     app->ui.art_st.initialized = false;
 }
 
-void play_at_index(app_instance *app, int index)
+void play_at_index(app_instance *app, int index, bool clear)
 {
     const fs_entry_t *entry = playlist_play(&app->playlist, index);
     if (entry == NULL)
@@ -143,9 +160,7 @@ void play_at_index(app_instance *app, int index)
 
     char *file = entry->path.buf;
 
-    audio_source src =
-        audio_from_file(file, app->audio->nb_channels, app->audio->sample_rate,
-                        app->audio->sample_fmt);
+    audio_source src = audio_from_file(file);
     if (errno != 0)
     {
         play_next(app);
@@ -154,7 +169,11 @@ void play_at_index(app_instance *app, int index)
     }
 
     attach_static_effect(&src);
-    mixer_clear(&app->audio->mixer);
+    if (clear)
+    {
+        mixer_clear(&app->audio->mixer);
+    }
+
     array_append(&app->audio->mixer.sources, &src, 1);
     app->ui.playlist_st.hovered_idx = app->playlist.current_idx;
     app->ui.art_st.initialized = false;
