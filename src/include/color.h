@@ -30,6 +30,11 @@ typedef struct color_norm_t
 
 color_t color_hex(uint32_t hex);
 color_t color_hsl(color_hsl_t hsl);
+/* Inverse of color_hsl(): hue in degrees, saturation and lightness in percent,
+ * alpha copied as-is. */
+color_hsl_t color_to_hsl(color_t color);
+/* Per-channel linear blend (alpha included); `t` is clamped to [0, 1]. */
+color_t color_mix(color_t a, color_t b, float t);
 int color_term_pallete(color_t color);
 color_norm_t color_normalize(color_t color);
 color_t color_scale(color_norm_t color);

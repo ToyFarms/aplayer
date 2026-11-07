@@ -5,7 +5,6 @@
 #include "clock.h"
 #include "logger.h"
 #include "pathlib.h"
-#include "ui.h"
 #include <locale.h>
 #include <stddef.h>
 #include <string.h>

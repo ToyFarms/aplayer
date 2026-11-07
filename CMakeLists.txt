@@ -42,7 +42,7 @@ if (WIN32)
 
     FetchContent_Declare(
         ffmpeg_prebuilt
-        URL https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-07-24-13-32/ffmpeg-n7.1.5-10-g2aefd64d48-win64-gpl-shared-7.1.zip
+        URL https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl-shared.zip
     )
     FetchContent_MakeAvailable(ffmpeg_prebuilt)
 else()
@@ -87,13 +87,84 @@ FetchContent_Declare(
     URL https://www.fftw.org/pub/fftw/fftw-3.3.11.tar.gz
 )
 
-FetchContent_MakeAvailable(taglib libebur128 portaudio fftw3)
+# Text for the big lyric line: hinted, monochrome glyphs (src/ui/ui_font.c).
+# Built without its optional dependencies, so nothing but the sources is needed
+# and the result is one small static library.
+set(FT_DISABLE_ZLIB ON CACHE BOOL "" FORCE)
+set(FT_DISABLE_BZIP2 ON CACHE BOOL "" FORCE)
+set(FT_DISABLE_PNG ON CACHE BOOL "" FORCE)
+set(FT_DISABLE_HARFBUZZ ON CACHE BOOL "" FORCE)
+set(FT_DISABLE_BROTLI ON CACHE BOOL "" FORCE)
+FetchContent_Declare(
+    freetype
+    GIT_REPOSITORY https://github.com/freetype/freetype.git
+    GIT_TAG VER-2-13-3
+    GIT_SHALLOW TRUE
+)
+
+FetchContent_MakeAvailable(taglib libebur128 portaudio fftw3 freetype)
 
 if (WIN32)
     set(PLATFORM_SUFFIX win)
 else()
     set(PLATFORM_SUFFIX linux)
 endif()
+
+# Retained-mode TUI toolkit (generic: knows nothing about the player).
+set(TUI_SOURCES
+    ./src/tui/tui_node.c
+    ./src/tui/tui_attr.c
+    ./src/tui/tui_text.c
+    ./src/tui/tui_measure.c
+    ./src/tui/tui_layout.c
+    ./src/tui/tui_paint.c
+    ./src/tui/tui_screen.c
+    ./src/tui/tui_event.c
+    ./src/tui/tui_lifecycle.c
+    ./src/tui/tui_widgets.c
+    ./src/tui/tui_widgets_data.c
+    ./src/tui/tui_router.c
+    ./src/tui/tui_term.c
+)
+
+# The aplayer interface, built on the toolkit. Public API: src/include/ui.h.
+# Everything else in src/ui is private (see docs/UI.md).
+set(UI_SOURCES
+    ./src/ui/ui.c
+    ./src/ui/ui_views.c
+    ./src/ui/ui_actions.c
+    ./src/ui/ui_hotkeys.c
+    ./src/ui/ui_theme.c
+    ./src/ui/ui_options.c
+    ./src/ui/ui_format.c
+    ./src/ui/ui_ansi.c
+    ./src/ui/ui_palette.c
+    ./src/ui/ui_sprite.c
+    ./src/ui/ui_font.c
+    ./src/ui/ui_grow.c
+    ./src/ui/ui_ambience.c
+    ./src/ui/ui_dither.c
+    ./src/ui/ui_skin.c
+    ./src/ui/widgets/ui_tab_bar.c
+    ./src/ui/widgets/ui_transport.c
+    ./src/ui/widgets/ui_playlist.c
+    ./src/ui/widgets/ui_search.c
+    ./src/ui/widgets/ui_vu_meter.c
+    ./src/ui/widgets/ui_lyrics.c
+    ./src/ui/widgets/ui_cover_art.c
+    ./src/ui/widgets/ui_track_info.c
+    ./src/ui/widgets/ui_spectrum.c
+)
+
+# Word timing for synced lyrics (docs/KARAOKE.md). Needs nothing the player does
+# not already link: FFTW for the spectra, FFmpeg for its own decoder.
+set(KARAOKE_SOURCES
+    ./src/karaoke/kara_text.c
+    ./src/karaoke/kara_lex.c
+    ./src/karaoke/kara_feat.c
+    ./src/karaoke/kara_align.c
+    ./src/karaoke/kara_job.c
+)
 
 add_executable(aplayer
     ./src/main.c
@@ -117,9 +188,12 @@ add_executable(aplayer
     ./src/struct/ds.c
     ./src/struct/arena_allocator.c
     ./src/struct/pathlib.c
+    ./src/struct/fuzzy.c
 
     ./src/term/term_${PLATFORM_SUFFIX}.c
     ./src/term/term_draw.c
+    ./src/term/color.c
+    ./src/term/image_renderer.c
 
     ./src/audio/audio.c
     ./src/audio/audio_source.c
@@ -138,28 +212,22 @@ add_executable(aplayer
     ./src/audio/analyzer/audio_rms.c
     ./src/audio/analyzer/audio_fft.c
     ./src/audio/analyzer/audio_activity.c
+    ./src/audio/analyzer/audio_spectrum.c
+    ./src/audio/analyzer/audio_scope.c
+    ./src/audio/analyzer/audio_scope_analyzer.c
 
-    ./src/ui/color.c
-    ./src/ui/ui.c
-    ./src/ui/layout.c
-    ./src/ui/image_renderer.c
-
-    ./src/ui/widgets/list.c
-    ./src/ui/widgets/hprogress.c
-    ./src/ui/widgets/debug.c
-    ./src/ui/widgets/rect.c
-    ./src/ui/widgets/timestamp.c
-    ./src/ui/widgets/volume.c
-    ./src/ui/widgets/media_control.c
-    ./src/ui/widgets/vu_meter.c
-    ./src/ui/widgets/statusline.c
-    ./src/ui/widgets/tabs.c
-    ./src/ui/widgets/art.c
-    ./src/ui/widgets/lyrics.c
+    ${TUI_SOURCES}
+    ${UI_SOURCES}
+    ${KARAOKE_SOURCES}
 
     ./thirdparty/wcwidth.c
     ./thirdparty/cJSON.c
 )
+
+# ui_internal.h and friends are private to src/ui: only its own sources may
+# include them.
+set_source_files_properties(${UI_SOURCES} PROPERTIES
+    INCLUDE_DIRECTORIES "${CMAKE_CURRENT_SOURCE_DIR}/src/ui")
 
 target_compile_definitions(aplayer PRIVATE TAGLIB_STATIC)
 
@@ -180,6 +248,7 @@ list(REMOVE_DUPLICATES TAGLIB_INCLUDE_DIRS)
 
 target_include_directories(aplayer PRIVATE
     ./src/include
+    ./src/tui
     ./thirdparty/include
     "${ffmpeg_prebuilt_SOURCE_DIR}/include"
     "${pthread-win32_SOURCE_DIR}"
@@ -191,7 +260,15 @@ target_include_directories(aplayer PRIVATE
     "${portaudio_SOURCE_DIR}/api"
 )
 
-target_link_libraries(aplayer PRIVATE fftw3 tag portaudio_static ebur128)
+target_link_libraries(aplayer PRIVATE fftw3 tag portaudio_static ebur128 freetype)
+
+# Fonts the user drops next to the program (see fonts/README.md) are found
+# automatically: copy the folder beside the executable.
+add_custom_command(TARGET aplayer POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+        "${CMAKE_CURRENT_SOURCE_DIR}/fonts" "$<TARGET_FILE_DIR:aplayer>/fonts"
+    VERBATIM
+)
 
 if (WIN32)
     file(GLOB FFMPEG_DLLS
@@ -204,4 +281,29 @@ if (WIN32)
             $<TARGET_FILE_DIR:aplayer>
         VERBATIM
     )
+endif()
+
+# Optional word lists for the word timing (see lexicon/README.md): found next to
+# the executable. The player works without them.
+add_custom_command(TARGET aplayer POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+        "${CMAKE_CURRENT_SOURCE_DIR}/lexicon" "$<TARGET_FILE_DIR:aplayer>/lexicon"
+    VERBATIM
+)
+
+# Developer tools for the word timing: not part of the player.
+#   cmake -DAPLAYER_KARA_TOOLS=ON ..
+option(APLAYER_KARA_TOOLS "Build the word timing command line tools" OFF)
+if (APLAYER_KARA_TOOLS)
+    add_executable(kara_cli ./tools/kara_cli.c ${KARAOKE_SOURCES} ./src/logger.c)
+    target_include_directories(kara_cli PRIVATE ./src/include
+        "${fftw3_SOURCE_DIR}/api" "${ffmpeg_prebuilt_SOURCE_DIR}/include")
+    if (WIN32)
+        target_link_libraries(kara_cli PRIVATE pthreadVC3 avformat avcodec avutil swresample)
+        target_link_directories(kara_cli PRIVATE "${ffmpeg_prebuilt_SOURCE_DIR}/lib")
+        target_include_directories(kara_cli PRIVATE "${pthread-win32_SOURCE_DIR}")
+    else()
+        target_link_libraries(kara_cli PRIVATE m pthread PkgConfig::LIBAV)
+    endif()
+    target_link_libraries(kara_cli PRIVATE fftw3)
 endif()

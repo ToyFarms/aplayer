@@ -11,7 +11,7 @@ CFLAGS_BEGIN /*
  -Isrc/include
  -Ithirdparty/include
  src/term/term_draw.c
- src/ui/color.c
+ src/term/color.c
  src/struct/ds.c
  src/logger.c
  thirdparty/wcwidth.c

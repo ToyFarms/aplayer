@@ -53,6 +53,9 @@ typedef struct audio_file
     bool loudness_cancel;
     float loudness_lufs;
 
+    karaoke *kara; /* made on the first get_karaoke(); UI thread */
+    bool kara_tried;
+
     int64_t next_ts_estimate;
 } audio_file;
 
@@ -168,6 +171,10 @@ static void audio_file_free(audio_source *audio)
         pthread_join(ctx->loudness_thread, NULL);
         ctx->loudness_thread_started = false;
     }
+
+    /* never waits: this runs on the audio thread when a track ends */
+    kara_destroy(ctx->kara);
+    ctx->kara = NULL;
 
     pthread_mutex_lock(&audio->ctx_mutex);
 
@@ -384,6 +391,33 @@ static void audio_file_get_arts(audio_source *audio, array(image_t) * out)
         }
     }
 
+    pthread_mutex_unlock(&audio->ctx_mutex);
+}
+
+static void audio_file_get_art_blobs(audio_source *audio,
+                                     array(art_blob) * out)
+{
+    pthread_mutex_lock(&audio->ctx_mutex);
+    audio_file *file = audio->ctx;
+    for (unsigned i = 0; file != NULL && i < file->ic->nb_streams; i++)
+    {
+        AVStream *stream = file->ic->streams[i];
+        if (!(stream->disposition & AV_DISPOSITION_ATTACHED_PIC) ||
+            stream->attached_pic.size <= 0)
+            continue;
+        art_blob b = {0};
+        b.size = stream->attached_pic.size;
+        b.data = malloc((size_t)b.size);
+        if (b.data == NULL)
+            continue;
+        memcpy(b.data, stream->attached_pic.data, (size_t)b.size);
+        AVDictionaryEntry *t = av_dict_get(stream->metadata, "title", NULL, 0);
+        AVDictionaryEntry *c =
+            av_dict_get(stream->metadata, "comment", NULL, 0);
+        b.title = t ? strdup(t->value) : NULL;
+        b.comment = c ? strdup(c->value) : NULL;
+        array_append(out, &b, 1);
+    }
     pthread_mutex_unlock(&audio->ctx_mutex);
 }
 
@@ -724,6 +758,56 @@ static bool audio_start_loudness_thread(audio_source *audio)
     return true;
 }
 
+static bool key_is(const char *key, const char *lower)
+{
+    for (; *key && *lower; key++, lower++)
+        if ((*key >= 'A' && *key <= 'Z' ? *key + 32 : *key) != *lower)
+            return false;
+    return *key == '\0' && *lower == '\0';
+}
+
+/* the language tag of the file, if it has one */
+static const char *meta_language(const metadata_t *m)
+{
+    for (size_t i = 0; i < m->n_extra_properties; i++)
+    {
+        const char *k = m->extra_properties[i].key;
+        if (k != NULL && m->extra_properties[i].value != NULL &&
+            (key_is(k, "language") || key_is(k, "lang")))
+            return m->extra_properties[i].value;
+    }
+    return NULL;
+}
+
+static karaoke *audio_get_karaoke(audio_source *audio)
+{
+    audio_file *ctx = audio->ctx;
+    if (ctx == NULL)
+        return NULL;
+    if (ctx->kara_tried)
+        return ctx->kara;
+    ctx->kara_tried = true;
+
+    const metadata_t *m = ctx->meta;
+    if (m == NULL || m->n_lyrics_synced == 0)
+        return NULL;
+
+    kara_source_line *lines = malloc(m->n_lyrics_synced * sizeof(*lines));
+    if (lines == NULL)
+        return NULL;
+    for (size_t i = 0; i < m->n_lyrics_synced; i++)
+    {
+        lines[i].text = m->lyrics_synced[i].text ? m->lyrics_synced[i].text : "";
+        lines[i].start_ms = m->lyrics_synced[i].start_ms;
+    }
+    ctx->kara = kara_create(ctx->filename, lines, (int)m->n_lyrics_synced,
+                            meta_language(m));
+    free(lines); /* kara_create copied them */
+    if (ctx->kara == NULL)
+        log_error("Cannot start word timing for %s\n", ctx->filename);
+    return ctx->kara;
+}
+
 static float audio_get_loudness(audio_source *audio)
 {
     audio_file *ctx = audio->ctx;
@@ -797,8 +881,10 @@ audio_source audio_from_file(const char *filename)
     audio.get_frame = audio_common_get_frame;
     audio.seek = audio_file_seek;
     audio.get_arts = audio_file_get_arts;
+    audio.get_art_blobs = audio_file_get_art_blobs;
     audio.get_metadata = audio_file_get_metadata;
     audio.get_loudness = audio_get_loudness;
+    audio.get_karaoke = audio_get_karaoke;
 
     if (audio_file_init(&audio) < 0)
     {

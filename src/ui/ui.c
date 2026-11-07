@@ -1,511 +1,129 @@
-#include "ui.h"
-#include "_math.h"
-#include "app.h"
-#include "array.h"
-#include "audio_effect.h"
-#include "audio_source.h"
+#include "ui_internal.h"
+
 #include "clock.h"
-#include "color.h"
-#include "ds.h"
-#include "image.h"
-#include "image_renderer.h"
-#include "term_draw.h"
-#include "utils.h"
-#include "widgets/widgets.h"
-#include <stdlib.h>
-#include <string.h>
 
-#ifdef _MSC_VER
-#  define strcasecmp _stricmp
-#endif
+/*
+ * Screen layout:
+ *
+ *   [ tab bar ]                                 row 0
+ *   [ active view                          ]    grows
+ *   (blank)
+ *   timestamp ─ seek bar ─ gain                 row h-2
+ *   status line    << [> >>        loudness     row h-1
+ */
 
-static ui_setting ui_default_setting()
+static void build_screen(ui_ctx *u)
 {
-    ui_setting s = (ui_setting){
-        .scrolloff = 2,
-        .debug = false,
-        .theme = dict_create(),
+    tui_ctx *ctx = u->tui;
+
+    tui_attr root = tui_get_attr(tui_root(ctx));
+    root.dir = TUI_COLUMN;
+    tui_set_attr(tui_root(ctx), &root);
+
+    u->tab_bar = ui_tab_bar_new(u);
+    ui_views_build(u);
+    u->transport = ui_transport_new(u, false);
+
+    ui_view_select(u, UI_VIEW_PLAYLIST);
+}
+
+ui_ctx *ui_create(app_instance *app)
+{
+    ui_ctx *u = calloc(1, sizeof(*u));
+    if (u == NULL)
+        return NULL;
+    u->app = app;
+    u->base_theme = ui_theme_default();
+    u->theme = u->base_theme;
+    u->opt = ui_options_default();
+    u->spectrum_mode = u->opt.spectrum.mode;
+    u->color256 = app->term.capability.color != TERM_COLOR_24BIT;
+    ui_ambience_init(&u->ambience, &u->base_theme.palette);
+    u->skin_rev = u->ambience.palette_rev;
+
+    vec2 size = term_size();
+    tui_options opt = {
+        .color_mode = app->term.capability.color == TERM_COLOR_24BIT
+                          ? TUI_COLOR_TRUE
+                          : TUI_COLOR_256,
+        .sync_output = true,
     };
-    s.theme.strcmp = strcasecmp;
-
-    typedef struct kv_pair
+    u->tui = tui_create(size.x, size.y, &opt);
+    if (u->tui == NULL)
     {
-        const char *k;
-        color_t v;
-    } kv_pair;
-
-    // TODO: generalized theme system
-    const color_t PRIMARY = COLOR(230, 200, 150);
-
-    kv_pair themes[] = {
-        {"PRIMARY", PRIMARY},
-        {"PRIMARY_DIM", COLOR(138, 120, 90)},
-
-        {"CONTROL_BG", COLOR(10, 10, 10)},
-        {"LIST_NORMAL_BG", COLOR(30, 30, 30)},
-        {"LIST_NORMAL_FG", COLOR_NONE},
-        {"LIST_PLAYING_BG", COLOR(91, 201, 77)},
-        {"LIST_PLAYING_FG", COLOR(30, 30, 30)},
-        {"LIST_NUMBER_BG", COLOR(10, 10, 10)},
-        {"LIST_NUMBER_FG", PRIMARY},
-
-        {"VOLUME_BG", COLOR(10, 10, 10)},
-        {"VOLUME_FG", PRIMARY},
-        {"VOLUME_BG_MUTED", COLOR(10, 10, 10)},
-        {"VOLUME_FG_MUTED", COLOR(245, 90, 60)},
-        {"TIMESTAMP_BG", COLOR(10, 10, 10)},
-        {"TIMESTAMP_FG", PRIMARY},
-        {"PROGRESS_BG", COLOR(30, 30, 30)},
-        {"PROGRESS_FG", COLOR(255, 0, 0)},
-        {"MEDIA_CONTROL_BG", COLOR(255, 255, 255)},
-        {"MEDIA_CONTROL_FG", COLOR(0, 0, 0)},
-        {"STATUSLINE_BG", COLOR(10, 10, 10)},
-        {"STATUSLINE_FG", PRIMARY},
-
-        {"VU_METER_LOW_FG", COLOR(0, 255, 0)},
-        {"VU_METER_MID_FG", COLOR(255, 255, 0)},
-        {"VU_METER_HIGH_FG", COLOR(255, 0, 0)},
-        {"VU_METER_LOW_BG", COLOR(0, 100, 0)},
-        {"VU_METER_MID_BG", COLOR(100, 100, 0)},
-        {"VU_METER_HIGH_BG", COLOR(100, 0, 0)},
-        {"VU_METER_SEP", COLOR(10, 10, 10)},
-        {"VU_METER_BG", COLOR(10, 10, 10)},
-        {"VU_METER_FG", PRIMARY},
-    };
-
-    for (int i = 0; i < sizeof(themes) / sizeof(themes[0]); i++)
-        dict_insert_copy(&s.theme, themes[i].k, &themes[i].v,
-                         sizeof(themes[i].v));
-
-    s.vu_meter.bar_gap = 1;
-    s.vu_meter.bar_width = 3;
-    s.vu_meter.left_pad = 2;
-    s.vu_meter.right_pad = 1;
-    s.vu_meter.tick_gap = 1;
-    s.vu_meter.render_separator = true;
-    s.vu_meter.render_ticks = true;
-    s.vu_meter.render_marks = true;
-    s.vu_meter.render_numeric = true;
-    s.vu_meter.render_peak = true;
-    s.vu_meter.discrete = false;
-    s.vu_meter.peak_decay = 0.995;
-    s.vu_meter.style = VU_METER_ANALOG_BAR;
-
-    s.tabs.gap = 1;
-    s.tabs.padding = 2;
-
-    return s;
-}
-
-void ui_init(ui_state *state, term_state *term, app_instance *app)
-{
-    memset(state, 0, sizeof(*state));
-    state->term = term;
-    state->app = app;
-    state->opt = ui_default_setting();
-
-    state->debug_st.logs = queue_create();
-    state->debug_st.logs.free = free;
-
-    // TODO: refactor each into its own file, or atleast function
-    state->vu_meter_st.bars = array_create(8, sizeof(float));
-    state->vu_meter_st.prev_bars = array_create(8, sizeof(float));
-    state->vu_meter_st.easing_bars = array_create(8, sizeof(float));
-    state->vu_meter_st.peaks = array_create(8, sizeof(float));
-    state->vu_meter_st.peak_set = array_create(8, sizeof(uint64_t));
-    state->vu_meter_st.anchor_rows = array_create(8, sizeof(int));
-    state->vu_meter_st.anchor_dbfs = array_create(8, sizeof(float));
-
-    state->source_vu_meter_st.bars = array_create(8, sizeof(float));
-    state->source_vu_meter_st.prev_bars = array_create(8, sizeof(float));
-    state->source_vu_meter_st.easing_bars = array_create(8, sizeof(float));
-    state->source_vu_meter_st.peaks = array_create(8, sizeof(float));
-    state->source_vu_meter_st.peak_set = array_create(8, sizeof(uint64_t));
-    state->source_vu_meter_st.anchor_rows = array_create(8, sizeof(int));
-    state->source_vu_meter_st.anchor_dbfs = array_create(8, sizeof(float));
-
-    state->tabs_st.tabs = array_create(8, sizeof(str_t));
-    for (int i = 0; i < TAB_LEN; i++)
-    {
-        str_t s = str_new(tab_name((enum tab_type)i));
-        array_append(&state->tabs_st.tabs, &s, 1);
+        free(u);
+        return NULL;
     }
 
-    state->art_st.images = array_create(8, sizeof(ui_art_image));
-    state->art_st.method = IMAGE_RENDER_GLYPH;
-    state->bands_st.bands = array_create(8, sizeof(float));
+    tui_terminal_enter(u->tui, false); /* mouse reporting comes from term */
+    tui_term_input_init(&u->input);
+    u->router = tui_router_new(u->tui, &(tui_router_options){
+                                          .timeout_ms = u->opt.keys.timeout_ms});
+    tui_term_input_set_router(&u->input, u->router);
+    if (u->opt.keys.langmap)
+    {
+        tui_langmap *lm = tui_router_langmap(u->router);
+        tui_langmap_preset(lm, "ru");
+        tui_langmap_preset(lm, "uk");
+        tui_langmap_preset(lm, "el");
+        tui_langmap_preset(lm, "cjk");
+    }
+    ui_hotkeys_init(u);
+    ui_theme_apply_to_toolkit(&u->theme);
+    build_screen(u);
+    return u;
 }
 
-void ui_free(ui_state *state)
+ui_font *ui_ctx_font(ui_ctx *u)
 {
-    queue_free(&state->debug_st.logs);
-    array_free(&state->playlist_st.lines);
-    dict_free(&state->opt.theme);
-    array_free(&state->vu_meter_st.bars);
-    array_free(&state->vu_meter_st.prev_bars);
-    array_free(&state->vu_meter_st.easing_bars);
-    array_free(&state->vu_meter_st.peaks);
-    array_free(&state->vu_meter_st.peak_set);
-    array_free(&state->vu_meter_st.anchor_rows);
-    array_free(&state->vu_meter_st.anchor_dbfs);
-
-    array_free(&state->source_vu_meter_st.bars);
-    array_free(&state->source_vu_meter_st.prev_bars);
-    array_free(&state->source_vu_meter_st.easing_bars);
-    array_free(&state->source_vu_meter_st.peaks);
-    array_free(&state->source_vu_meter_st.peak_set);
-    array_free(&state->source_vu_meter_st.anchor_rows);
-    array_free(&state->source_vu_meter_st.anchor_dbfs);
-
-    str_t *s;
-    ARR_FOREACH_BYREF(state->tabs_st.tabs, s, i)
+    if (!u->font_tried)
     {
-        str_free(s);
+        u->font_tried = true;
+        u->font = ui_font_open_default(u->opt.lyrics.font);
+        ui_font_set_weight(u->font, u->opt.lyrics.weight);
     }
-    array_free(&state->tabs_st.tabs);
-
-    ui_art_image *ui_img;
-    ARR_FOREACH_BYREF(state->art_st.images, ui_img, i)
-    {
-        image_free(ui_img->img);
-        free(ui_img->img);
-        str_free(&ui_img->rendered);
-    }
-    array_free(&state->art_st.images);
-    array_free(&state->lyrics_st.lines);
-    array_free(&state->bands_st.bands);
+    return u->font;
 }
 
-static void ui_update(ui_state *state)
+void ui_destroy(ui_ctx *u)
 {
-    const audio_source *src =
-        &ARR_AS(state->app->audio->mixer.sources, audio_source)[0];
-    state->progress = (double)src->timestamp / (double)src->duration;
+    if (u == NULL)
+        return;
+    tui_terminal_leave(u->tui);
+    tui_router_free(u->router); /* before the nodes it watches go away */
+    tui_term_input_free(&u->input);
+    ui_hotkeys_destroy(u);
+    tui_destroy(u->tui); /* releases every widget's state */
+    ui_font_close(u->font);
+    free(u);
 }
 
-typedef struct widget
+bool ui_quit_requested(const ui_ctx *u)
 {
-    vec2 pos;
-    vec2 size;
-} widget;
-
-static void render_playlist_tabs(ui_state *state)
-{
-    int meter_width = vu_meter_get_width(state, state->term->height - 3,
-                                         state->vu_meter_st.bars.length);
-
-    widget list = {.pos = VEC(0, 1),
-                   .size = VEC(state->term->width - meter_width, 0)};
-    list.size.y = state->term->height - list.pos.y - 3;
-    render_list(state, list.pos, list.size);
-
-    int control_mid_y = list.pos.y + list.size.y + 1;
-
-    audio_source *src =
-        &ARR_AS(state->app->audio->mixer.sources, audio_source)[0];
-    widget timestamp = {VEC(2, control_mid_y), VEC(0, 1)};
-    timestamp.size.x = render_timestamp(state, timestamp.pos, timestamp.size,
-                                        src->timestamp, src->duration);
-    term_draw_padding(&state->term->buf, 1);
-    widget hprogress = {
-        VEC(timestamp.pos.x + timestamp.size.x + 1, control_mid_y),
-        VEC(state->term->width - (timestamp.pos.x + timestamp.size.x + 14), 1)};
-
-    render_hprogress(state, hprogress.pos, hprogress.size,
-                     (double)src->timestamp / (double)src->duration);
-
-    widget volume = {VEC(hprogress.pos.x + hprogress.size.x + 1, control_mid_y),
-                     VEC(13, 1)};
-
-    render_volume(state, volume.pos, volume.size,
-                  state->app->audio->mixer.master_gain, "V:");
-
-    if (src->get_loudness)
-    {
-        render_volume_color(state, VEC(volume.pos.x, volume.pos.y + 1),
-                            volume.size, src->get_loudness(src),
-                            "A:", GET_THEMECOLOR(state, "VOLUME_BG"),
-                            GET_THEMECOLOR(state, "PRIMARY_DIM"));
-    }
-
-    widget media_control = {
-        VEC(hprogress.pos.x + hprogress.size.x / 2 - 9, control_mid_y + 1),
-        VEC(17, 1)};
-    render_media_control(state, media_control.pos, media_control.size);
-
-    widget statusline = {VEC(timestamp.pos.x, control_mid_y + 1),
-                         VEC(media_control.pos.x - 2, 1)};
-    render_statusline(state, statusline.pos, statusline.size);
-
-    widget vu_meter = {VEC(state->term->width - meter_width, control_mid_y - 3),
-                       VEC(meter_width, list.size.y - 1)};
-    render_vu_meter(state, vu_meter.pos, vu_meter.size);
-
-    int tabs_width = tabs_get_width(state);
-    widget tabs = {VEC(state->term->width / 2 - tabs_width / 2, 0),
-                   VEC(tabs_width, 1)};
-    render_tabs(state, tabs.pos, tabs.size);
-
-    term_draw_pos(&state->term->buf, VEC(vu_meter.pos.x, vu_meter.pos.y + 1));
-    term_draw_rect(&state->term->buf, VEC(vu_meter.size.x, 1),
-                   GET_THEMECOLOR(state, "VU_METER_BG"), COLOR_NONE);
-
-    float energy;
-    ARR_FOREACH(state->bands_st.bands, energy, i)
-    {
-        if (isnan(energy) || isinf(energy))
-            continue;
-
-        term_draw_pos(&state->term->buf,
-                      VEC(vu_meter.pos.x + state->opt.vu_meter.left_pad +
-                              i * (state->opt.vu_meter.bar_gap +
-                                   state->opt.vu_meter.bar_width),
-                          vu_meter.pos.y + 1));
-
-        term_draw_color(&state->term->buf,
-                        COLOR(energy * 255, energy * 255, energy * 255),
-                        COLOR_NONE);
-
-        term_draw_padding(&state->term->buf, state->opt.vu_meter.bar_width);
-        term_draw_reset(&state->term->buf);
-    }
-
-    term_draw_pos(
-        &state->term->buf,
-        VEC(vu_meter.pos.x + state->opt.vu_meter.left_pad +
-                state->bands_st.bands.length * (state->opt.vu_meter.bar_gap +
-                                                state->opt.vu_meter.bar_width),
-            vu_meter.pos.y + 1));
-    term_draw_color(&state->term->buf, COLOR_NONE,
-                    GET_THEMECOLOR(state, "PRIMARY"));
-    term_draw_str(&state->term->buf, "ACT", 3);
+    return u->quit;
 }
 
-static void render_visual_tabs(ui_state *state)
+void ui_event(ui_ctx *u, const term_event *e)
 {
-    if (!state->art_st.initialized)
-    {
-        term_draw_clear(&state->term->buf);
-        art_init(state, state->art_st.method);
-        state->term->resized = true;
-    }
+    if (e->type == TERM_EVENT_RESIZE)
+        term_size_update(&u->app->term);
 
-    ui_art_image *img;
-
-    ARR_FOREACH_BYREF(state->art_st.images, img, i)
-    {
-        vec2 size = render_art_image(
-            state, VEC(state->term->width / 2, state->term->height / 2), i,
-            VEC(-1, state->term->height / 2), UI_ART_SIZE_AUTO,
-            UI_ANCHOR_BOTTOM, state->art_st.method, &state->term->capability);
-    }
-
-    int width = state->term->width * 0.5;
-    render_lyrics(
-        state,
-        VEC(state->term->width / 2 - width / 2, state->term->height / 2 + 1),
-        VEC(width, 5));
-    // audio_source src =
-    //     ARR_AS(state->app->audio->mixer.sources, audio_source)[0];
-
-    // widget hprogress = {VEC(state->term->width / 2 - art.size.x / 2,
-    //                         art.pos.y + art.size.y + 1),
-    //                     VEC(art.size.x, 1)};
-    // render_hprogress(state, hprogress.pos, hprogress.size,
-    //                  (double)src.timestamp / (double)src.duration);
+    tui_term_dispatch(&u->input, u->tui, e);
 }
 
-static void render_metadata_tabs(ui_state *state)
+void ui_frame(ui_ctx *u)
 {
-    render_lyrics(state, VEC(0, 0),
-                  VEC(state->term->width, state->term->height));
-}
+    uint64_t now = gclock_now_ns();
+    double dt =
+        u->last_frame_ns == 0 ? 0.0 : (double)(now - u->last_frame_ns) / 1e9;
+    u->last_frame_ns = now;
 
-static void render_overlay(ui_state *state)
-{
-}
-
-void ui_render(ui_state *state)
-{
-    ui_update(state);
-
-    switch (state->tabs_st.selected)
-    {
-    case TAB_PLAYLIST:
-        render_playlist_tabs(state);
-        break;
-    case TAB_VISUAL:
-        render_visual_tabs(state);
-        break;
-    case TAB_METADATA:
-        render_metadata_tabs(state);
-        break;
-    default:
-        break;
-    }
-
-    render_overlay(state);
-}
-
-void ui_event(ui_state *state, term_event *e)
-{
-    switch (e->type)
-    {
-    case TERM_EVENT_KEY:
-        if (e->key.mod == 0)
-        {
-            if (e->key.ascii == 'j')
-                state->playlist_st.hovered_idx++;
-            if (e->key.ascii == 'k')
-                state->playlist_st.hovered_idx--;
-        }
-
-        if (e->key.virtual == TERM_KEY_DOWN)
-            state->playlist_st.hovered_idx++;
-        if (e->key.virtual == TERM_KEY_UP)
-            state->playlist_st.hovered_idx--;
-
-        if (e->key.ascii == '\n')
-        {
-            static clock_highres_t clk = {0};
-            static uint64_t last_update = 0;
-
-            uint64_t now = clock_now_ns(&clk);
-            if (now - last_update < MS2NS(50))
-                return;
-
-            play_at_index(state->app, state->playlist_st.hovered_idx,
-                          !(e->key.mod & TERM_KMOD_SHIFT));
-            last_update = now;
-        }
-        else if (e->key.ascii == 'g')
-        {
-            state->playlist_st.hovered_idx = 0;
-        }
-        else if (e->key.ascii == 'G')
-        {
-            state->playlist_st.hovered_idx = state->app->playlist.files.length;
-        }
-        else if (e->key.virtual == TERM_KEY_F3)
-        {
-            state->opt.debug = !state->opt.debug;
-        }
-        else if (e->key.ascii == 'j' && e->key.mod & TERM_KMOD_CTRL)
-        {
-            state->app->audio->mixer.master_gain -= 0.5f;
-        }
-        else if (e->key.ascii == 'k' && e->key.mod & TERM_KMOD_CTRL)
-        {
-            state->app->audio->mixer.master_gain += 0.5f;
-        }
-        else if (e->key.ascii == 'N')
-        {
-            state->media_ctl_st.next_hovered = true;
-            state->media_ctl_st.next_last = gclock_now_ns();
-            play_next(state->app);
-        }
-        else if (e->key.ascii == 'P')
-        {
-            state->media_ctl_st.prev_hovered = true;
-            state->media_ctl_st.prev_last = gclock_now_ns();
-            play_prev(state->app);
-        }
-        else if (e->key.ascii == ' ')
-        {
-            state->app->audio->mixer.paused = !state->app->audio->mixer.paused;
-            state->media_ctl_st.play_hovered = true;
-            state->media_ctl_st.play_last = gclock_now_ns();
-        }
-        else if (e->key.ascii == '{' ||
-                 (e->key.mod & TERM_KMOD_CTRL && e->key.ascii == 'u'))
-        {
-            state->playlist_st.hovered_idx = MATH_MAX(
-                state->playlist_st.hovered_idx - state->term->height * 0.5, 0);
-        }
-        else if (e->key.ascii == '}' ||
-                 (e->key.mod & TERM_KMOD_CTRL && e->key.ascii == 'd'))
-        {
-            state->playlist_st.hovered_idx = MATH_MIN(
-                state->playlist_st.hovered_idx + state->term->height * 0.5,
-                state->app->playlist.files.length);
-        }
-        else if (e->key.ascii == 'm')
-        {
-            state->app->audio->mixer.muted = !state->app->audio->mixer.muted;
-        }
-        else if (e->key.virtual == TERM_KEY_LEFT)
-        {
-            pthread_mutex_lock(&state->app->audio->mixer.source_mutex);
-            audio_source *src;
-            ARR_FOREACH_BYREF(state->app->audio->mixer.sources, src, i)
-            {
-                src->seek(src, -2500, SEEK_CUR);
-            }
-            pthread_mutex_unlock(&state->app->audio->mixer.source_mutex);
-        }
-        else if (e->key.virtual == TERM_KEY_RIGHT)
-        {
-            pthread_mutex_lock(&state->app->audio->mixer.source_mutex);
-            audio_source *src;
-            ARR_FOREACH_BYREF(state->app->audio->mixer.sources, src, i)
-            {
-                src->seek(src, 2500, SEEK_CUR);
-            }
-            pthread_mutex_unlock(&state->app->audio->mixer.source_mutex);
-        }
-        else if (e->key.ascii == 'r')
-        {
-            playlist_shuffle(&state->app->playlist);
-            state->playlist_st.redraw = true;
-            state->playlist_st.recenter = true;
-            state->playlist_st.hovered_idx = state->app->playlist.current_idx;
-        }
-        else if (e->key.ascii == 's')
-        {
-            enum playlist_sort next_sort =
-                state->app->playlist.is_shuffled
-                    ? state->app->playlist.sort
-                    : (state->app->playlist.sort + 1) % PLAYLIST_SORT_LENGTH;
-            playlist_sort(&state->app->playlist, next_sort,
-                          state->app->playlist.sort_direction);
-            state->playlist_st.redraw = true;
-            state->playlist_st.recenter = true;
-            state->playlist_st.hovered_idx = state->app->playlist.current_idx;
-        }
-        else if (e->key.ascii == 'd')
-        {
-            enum playlist_sort_direction dir =
-                (state->app->playlist.sort_direction + 1) % 2;
-            playlist_sort(&state->app->playlist, state->app->playlist.sort,
-                          dir);
-            state->playlist_st.redraw = true;
-            state->playlist_st.recenter = true;
-            state->playlist_st.hovered_idx = state->app->playlist.current_idx;
-        }
-        else if (e->key.ascii == 'l' && e->key.mod & TERM_KMOD_CTRL)
-        {
-            term_draw_clear(&state->term->buf);
-        }
-        else if (e->key.ascii >= '0' && e->key.ascii <= '9')
-        {
-            if (MATH_INBETWEEN(e->key.ascii - '0' - 1, 0, TAB_LEN - 1) &&
-                e->key.ascii - '0' - 1 != (int)state->tabs_st.selected)
-            {
-                state->tabs_st.selected = e->key.ascii - '0' - 1;
-                state->term->resized = true;
-            }
-        }
-        else if (e->key.virtual == TERM_KEY_F1)
-        {
-            state->art_st.method =
-                (state->art_st.method + 1) % IMAGE_RENDER_LENGTH;
-        }
-        break;
-    case TERM_EVENT_MOUSE:
-        break;
-    case TERM_EVENT_RESIZE:
-        break;
-    case TERM_EVENT_UNKNOWN:
-        break;
-    }
+    tui_term_flush(&u->input, u->tui); /* end of this loop's input batch */
+    tui_router_tick(u->router, dt);
+    ui_search_sync(u->search);
+    ui_skin_sync(u, dt);
+    ui_transport_sync(u->transport);
+    ui_transport_sync(u->transport_visual);
+    tui_update(u->tui, dt);
+    tui_render(u->tui);
 }

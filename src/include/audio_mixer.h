@@ -34,6 +34,10 @@ typedef struct audio_mixer
     float norm_gain;
     bool paused;
     bool muted;
+    /* Bumped by the audio thread each time the last source ran to its end.
+     * The main loop compares it with what it saw (the source is gone by the
+     * time anyone could look at `is_finished`). */
+    volatile uint32_t tracks_finished;
     array(audio_effect) effects;
     array(audio_analyzer) analyzer;
 } audio_mixer;

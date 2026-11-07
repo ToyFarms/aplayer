@@ -13,6 +13,7 @@ enum audio_analyzer_type
     AUDIO_ANALYZER_RMS,
     AUDIO_ANALYZER_FFT,
     AUDIO_ANALYZER_ACTIVITY,
+    AUDIO_ANALYZER_SCOPE,
 };
 
 typedef struct audio_analyzer
@@ -36,6 +37,8 @@ audio_analyzer audio_analyzer_rms(analyzer_callback callback, void *userdata);
 
 #define ANALYZER_FFT_FREQ_SIZE (1 << 13)
 
+/* `freqs` are amplitudes of the mono mix (a full-scale sine reads 1.0 at its
+ * bin), `size` bins from 0 Hz to sample_rate / 2. */
 typedef struct analyzer_fft_ctx
 {
     float *freqs;
@@ -55,5 +58,17 @@ typedef struct analyzer_activity_ctx
 
 audio_analyzer audio_analyzer_activity(analyzer_callback callback,
                                        void *userdata);
+
+/* The block as the audio callback sees it: `nb_frames` interleaved frames of
+ * `nb_channels` floats. Only valid during the callback. */
+typedef struct analyzer_scope_ctx
+{
+    const float *samples;
+    int nb_frames;
+    int nb_channels;
+    int sample_rate;
+} analyzer_scope_ctx;
+
+audio_analyzer audio_analyzer_scope(analyzer_callback callback, void *userdata);
 
 #endif /* __AUDIO_ANALYZER_H */

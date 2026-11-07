@@ -22,14 +22,20 @@ static void term_prepare()
     cbreak();
     curs_set(false);
     keypad(stdscr, true);
+    meta(stdscr, true);     /* keep the 8th bit: UTF-8 input from IMEs */
+    set_escdelay(25);       /* a lone Esc must not wait a second */
+    define_key("\033[200~", TERM_KEY_PASTE_BEGIN);
+    define_key("\033[201~", TERM_KEY_PASTE_END);
     mousemask(ALL_MOUSE_EVENTS | REPORT_MOUSE_POSITION, NULL);
     mouseinterval(0);
     term_write(TESC TMOUSEENABLE, -1);
     term_write("\x1b[?7l", -1);
+    term_write("\x1b[?2004h", -1); /* bracketed paste */
 }
 
 static void term_reset()
 {
+    term_write("\x1b[?2004l", -1);
     term_write("\x1b[?7h", -1);
     term_write(TESC TMOUSEDISABLE, -1);
     echo();
@@ -144,9 +150,17 @@ void term_get_events(queue_t *out)
                 CHECK_BUTTON(3);
 
                 if (CHECK_STATE(m, BUTTON4_PRESSED))
+                {
                     ev.mouse.state[3] = true;
+                    ev.mouse.scrolled = true;
+                    ev.mouse.scroll_delta = -1;
+                }
                 if (CHECK_STATE(m, BUTTON5_PRESSED))
+                {
                     ev.mouse.state[3] = true;
+                    ev.mouse.scrolled = true;
+                    ev.mouse.scroll_delta = 1;
+                }
 
                 if (CHECK_STATE(m, BUTTON_SHIFT))
                     ev.mouse.mod |= TERM_KMOD_SHIFT;
@@ -208,6 +222,10 @@ void term_get_events(queue_t *out)
                 case TERM_KEY_ESC:
                     ev.key.virtual = TERM_KEY_ESC;
                     ev.key.ascii = '';
+                    break;
+                case TERM_KEY_PASTE_BEGIN:
+                case TERM_KEY_PASTE_END:
+                    ev.key.virtual = (uint32_t)c;
                     break;
                     CASE_KEY(F(1));
                     CASE_KEY(F(2));

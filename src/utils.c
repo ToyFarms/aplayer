@@ -2,6 +2,8 @@
 #include "array.h"
 #include "audio_analyzer.h"
 #include "audio_effect.h"
+#include "audio_scope.h"
+#include "audio_spectrum.h"
 #include "audio_source.h"
 #include "ds.h"
 #include "playlist.h"
@@ -63,14 +65,7 @@ static void source_rms_callback(void *actx, void *userdata)
         return;
 
     analyzer_rms_ctx *ctx = actx;
-
-    if (app->ui.vu_meter_st.bars.capacity < ctx->nb_channels)
-        array_resize(&app->ui.vu_meter_st.bars, ctx->nb_channels);
-
-    app->ui.vu_meter_st.bars.length = ctx->nb_channels;
-
-    for (int i = 0; i < ctx->nb_channels; i++)
-        ARR_AS(app->ui.vu_meter_st.bars, float)[i] = ctx->rms[i];
+    app_meters_set(&app->meters.rms, ctx->rms, ctx->nb_channels);
 }
 
 static void source_activity_callback(void *actx, void *userdata)
@@ -80,14 +75,32 @@ static void source_activity_callback(void *actx, void *userdata)
         return;
 
     analyzer_activity_ctx *ctx = actx;
+    app_meters_set(&app->meters.activity, ctx->level, ctx->nb_channels);
+}
 
-    if (app->ui.bands_st.bands.capacity < ctx->nb_channels)
-        array_resize(&app->ui.bands_st.bands, ctx->nb_channels);
+static void source_fft_callback(void *actx, void *userdata)
+{
+    (void)userdata;
+    app_instance *app = app_get();
+    if (app == NULL)
+        return;
 
-    app->ui.bands_st.bands.length = ctx->nb_channels;
+    analyzer_fft_ctx *ctx = actx;
+    audio_spectrum_params p = audio_spectrum_defaults();
+    audio_spectrum_bands(ctx->freqs, ctx->size, ctx->sample_rate, &p,
+                         app->spectrum.band, APP_SPECTRUM_BANDS);
+}
 
-    for (int i = 0; i < ctx->nb_channels; i++)
-        ARR_AS(app->ui.bands_st.bands, float)[i] = ctx->level[i];
+static void source_scope_callback(void *actx, void *userdata)
+{
+    (void)userdata;
+    app_instance *app = app_get();
+    if (app == NULL)
+        return;
+
+    analyzer_scope_ctx *ctx = actx;
+    audio_scope_push(&app->scope, ctx->samples, ctx->nb_frames,
+                     ctx->nb_channels, ctx->sample_rate);
 }
 
 static void attach_static_effect(audio_source *src)
@@ -106,6 +119,12 @@ static void attach_static_effect(audio_source *src)
     audio_analyzer activity =
         audio_analyzer_activity(source_activity_callback, NULL);
     array_append(&src->analyzer, &activity, 1);
+
+    audio_analyzer fft = audio_analyzer_fft(source_fft_callback, NULL);
+    array_append(&src->analyzer, &fft, 1);
+
+    audio_analyzer scope = audio_analyzer_scope(source_scope_callback, NULL);
+    array_append(&src->analyzer, &scope, 1);
 }
 
 void play_next(app_instance *app)
@@ -126,8 +145,7 @@ void play_next(app_instance *app)
     attach_static_effect(&src);
     mixer_clear(&app->audio->mixer);
     array_append(&app->audio->mixer.sources, &src, 1);
-    app->ui.playlist_st.hovered_idx = app->playlist.current_idx;
-    app->ui.art_st.initialized = false;
+    app->track_serial++;
 }
 
 void play_prev(app_instance *app)
@@ -148,8 +166,7 @@ void play_prev(app_instance *app)
     attach_static_effect(&src);
     mixer_clear(&app->audio->mixer);
     array_append(&app->audio->mixer.sources, &src, 1);
-    app->ui.playlist_st.hovered_idx = app->playlist.current_idx;
-    app->ui.art_st.initialized = false;
+    app->track_serial++;
 }
 
 void play_at_index(app_instance *app, int index, bool clear)
@@ -175,8 +192,7 @@ void play_at_index(app_instance *app, int index, bool clear)
     }
 
     array_append(&app->audio->mixer.sources, &src, 1);
-    app->ui.playlist_st.hovered_idx = app->playlist.current_idx;
-    app->ui.art_st.initialized = false;
+    app->track_serial++;
 }
 
 stream_mute_ctx mute_stream(FILE *stream)

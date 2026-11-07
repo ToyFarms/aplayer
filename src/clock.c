@@ -12,6 +12,19 @@
 #  include <unistd.h>
 #endif
 
+#ifdef PLATFORM_WINDOWS
+static uint64_t qpc_to_ns(LARGE_INTEGER counter, LARGE_INTEGER freq)
+{
+    uint64_t ticks = (uint64_t)counter.QuadPart;
+    uint64_t hz = (uint64_t)freq.QuadPart;
+
+    uint64_t seconds = ticks / hz;
+    uint64_t remainder = ticks % hz;
+
+    return seconds * 1000000000ULL + (remainder * 1000000000ULL) / hz;
+}
+#endif
+
 void clock_init(clock_highres_t *clk)
 {
 #ifdef PLATFORM_WINDOWS
@@ -22,8 +35,8 @@ void clock_init(clock_highres_t *clk)
 
     LARGE_INTEGER now_cnt;
     QueryPerformanceCounter(&now_cnt);
-    clk->last_time_ns =
-        (uint64_t)((now_cnt.QuadPart * 1000000000ULL) / clk->freq.QuadPart);
+
+    clk->last_time_ns = qpc_to_ns(now_cnt, clk->freq);
 #else
     struct timespec ts;
     clock_gettime(CLOCK_MONOTONIC, &ts);
@@ -53,12 +66,15 @@ uint64_t clock_now_ns(clock_highres_t *clk)
         QueryPerformanceFrequency(&clk->freq);
         clk->inited = 1;
     }
+
     LARGE_INTEGER now_cnt;
     QueryPerformanceCounter(&now_cnt);
-    return (uint64_t)((now_cnt.QuadPart * 1000000000ULL) / clk->freq.QuadPart);
+
+    return qpc_to_ns(now_cnt, clk->freq);
 #else
     struct timespec ts;
     clock_gettime(CLOCK_MONOTONIC, &ts);
+
     return (uint64_t)ts.tv_sec * 1000000000ULL + (uint64_t)ts.tv_nsec;
 #endif
 }

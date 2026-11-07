@@ -131,6 +131,15 @@
 #  define TERM_KEY_PAGEDOWN    KEY_NPAGE
 #endif
 
+/* bracketed paste markers (\e[200~ / \e[201~), delivered as virtual keys */
+#ifdef _WIN32
+#  define TERM_KEY_PASTE_BEGIN 0x1000
+#  define TERM_KEY_PASTE_END   0x1001
+#else
+#  define TERM_KEY_PASTE_BEGIN (KEY_MAX + 1)
+#  define TERM_KEY_PASTE_END   (KEY_MAX + 2)
+#endif
+
 enum term_event_type
 {
     TERM_EVENT_UNKNOWN = 0,

@@ -6,7 +6,7 @@ INCLUDE_END
 
 CFLAGS_BEGIN /*
  -Isrc/include
- src/ui/color.c
+ src/term/color.c
  src/struct/ds.c
  src/logger.c
  -lm
@@ -355,5 +355,63 @@ TEST_BEGIN(xterm256_pallete)
         int out = color_term_pallete(col[i]);
         ASSERT_INT_EQ(out, expected[i]);
     }
+}
+TEST_END()
+
+TEST_BEGIN(rgb_to_hsl_primaries)
+{
+    color_t col[] = {
+        COLOR(255, 0, 0), COLOR(0, 255, 0), COLOR(0, 0, 255),
+        COLOR(255, 255, 0), COLOR(128, 128, 128), COLOR(0, 0, 0),
+    };
+    float hue[] = {0.0f, 120.0f, 240.0f, 60.0f, 0.0f, 0.0f};
+    float sat[] = {100.0f, 100.0f, 100.0f, 100.0f, 0.0f, 0.0f};
+
+    int len = sizeof(col) / sizeof(col[0]);
+    for (int i = 0; i < len; i++)
+    {
+        color_hsl_t out = color_to_hsl(col[i]);
+        ASSERT_FLOAT_WITHIN(out.h, hue[i], 0.5f);
+        ASSERT_FLOAT_WITHIN(out.s, sat[i], 0.5f);
+    }
+}
+TEST_END()
+
+TEST_BEGIN(rgb_hsl_roundtrip)
+{
+    color_t col[] = {
+        COLOR(230, 200, 150), COLOR(91, 201, 77), COLOR(12, 34, 56),
+        COLOR(250, 5, 140),   COLOR(30, 30, 30),  COLOR(255, 255, 255),
+    };
+
+    int len = sizeof(col) / sizeof(col[0]);
+    for (int i = 0; i < len; i++)
+    {
+        color_t out = color_hsl(color_to_hsl(col[i]));
+        ASSERT_INT_EQ(out.r, col[i].r);
+        ASSERT_INT_EQ(out.g, col[i].g);
+        ASSERT_INT_EQ(out.b, col[i].b);
+    }
+}
+TEST_END()
+
+TEST_BEGIN(rgb_mix)
+{
+    color_t a = COLOR(0, 100, 200), b = COLOR(100, 200, 0);
+
+    color_t lo = color_mix(a, b, 0.0f);
+    color_t hi = color_mix(a, b, 1.0f);
+    color_t mid = color_mix(a, b, 0.5f);
+    ASSERT_MEM_EQ(&lo, &a, sizeof(color_t));
+    ASSERT_MEM_EQ(&hi, &b, sizeof(color_t));
+    ASSERT_INT_EQ(mid.r, 50);
+    ASSERT_INT_EQ(mid.g, 150);
+    ASSERT_INT_EQ(mid.b, 100);
+
+    /* out-of-range t is clamped, never wraps */
+    color_t under = color_mix(a, b, -3.0f);
+    color_t over = color_mix(a, b, 3.0f);
+    ASSERT_MEM_EQ(&under, &a, sizeof(color_t));
+    ASSERT_MEM_EQ(&over, &b, sizeof(color_t));
 }
 TEST_END()

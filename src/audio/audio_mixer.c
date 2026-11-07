@@ -135,6 +135,8 @@ static void mixer_finish_source(audio_mixer *mixer, int index,
 
     src->free(src);
     array_remove(&mixer->sources, index, 1);
+    if (mixer->sources.length == 0)
+        mixer->tracks_finished++;
 }
 
 audio_mixer mixer_create(int nb_channels, int sample_rate,

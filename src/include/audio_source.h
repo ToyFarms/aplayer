@@ -2,6 +2,7 @@
 #define __AUDIO_SOURCE_H
 
 #include "array.h"
+#include "karaoke.h"
 #include "metagen.h"
 #include "ring_buf.h"
 #include <libavutil/frame.h>
@@ -25,6 +26,15 @@ typedef struct audio_chunk_marker
     int64_t timestamp;
 } audio_chunk_marker;
 
+/* A picture still in its compressed form, as stored in the file. Cheap to
+ * copy, so it can be taken under the source's lock and decoded elsewhere. */
+typedef struct art_blob
+{
+    uint8_t *data;
+    int size;
+    char *title, *comment;
+} art_blob;
+
 typedef struct audio_source
 {
     void *ctx;
@@ -38,8 +48,14 @@ typedef struct audio_source
 
     // optional, callee needs to check if its implemented before calling it
     void (*get_arts)(struct audio_source *, array(image_t) * out);
+    /* Copies of the compressed pictures (free each field and the array). */
+    void (*get_art_blobs)(struct audio_source *, array(art_blob) * out);
     metadata_t *(*get_metadata)(struct audio_source *);
     float (*get_loudness)(struct audio_source *);
+    /* Word timing of the source's synced lyrics, worked out in the
+     * background the first time it is asked for. NULL when there are no
+     * synced lyrics or it cannot be done. Owned by the source. */
+    karaoke *(*get_karaoke)(struct audio_source *);
 
     uint64_t id;
 

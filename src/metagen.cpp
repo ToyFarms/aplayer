@@ -160,7 +160,11 @@ struct RawLine
 std::vector<RawLine> parse_lrc(const std::string &blob)
 {
     std::vector<RawLine> out;
-    static const std::regex tag_re(R"(\[(\d{1,3}):(\d{2})(?:\.(\d{1,3}))?\])");
+    /* [mm:ss], [mm:ss.xx], [mm:ss.xxx] and the long form [hh:mm:ss.xxx] that
+     * some taggers write. The optional hours group is tried first and backs off
+     * when what follows is not another "mm:ss", so [01:23.45] stays minutes. */
+    static const std::regex tag_re(
+        R"(\[(?:(\d{1,2}):)?(\d{1,3}):(\d{2})(?:[.,](\d{1,3}))?\])");
 
     std::istringstream stream(blob);
     std::string line;
@@ -177,17 +181,19 @@ std::vector<RawLine> parse_lrc(const std::string &blob)
         for (auto it = begin; it != end; ++it)
         {
             std::smatch m = *it;
-            int minutes = std::atoi(m[1].str().c_str());
-            int seconds = std::atoi(m[2].str().c_str());
+            int hours = m[1].matched ? std::atoi(m[1].str().c_str()) : 0;
+            int minutes = std::atoi(m[2].str().c_str());
+            int seconds = std::atoi(m[3].str().c_str());
             int frac_ms = 0;
-            if (m[3].matched)
+            if (m[4].matched)
             {
-                std::string frac = m[3].str();
+                std::string frac = m[4].str();
                 while (frac.size() < 3)
                     frac += '0';
                 frac_ms = std::atoi(frac.substr(0, 3).c_str());
             }
-            timestamps_ms.push_back(minutes * 60000 + seconds * 1000 + frac_ms);
+            timestamps_ms.push_back(hours * 3600000 + minutes * 60000 +
+                                    seconds * 1000 + frac_ms);
             last_tag_end = static_cast<size_t>(m.position(0) + m.length(0));
         }
 
@@ -249,7 +255,8 @@ std::vector<RawLine> parse_ttml(const std::string &xml)
 
 bool looks_synced(const std::string &s)
 {
-    static const std::regex tag_re(R"(\[\d{1,3}:\d{2}(?:\.\d{1,3})?\])");
+    static const std::regex tag_re(
+        R"(\[(?:\d{1,2}:)?\d{1,3}:\d{2}(?:[.,]\d{1,3})?\])");
     return std::regex_search(s, tag_re);
 }
 
@@ -517,14 +524,34 @@ extern "C" metadata_t *metadata_read(const char *path)
         }
         else if (key_is(key.c_str(), "LYRICS"))
         {
-            size_t n = values.size();
+            /* A single LYRICS value is often the whole text with embedded
+             * newlines: split it so each line is its own entry. */
+            std::vector<std::string> split;
+            for (size_t l = 0; l < values.size(); ++l)
+            {
+                std::string v = to_std_string(values[l]);
+                size_t start = 0;
+                while (true)
+                {
+                    size_t nl = v.find('\n', start);
+                    std::string part = v.substr(
+                        start, nl == std::string::npos ? nl : nl - start);
+                    if (!part.empty() && part.back() == '\r')
+                        part.pop_back();
+                    split.push_back(part);
+                    if (nl == std::string::npos)
+                        break;
+                    start = nl + 1;
+                }
+            }
+            size_t n = split.size();
             if (n > 0)
             {
                 meta->lyrics = (lyric_line_t *)calloc(n, sizeof(lyric_line_t));
                 if (meta->lyrics)
                 {
                     for (size_t l = 0; l < n; ++l)
-                        meta->lyrics[l].text = dup_string(values[l]);
+                        meta->lyrics[l].text = strdup(split[l].c_str());
                     meta->n_lyrics = n;
                 }
             }

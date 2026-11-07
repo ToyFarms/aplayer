@@ -18,8 +18,6 @@ static int audio_callback(const void *input, void *output,
 static void av_log_callback(void *avcl, int level, const char *fmt,
                             va_list args);
 
-static void log_to_widget(const char *log);
-
 static app_instance *g_app = NULL;
 static void rms_callback(void *actx, void *userdata);
 static void activity_callback(void *actx, void *userdata);
@@ -35,7 +33,6 @@ int app_init()
     setlocale(LC_ALL, "");
     logger_set_level(LOG_DEBUG);
     logger_add_output(-1, fopen("out.log", "a"), LOG_DEFER_CLOSE);
-    logger_add_callback(-1, log_to_widget, LOG_USE_COLOR);
 
     av_log_set_level(AV_LOG_DEBUG);
     av_log_set_callback(av_log_callback);
@@ -45,7 +42,6 @@ int app_init()
         return -ENOMEM;
 
     app->term.buf = str_alloc(1024);
-    ui_init(&app->ui, &app->term, app);
 
     log_debug("################################ NEW RUN "
               "################################\n");
@@ -100,14 +96,7 @@ static void activity_callback(void *actx, void *userdata)
         return;
 
     analyzer_activity_ctx *ctx = actx;
-
-    if (app->ui.bands_st.bands.capacity < ctx->nb_channels)
-        array_resize(&app->ui.bands_st.bands, ctx->nb_channels);
-
-    app->ui.bands_st.bands.length = ctx->nb_channels;
-
-    for (int i = 0; i < ctx->nb_channels; i++)
-        ARR_AS(app->ui.bands_st.bands, float)[i] = ctx->level[i];
+    app_meters_set(&app->meters.activity, ctx->level, ctx->nb_channels);
 }
 
 static void rms_callback(void *actx, void *userdata)
@@ -117,14 +106,28 @@ static void rms_callback(void *actx, void *userdata)
         return;
 
     analyzer_rms_ctx *ctx = actx;
+    app_meters_set(&app->meters.rms, ctx->rms, ctx->nb_channels);
+}
 
-    if (app->ui.vu_meter_st.bars.capacity < ctx->nb_channels)
-        array_resize(&app->ui.vu_meter_st.bars, ctx->nb_channels);
+void app_meters_set(app_level_meter *meter, const float *levels, int channels)
+{
+    if (channels > APP_METERS_MAX_CHANNELS)
+        channels = APP_METERS_MAX_CHANNELS;
+    if (channels < 0)
+        channels = 0;
 
-    app->ui.vu_meter_st.bars.length = ctx->nb_channels;
+    for (int i = 0; i < channels; i++)
+        meter->level[i] = levels[i];
+    meter->channels = channels;
+}
 
-    for (int i = 0; i < ctx->nb_channels; i++)
-        ARR_AS(app->ui.vu_meter_st.bars, float)[i] = ctx->rms[i];
+audio_source *app_current_source(app_instance *app)
+{
+    if (app == NULL || app->audio == NULL ||
+        app->audio->mixer.sources.length == 0)
+        return NULL;
+
+    return &ARR_AS(app->audio->mixer.sources, audio_source)[0];
 }
 
 app_instance *app_get()
@@ -137,8 +140,6 @@ app_instance *app_get()
 
 void app_cleanup()
 {
-    logger_remove_callback(log_to_widget);
-
     term_mainbuf();
     if (g_app == NULL)
         return;
@@ -155,7 +156,6 @@ void app_cleanup()
     g_app->audio = NULL;
 
     str_free(&g_app->term.buf);
-    ui_free(&g_app->ui);
 
     playlist_free(&g_app->playlist);
 
@@ -197,11 +197,3 @@ static void av_log_callback(void *avcl, int level, const char *fmt,
     logger_logv(level, "", "ffmpeg", 0, fmt, args);
 }
 
-static void log_to_widget(const char *log)
-{
-    if (g_app == NULL)
-        return;
-
-    // TODO: widget is broken
-    queue_push_copy(&g_app->ui.debug_st.logs, log, strlen(log) + 1);
-}

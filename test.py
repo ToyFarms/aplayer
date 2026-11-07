@@ -222,7 +222,7 @@ class Unit:
         self.filename = Path(filename)
         self.name = name
         self.source = source
-        self.cflags = cflags
+        self.cflags = expand_pkg_config(cflags)
         self.flags = flags
         self.compiler = compiler
         self.out = Path(f"tests/build/{self.filename.stem}_{self.name}{EXE_SUFFIX}")
@@ -659,6 +659,29 @@ def parse_testcases(source: list[str]) -> dict[str, Testcase]:
         )
 
     return testcases
+
+
+def expand_pkg_config(cflags: str) -> str:
+    """A CFLAGS line `pkg-config:NAME` becomes what `pkg-config --cflags --libs
+    NAME` prints, one flag per line. Where there is no pkg-config (Windows) or
+    no such package the line is dropped, and the build says what is missing."""
+    out: list[str] = []
+    for line in cflags.splitlines():
+        name = line.strip()
+        if not name.startswith("pkg-config:"):
+            out.append(line)
+            continue
+        try:
+            res = subprocess.run(
+                ["pkg-config", "--cflags", "--libs", name.removeprefix("pkg-config:")],
+                capture_output=True,
+                text=True,
+            )
+            if res.returncode == 0:
+                out.extend(res.stdout.split())
+        except OSError:
+            pass
+    return "\n".join(out)
 
 
 def parse_cflags(source: list[str]) -> str:
